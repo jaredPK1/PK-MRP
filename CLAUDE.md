@@ -140,6 +140,14 @@ Columns use a table-number suffix. Text columns are padded, so always `RTRIM` th
 - **WO → SO link**: only `ORDREF_10`, hand-typed. `Job_Progress.QTYREM_14=0` means "not reached", not done.
 - **On hand by location** is `Part_Stock` (`QTYOH_06`, `ALLOC_06`); free stock = `QTYOH_06 - ALLOC_06`.
 
+### Open questions found by the first live run (2026-10-28) -- ask Jared, don't guess
+
+1. **Bought assemblies with BOMs (contract-manufactured boards).** e.g. 02-3342-03G and 02-3346-05G are `TYPE_01='B'` and carry the 31-7100-01SG FPGA. PK buys only ~3-7% of the components under bought parents (the CM sources the rest), so exploding them all invents buys; exploding none hides consigned parts -- the FPGA reads as 290 units of cancel candidates with no demand. Need: the rule for which components PK supplies to a CM (consigned list? Offsite stock? subcontract `Requirement_Detail` 7- rows?).
+2. **`TYPCDE_02='E'`** (20,114 rows, 782 parents, same bought/issued pattern as N) -- what is it? Skipped for now (`bom_type_codes=('N',)`).
+3. **`Requirement_Detail` by prefix** -- 5- (WO, RQ) is used. What are 2- (161K open, TYPE CU, on SOs), 4- (59,791 open, RQ) and 3- (1,979 open)? Ignored for now.
+4. **Which SO date drives demand** -- `CUSDUE_28` (default, matches PK Dispatch) or `CURDUE_28`.
+5. **Ancient open WOs** put demand in the past (53-4104-00G: a WO requirement dated 2019-03-28). Keep as "needed now", or exclude WOs older than N months until planners close them?
+
 ### Overlap to resolve, not duplicate
 
 PK Dispatch already runs a read-only MRP pass every 15 min (`PK-Dispatch/web/plan.py`: make parts, SO + open-WO demand, lot-for-lot, latest-EFFDTE BOM) for its "should be open now" Planning lists. PK-MRP should become the source for that list, or reuse its netting, not run a second answer beside it.
