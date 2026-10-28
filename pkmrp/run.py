@@ -138,6 +138,7 @@ def build_plan(erp, settings=None, today=None, history_months=24):
         "result": result,
         "worklists": worklists,
         "so_lines": so_df,
+        "po_history": hist_df,
         "vendor_name": vendor_name,
         "segments": segments,
         "consigned": consigned,

@@ -86,7 +86,7 @@ def _ledger(run, snap):
     """Record the run in the Decision Ledger; never fail the plan over it.
     Returns the status shown on the page."""
     from .db import store
-    from .ledger import decisions
+    from .ledger import decisions, outcomes
 
     try:
         engine = store.ops_engine(DbConfig.from_env())
@@ -94,6 +94,7 @@ def _ledger(run, snap):
         if missing:
             return {"status": "waiting_on_dba", "missing": missing}
         out = decisions.record(engine, run, snap, version=VERSION)
+        out["outcomes"] = outcomes.record_outcomes(engine, run["po_history"], run["today"])
         return {"status": "ok", **out}
     except Exception as exc:  # noqa: BLE001 -- the plan still publishes
         click.echo(f"ledger: {exc}", err=True)
