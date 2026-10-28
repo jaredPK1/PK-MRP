@@ -7,6 +7,21 @@ Every feature people can see gets a line here in the same change
 WHATS_NEW = (
     (
         "2026-10-28",
+        "Committed plans pull in before they buy",
+        'When a month is short but POs are already placed for later, the plan now says "pull in N" instead of proposing a new blanket — new buys only for what\'s genuinely missing.',
+    ),
+    (
+        "2026-10-28",
+        "Committed vs Lead times, clearer",
+        "Each page now says the one question it answers — Committed: which parts are planned a year ahead (a buying page); Lead times: which numbers in MAX are wrong (a clean-up page) — and both use MAX's working days.",
+    ),
+    (
+        "2026-10-28",
+        "Fold cards away",
+        '"Why?" opens and closes on a second click. "Done" (or d) folds a buy card to one line with an Undo, and the top 10 counts how many you\'ve got through.',
+    ),
+    (
+        "2026-10-28",
         "Overbuys page",
         "Open POs nobody needs, POs bought for more than will be needed, POs arriving early, and stock no booked order needs — in dollars, by buyer, with what was placed in the last 30 days.",
     ),

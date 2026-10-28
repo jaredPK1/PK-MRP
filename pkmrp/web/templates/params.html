@@ -2,8 +2,9 @@
 {% block title %}Lead times · PK-MRP{% endblock %}
 {% block content %}
 <section class="page-intro">
-  <h1 class="h1-small">Lead times to fix in MAX</h1>
-  <p class="lede">Parts whose real lead time, from their own receipts, is more than 25% off what MAX has. Each proposal is the slow end of that history (P80) — or the median, when there are fewer than 5 receipts to go on — rounded up to 5 business days. Someone keys the ones they agree with into MAX — PK-MRP never writes there.</p>
+  <h1 class="h1-small">Lead times — fix the numbers in MAX</h1>
+  <p class="lede"><b>The question this page answers: which lead times stored in MAX are wrong?</b> Nothing here is a buy. It compares the lead time in MAX (PURLT) with how long each part has actually taken on its own past POs, and lists the ones more than 25% off, with a proposed number — the slow end of that history (or the median, with fewer than 5 receipts), rounded up to 5 working days. Someone keys the ones they agree with into MAX; PK-MRP never writes there.</p>
+  <p class="lede small-gap">Why bother: MAX's own MRP — and the order-by dates everyone else sees — run on these numbers. Too long and things get ordered early (overbuys); too short and they arrive late. Which parts get planned a year ahead is a different question — that's <a href="{{ script_root }}/committed">Committed</a>.</p>
   {% set longer = all_rows|selectattr('direction', 'equalto', 'longer')|list|length %}
   <p class="filters">
     <a class="chip {{ 'soon' if not direction else 'quiet' }}" href="?">All {{ all_rows|length }}</a>
@@ -16,7 +17,7 @@
 <div class="table-tools"><input type="search" class="table-filter" placeholder="Filter: part number or description words — e.g. 2300 lens" aria-label="Filter the table"><span class="muted small filter-count"></span></div>
 <div class="table-wrap">
 <table class="dense">
-  <thead><tr><th>Part</th><th>Description</th><th>Buyer</th><th>Vendor</th><th class="r">MAX now</th><th class="r">Propose</th><th class="r">Change</th><th class="r">Median</th><th class="r">P80</th><th class="r">Receipts</th></tr></thead>
+  <thead><tr><th>Part</th><th>Description</th><th>Buyer</th><th>Vendor</th><th class="r">MAX has</th><th class="r">Propose</th><th class="r">Change</th><th class="r">Median</th><th class="r">P80</th><th class="r">Receipts</th><th></th></tr></thead>
   <tbody>
   {% for r in rows %}
     <tr>
@@ -30,10 +31,11 @@
       <td class="r">{{ r.median_bdays }}</td>
       <td class="r">{{ r.p80_bdays }}</td>
       <td class="r">{{ r.lines }}</td>
+      <td>{% if r.segment == 'committed' %}<span class="chip quiet" title="Also planned a year ahead on Committed">committed</span>{% endif %}</td>
     </tr>
-  {% else %}<tr><td colspan="10" class="muted">Every lead time with enough history is within 25%. Lovely.</td></tr>{% endfor %}
+  {% else %}<tr><td colspan="11" class="muted">Every lead time with enough history is within 25%. Lovely.</td></tr>{% endfor %}
   </tbody>
 </table>
 </div>
-<p class="foot-note">Business days, as MAX stores PURLT. Lines ordered deliberately early are left out of the history.</p>
+<p class="foot-note">All in working days, the unit MAX stores PURLT in (5 a week). Lines ordered deliberately early are left out of the history.</p>
 {% endblock %}

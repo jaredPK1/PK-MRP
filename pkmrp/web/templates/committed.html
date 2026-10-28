@@ -2,9 +2,9 @@
 {% block title %}Committed parts · PK-MRP{% endblock %}
 {% block content %}
 <section class="page-intro">
-  <h1 class="h1-small">Committed parts</h1>
-  <p class="lede">The few bought parts whose own history proves a lead time longer than booked orders give warning of. Each gets a 12-month plan — requirement, buffer, a proposed blanket order with monthly releases — and a forecast for its supplier. Everything else is bought against the backlog.
-    <b>{{ counts.committed or 0 }}</b> committed · <b>{{ counts.unproven_long or 0 }}</b> MAX says are long but nothing proves it yet · {{ counts.order_driven or 0 }} order-driven.</p>
+  <h1 class="h1-small">Committed parts — planned a year ahead</h1>
+  <p class="lede"><b>The question this page answers: which parts can't wait for an order?</b> Most parts are bought only when a customer order needs them. A few take longer to arrive than orders give warning — their <b>real</b> lead time, measured from their own past POs, is more than about 63 working days (~13 weeks). Those are planned 12 months out: a requirement, a buffer, a proposed blanket order with monthly releases, and a forecast for the supplier.</p>
+  <p class="lede small-gap"><b>{{ counts.committed or 0 }}</b> parts are planned this way. Another <b>{{ counts.unproven_long or 0 }}</b> are listed at the bottom: MAX says they're slow, but we've never received one to check, so they aren't planned a year out yet. Whether MAX's own lead-time number is right is a separate question — that's the <a href="{{ script_root }}/lead-times">Lead times</a> page.</p>
   <p class="filters">
     {% set pl = snap.pipeline or {} %}
     {% if pl.status == 'ok' %}<span class="muted small">Requirement = booked orders + Book/Bill 2.0 pipeline ({{ pl.bookings }} open bookings, weighted by win probability){% if pl.unmapped %} · {{ pl.unmapped|length }} SKUs not yet matched to a MAX part{% endif %}.</span>
@@ -22,39 +22,40 @@
 <div class="table-tools"><input type="search" class="table-filter" placeholder="Filter: part number or description words — e.g. 2300 lens" aria-label="Filter the table"><span class="muted small filter-count"></span></div>
 <div class="table-wrap">
 <table class="dense">
-  <thead><tr><th>Part</th><th>Description</th><th>Vendor</th><th class="r">Slow end</th><th class="r">12-mo need</th><th class="r" title="Of the 12-month need, how much comes from the Book/Bill 2.0 pipeline">from pipeline</th><th class="r">Buffer</th><th class="r">Have + on order</th><th class="r">Blanket</th><th>Next release</th><th></th></tr></thead>
+  <thead><tr><th>Part</th><th>Description</th><th>Vendor</th><th class="r" title="80% of this part's past POs arrived within this">Real lead (slow end)</th><th class="r" title="The lead time stored in MAX (PURLT)">MAX has</th><th class="r">12-mo need</th><th class="r" title="Of the 12-month need, how much comes from the Book/Bill 2.0 pipeline">from pipeline</th><th class="r">Buffer</th><th class="r">Have + on order</th><th class="r">Blanket</th><th>Next release</th><th></th></tr></thead>
   <tbody>
   {% for r in rows if r.segment == 'committed' %}{% set cp = plans.get(r.part) %}
     <tr>
       <td class="mono">{{ r.part }}</td>
       <td>{{ r.description|lower|capitalize }}</td>
       <td class="small">{{ cp.vendor if cp else '' }}</td>
-      <td class="r">{{ r.p80_days }}d</td>
+      <td class="r">{{ (r.p80_days * 5 / 7)|round|int }} wd</td>
+      <td class="r muted">{{ (r.purlt_days * 5 / 7)|round|int }} wd</td>
       {% if cp %}
       <td class="r">{{ cp.requirement_12m|qty }}</td>
       <td class="r muted">{{ cp.pipeline_12m|qty if cp.pipeline_12m else '' }}</td>
       <td class="r">{{ cp.buffer|qty }}</td>
       <td class="r">{{ (cp.on_hand + cp.on_order)|qty }}</td>
       <td class="r"><b>{{ cp.blanket_qty|qty if cp.blanket_qty else '—' }}</b></td>
-      <td>{% if cp.releases %}{% set n = cp.releases[0] %}<span class="chip {{ 'late' if n.late else 'soon' }}">{{ n.qty|qty }} by {{ n.order_by }}</span>{% else %}<span class="muted small">covered</span>{% endif %}</td>
-      <td><button class="why-btn" hx-get="{{ script_root }}/committed/plan/{{ r.part }}" hx-target="#cp-{{ loop.index }}" hx-swap="innerHTML">12 months</button></td>
+      <td>{% if cp.pull_in_qty %}<span class="chip today" title="Open POs due later cover this if pulled in">pull in {{ cp.pull_in_qty|qty }}</span> {% endif %}{% if cp.releases %}{% set n = cp.releases[0] %}<span class="chip {{ 'late' if n.late else 'soon' }}">{{ n.qty|qty }} by {{ n.order_by|nice_date }}</span>{% elif not cp.pull_in_qty %}<span class="muted small">covered</span>{% endif %}</td>
+      <td><button class="why-btn" data-why="{{ script_root }}/committed/plan/{{ r.part }}" data-target="#cp-{{ loop.index }}" aria-expanded="false">12 months</button></td>
       {% else %}<td colspan="7" class="muted small">no plan</td>{% endif %}
     </tr>
-    <tr class="cp-row"><td colspan="11" id="cp-{{ loop.index }}" class="cp-cell"></td></tr>
+    <tr class="cp-row"><td colspan="12" id="cp-{{ loop.index }}" class="cp-cell"></td></tr>
   {% endfor %}
   </tbody>
 </table>
 </div>
-<h3 class="steps-h">MAX says long, nothing proves it yet</h3>
+<h3 class="steps-h">MAX says slow, never received one — not planned a year out yet</h3>
 <div class="table-wrap">
 <table class="dense">
-  <thead><tr><th>Part</th><th>Description</th><th class="r">MAX says</th><th class="r">Orders it feeds</th><th>Why it's here</th></tr></thead>
+  <thead><tr><th>Part</th><th>Description</th><th class="r">MAX has</th><th class="r">Orders it feeds</th><th>Why it's here</th></tr></thead>
   <tbody>
   {% for r in rows if r.segment == 'unproven_long' %}
-    <tr><td class="mono">{{ r.part }}</td><td>{{ r.description|lower|capitalize }}</td><td class="r">{{ r.purlt_days }}d</td><td class="r">{{ r.orders }}</td><td class="muted small">{{ r.reasons|join('; ') }}</td></tr>
+    <tr><td class="mono">{{ r.part }}</td><td>{{ r.description|lower|capitalize }}</td><td class="r">{{ (r.purlt_days * 5 / 7)|round|int }} wd</td><td class="r">{{ r.orders }}</td><td class="muted small">{{ r.reasons|join('; ') }}</td></tr>
   {% endfor %}
   </tbody>
 </table>
 </div>
-<p class="foot-note">Lead times in calendar days. "Slow end" is the 80th percentile of the part's own fully-received POs over 24 months.</p>
+<p class="foot-note">wd = working days, the unit MAX uses (5 a week). "Real lead (slow end)" is how long 80% of the part's own fully-received POs took over the last 24 months.</p>
 {% endblock %}

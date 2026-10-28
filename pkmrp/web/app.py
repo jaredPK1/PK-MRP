@@ -59,6 +59,12 @@ def _month_name(v):
     return f"{d:%b}" + (f" {d.year}" if d.year != date.today().year else "")
 
 
+def _wdays(v):
+    """Working days with weeks alongside: 261 -> '261 working days (~52 wks)'."""
+    v = float(v or 0)
+    return f"{v:.0f} working days (~{max(v / 5, 1):.0f} wks)" if v else ""
+
+
 def _lead_words(source):
     """'realized (3 lines)' -> 'from its last 3 orders'; 'PURLT_01' -> 'MAX's lead time'."""
     s = source or ""
@@ -79,6 +85,7 @@ def create_app():
     app.jinja_env.filters["nice_date"] = _nice_date
     app.jinja_env.filters["month_name"] = _month_name
     app.jinja_env.filters["lead_words"] = _lead_words
+    app.jinja_env.filters["wdays"] = _wdays
 
     @app.context_processor
     def _ctx():

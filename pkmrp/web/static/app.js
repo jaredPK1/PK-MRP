@@ -16,8 +16,65 @@
     else if (e.key === 'Enter' && document.activeElement.classList.contains('card')) {
       const btn = document.activeElement.querySelector('.why-btn');
       if (btn) btn.click();
+    } else if (e.key === 'd' && document.activeElement.classList.contains('card')) {
+      const card = document.activeElement;
+      setDone(card, !card.classList.contains('done'));
+      if (card.classList.contains('done')) focus(at + 1);
     }
   });
+
+  // "Why?" opens and closes the same panel (any page): fetched once, then toggled.
+  document.addEventListener('click', function (e) {
+    const btn = e.target.closest('.why-btn[data-why]');
+    if (!btn) return;
+    const box = document.querySelector(btn.dataset.target);
+    if (!box) return;
+    const open = btn.getAttribute('aria-expanded') === 'true';
+    if (open) {
+      box.hidden = true;
+      btn.setAttribute('aria-expanded', 'false');
+      btn.textContent = btn.dataset.label || btn.textContent;
+      return;
+    }
+    btn.dataset.label = btn.dataset.label || btn.textContent;
+    btn.setAttribute('aria-expanded', 'true');
+    btn.textContent = 'Hide';
+    box.hidden = false;
+    if (!box.dataset.loaded) {
+      box.innerHTML = '<p class="muted small">Loading…</p>';
+      fetch(btn.dataset.why, { credentials: 'same-origin' })
+        .then(r => r.text()).then(html => { box.innerHTML = html; box.dataset.loaded = '1'; })
+        .catch(() => { box.innerHTML = '<p class="muted small">Could not load — try again.</p>'; });
+    }
+  });
+
+  // Done: fold a card to one line, remembered in this browser for this plan.
+  const list = document.querySelector('.cards[data-plan]');
+  const key = list ? 'pkmrp-done-' + list.dataset.plan : null;
+  let doneSet = new Set();
+  try { if (key) doneSet = new Set(JSON.parse(localStorage.getItem(key) || '[]')); } catch (e) {}
+  function save() { try { if (key) localStorage.setItem(key, JSON.stringify([...doneSet])); } catch (e) {} }
+  function count() {
+    const el = document.querySelector('.done-count');
+    if (!el || !cards.length) return;
+    const n = cards.filter(c => c.classList.contains('done')).length;
+    el.textContent = n ? n + ' of ' + cards.length + ' done' + (n === cards.length ? ' — all clear 🎉' : '') : '';
+    return n;
+  }
+  function setDone(card, done, quiet) {
+    card.classList.toggle('done', done);
+    card.querySelector('.done-line').hidden = !done;
+    if (done) doneSet.add(card.dataset.part); else doneSet.delete(card.dataset.part);
+    save();
+    const n = count();
+    if (!quiet && done && n === cards.length) confetti(90);
+  }
+  cards.forEach(function (card) {
+    if (doneSet.has(card.dataset.part)) setDone(card, true, true);
+    card.querySelector('.done-btn').addEventListener('click', e => { e.stopPropagation(); setDone(card, true); });
+    card.querySelector('.undo-btn').addEventListener('click', e => { e.stopPropagation(); setDone(card, false); });
+  });
+  count();
 
   function confetti(n) {
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;

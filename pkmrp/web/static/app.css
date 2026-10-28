@@ -204,3 +204,20 @@ footer { max-width: 1080px; margin: 0 auto; padding: 18px 20px 30px; color: var(
 .example p { margin: 2px 0; }
 .whats-new { margin: 0; padding-left: 18px; } .whats-new li { margin: 5px 0; color: var(--ink-2); }
 @media (max-width: 760px) { .pages, .glossary { grid-template-columns: 1fr; } .pages dd, .glossary dd { margin-bottom: 6px; } }
+
+/* Done cards fold to one line */
+.card-actions { display: flex; gap: 16px; align-items: center; margin-top: 10px; }
+.card-actions .why-btn { margin-top: 0; }
+.done-btn, .undo-btn { font: inherit; font-size: 13px; font-weight: 600; background: none; border: 1px solid var(--line);
+                       border-radius: 8px; padding: 3px 10px; color: var(--muted); cursor: pointer; }
+.done-btn:hover, .undo-btn:hover { border-color: var(--leaf); color: var(--leaf); }
+.card.done { grid-template-columns: 1fr; opacity: .7; box-shadow: none; }
+.card.done .rank, .card.done .body { display: none; }
+.done-line { padding: 10px 18px; display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--ink-2); }
+.done-line .tick { color: var(--leaf); font-weight: 700; }
+.done-line .undo-btn { margin-left: auto; }
+.done-count { font-size: 13px; font-weight: 600; color: var(--leaf); }
+.why[hidden] { display: none; }
+.done-line[hidden] { display: none; }
+.card > .done-line { grid-column: 1 / -1; }
+.lede.small-gap { margin-top: 8px; }

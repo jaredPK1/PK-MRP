@@ -42,11 +42,13 @@
 <section class="top" aria-labelledby="top-h">
   <div class="sec-head">
     <h2 id="top-h">Today's top {{ top|length }}</h2>
-    <p>Ranked by the booked orders each one is holding up. <kbd>j</kbd>/<kbd>k</kbd> to move, <kbd>Enter</kbd> for why.</p>
+    <p>Ranked by the booked orders each one is holding up. <kbd>j</kbd>/<kbd>k</kbd> to move, <kbd>Enter</kbd> for why, <kbd>d</kbd> when you're done with one.</p>
+    <span class="grow"></span><span class="done-count" aria-live="polite"></span>
   </div>
-  <ol class="cards">
+  <ol class="cards" data-plan="{{ snap.today }}">
     {% for b in top %}
-    <li class="card" tabindex="0" id="buy-{{ loop.index }}">
+    <li class="card" tabindex="0" id="buy-{{ loop.index }}" data-part="{{ b.part }}">
+      <div class="done-line" hidden><span class="tick">✓</span> <b class="mono">{{ b.part }}</b> · {{ b.qty|qty }} to buy · done <button type="button" class="undo-btn">Undo</button></div>
       <div class="rank" aria-hidden="true">{{ b.rank }}</div>
       <div class="body">
         <div class="row1">
@@ -68,7 +70,10 @@
           {% if b.customers %}<span class="cust">· {{ b.customers[:3]|join(', ') }}{% if b.customers|length > 3 %} +{{ b.customers|length - 3 }}{% endif %}</span>{% endif %}
         </div>
         {% endif %}
-        <button class="why-btn" hx-get="{{ script_root }}/why/{{ b.part }}" hx-target="#why-{{ loop.index }}" hx-swap="innerHTML">Why this buy?</button>
+        <div class="card-actions">
+          <button class="why-btn" data-why="{{ script_root }}/why/{{ b.part }}" data-target="#why-{{ loop.index }}" aria-expanded="false">Why this buy?</button>
+          <button type="button" class="done-btn" title="Fold this card away (d)">Done</button>
+        </div>
         <div class="why" id="why-{{ loop.index }}"></div>
       </div>
     </li>

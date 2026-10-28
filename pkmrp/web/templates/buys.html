@@ -30,7 +30,7 @@
       <td>{{ b.buyer }}</td>
       <td class="r">{{ b.orders or '' }}</td>
       <td class="r">{{ b.order_value|money if b.order_value else '' }}</td>
-      <td><button class="why-btn" hx-get="{{ script_root }}/why/{{ b.part }}" hx-target="#why-row-{{ loop.index }}" hx-swap="innerHTML">Why?</button></td>
+      <td><button class="why-btn" data-why="{{ script_root }}/why/{{ b.part }}" data-target="#why-row-{{ loop.index }}" aria-expanded="false">Why?</button></td>
     </tr>
     <tr class="cp-row"><td colspan="12" id="why-row-{{ loop.index }}" class="cp-cell why-cell"></td></tr>
   {% else %}

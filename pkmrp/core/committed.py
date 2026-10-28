@@ -105,14 +105,36 @@ def plan_part(part, info, months, lead_bdays, on_hand, open_pos, settings, today
 
     # Month by month: what's short after stock and open POs, ordered a lead
     # time ahead. The buffer is held from the first month on.
+    # Month by month. A short month first pulls in open POs due later (even
+    # past the 12 months) -- ordering new while placed POs sit further out is
+    # exactly how an overbuy happens -- and only what's still missing becomes
+    # a new release, ordered a lead time ahead. The buffer is held throughout.
     supply_by_month = defaultdict(float)
     for due, qty, _ref in open_pos:
         supply_by_month[max(month_start(due), first)] += qty
+    later = sorted(supply_by_month.items())  # [month, qty] still to arrive
+    later = [[m, q] for m, q in later]
     bal = float(on_hand)
-    releases, schedule = [], []
+    releases, pulls, schedule = [], [], []
     for i, k in enumerate(keys):
-        bal += supply_by_month.get(k, 0.0) - req[i]
+        arriving = 0.0
+        for cell in later:
+            if cell[0] == k:
+                arriving += cell[1]
+                cell[1] = 0.0
+        bal += arriving - req[i]
         short = max(buffer - bal, 0.0)
+        pulled = 0.0
+        for cell in later:
+            if short <= 1e-9:
+                break
+            if cell[0] > k and cell[1] > 1e-9:
+                take = min(cell[1], short)
+                cell[1] -= take
+                short -= take
+                pulled += take
+                pulls.append({"from": cell[0], "to": k, "qty": take})
+        bal += pulled
         if short > 1e-9:
             qty = math.ceil(short)
             bal += qty
@@ -124,7 +146,8 @@ def plan_part(part, info, months, lead_bdays, on_hand, open_pos, settings, today
             {
                 "month": k,
                 "requirement": req[i],
-                "arriving": supply_by_month.get(k, 0.0),
+                "arriving": arriving + pulled,
+                "pulled_in": pulled,
                 "horizon": "frozen" if i < 3 else "firm" if i < 6 else "indicative",
             }
         )
@@ -139,6 +162,8 @@ def plan_part(part, info, months, lead_bdays, on_hand, open_pos, settings, today
         "on_hand": on_hand,
         "on_order": on_order,
         "blanket_qty": sum(r["qty"] for r in releases),
+        "pull_in_qty": round(sum(p["qty"] for p in pulls), 3),
+        "pulls": pulls,
         "releases": releases,
         "schedule": schedule,
         "late_releases": sum(1 for r in releases if r["late"]),

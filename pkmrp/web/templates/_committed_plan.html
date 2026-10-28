@@ -1,10 +1,11 @@
 <div class="cp-detail">
   <table class="ledger">
-    <thead><tr><th>Month</th><th></th><th class="r">Need</th><th class="r">Arriving</th><th class="r">Order</th><th>Order by</th></tr></thead>
+    <thead><tr><th>Month</th><th></th><th class="r">Need</th><th class="r">Arriving</th><th class="r">Pull in</th><th class="r">Order</th><th>Order by</th></tr></thead>
     <tbody>
     {% for m in cp.schedule %}{% set rel = cp.releases|selectattr('month', 'equalto', m.month)|list %}
       <tr><td>{{ m.month[:7] }}</td><td class="muted small">{{ m.horizon }}</td><td class="r">{{ m.requirement|qty }}</td>
           <td class="r">{{ m.arriving|qty if m.arriving else '' }}</td>
+          <td class="r">{{ m.pulled_in|qty if m.pulled_in else '' }}</td>
           <td class="r">{% if rel %}<b>{{ rel[0].qty|qty }}</b>{% endif %}</td>
           <td>{% if rel %}<span class="{{ 'late-text' if rel[0].late else '' }}">{{ rel[0].order_by }}</span>{% endif %}</td></tr>
     {% endfor %}

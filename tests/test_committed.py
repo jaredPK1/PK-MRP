@@ -66,3 +66,19 @@ def test_plan_releases_ahead_of_need_and_holds_a_buffer():
 def test_nothing_needed_means_no_buffer_and_no_blanket():
     cp = plan_part("X", Part("X", "B"), {}, 100, 0, [], S, TODAY)
     assert (cp["buffer"], cp["blanket_qty"], cp["releases"]) == (0, 0, [])
+
+
+def test_short_month_pulls_in_later_open_pos_before_ordering_new():
+    # 30 needed in Dec; 40 already on order but due next June: pull it in, buy nothing new.
+    cp = plan_part(
+        "PIEZO",
+        Part("PIEZO", "B"),
+        {date(2026, 12, 1): 30.0},
+        60,
+        on_hand=0,
+        open_pos=[(date(2027, 6, 15), 40, "PO 1")],
+        settings=PlanSettings(service_factor=0.0),
+        today=TODAY,
+    )
+    assert cp["pull_in_qty"] == 30 and cp["blanket_qty"] == 0
+    assert cp["pulls"][0]["from"] == date(2027, 6, 1) and cp["pulls"][0]["to"] == date(2026, 12, 1)
