@@ -18,6 +18,7 @@
     <nav>
       <a href="{{ script_root }}/" class="{% if request.endpoint == 'home' %}on{% endif %}">Today</a>
       <a href="{{ script_root }}/buys" class="{% if request.endpoint == 'buys_page' %}on{% endif %}">All buys</a>
+      <a href="{{ script_root }}/promise" class="{% if request.endpoint == 'promise_page' %}on{% endif %}">Promise</a>
       <a href="{{ script_root }}/committed" class="{% if request.endpoint == 'committed_page' %}on{% endif %}">Committed</a>
       <a href="{{ script_root }}/lead-times" class="{% if request.endpoint == 'params_page' %}on{% endif %}">Lead times</a>
     </nav>

@@ -161,3 +161,54 @@ def progress(latest, previous):
         "cleared_parts": [b["part"] for b in cleared[:8]],
         "new": len(now - set(before)),
     }
+
+
+# ── Promise check data ──────────────────────────────────────────────────
+# Firm supply timelines, the BOM, part basics and lead times: everything
+# core/atp.py needs, so the Promise page answers in milliseconds without MAX.
+
+
+def build_atp(run):
+    from .core.atp import timelines
+
+    lead = run["lead_times"]
+    parts = run["parts"]
+    return {
+        "today": run["today"].isoformat(),
+        "timelines": {
+            p: [start, [[_iso(d), q] for d, q in ev]]
+            for p, (start, ev) in timelines(run["result"].ledger).items()
+        },
+        "children": run["children"],
+        "parts": {
+            p: [v.type, v.description, v.mfg_lt, v.purchase_lt]
+            for p, v in parts.items()
+            if v.type in ("A", "B")
+        },
+        "lead": {p: s["median"] for p, s in lead.items()},
+    }
+
+
+def write_atp(data):
+    os.makedirs(DATA_DIR, exist_ok=True)
+    path = os.path.join(DATA_DIR, "atp.json")
+    fd, tmp = tempfile.mkstemp(dir=DATA_DIR, prefix=".atp-")
+    with os.fdopen(fd, "w", encoding="utf-8") as fh:
+        json.dump(data, fh, separators=(",", ":"), default=str)
+    os.replace(tmp, path)
+
+
+_atp_cache = {"mtime": None, "data": None}
+
+
+def load_atp():
+    """The promise-check data, re-read only when the file changes."""
+    path = os.path.join(DATA_DIR, "atp.json")
+    try:
+        mtime = os.path.getmtime(path)
+    except OSError:
+        return None
+    if _atp_cache["mtime"] != mtime:
+        with open(path, encoding="utf-8") as fh:
+            _atp_cache.update(mtime=mtime, data=json.load(fh))
+    return _atp_cache["data"]

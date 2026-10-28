@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Promise check · PK-MRP{% endblock %}
+{% block content %}
+<section class="page-intro">
+  <h1 class="h1-small">Can we make that date?</h1>
+  <p class="lede">Type the part, how many, and when the customer wants it. You'll get the earliest date the material supports — after every order already booked takes its share — and the part that decides it.</p>
+</section>
+<form class="promise-form" method="get">
+  <label>Part <input name="part" value="{{ part }}" placeholder="01-2300AG-07G" autofocus autocomplete="off" required></label>
+  <label>Qty <input name="qty" type="number" min="1" step="1" value="{{ qty|int }}"></label>
+  <label>Customer wants it <input name="date" type="date" value="{{ asked }}"></label>
+  <button class="btn primary" type="submit">Check</button>
+</form>
+{% if error %}<p class="promise-error">{{ error }}</p>{% endif %}
+{% if not data %}<p class="muted">The promise data isn't built yet — it comes with the next planning run.</p>{% endif %}
+{% if result %}
+<section class="verdict {{ 'ok' if result.requested and not result.days_late else ('late' if result.requested else 'info') }}">
+  <div class="v-head">
+    {% if result.requested and not result.days_late %}<span class="v-big">Yes.</span> Material supports {{ result.requested }}.
+    {% elif result.requested %}<span class="v-big">Not by then.</span> Earliest is <b>{{ result.date }}</b> — {{ result.days_late }} days after the ask.
+    {% else %}<span class="v-big">{{ result.date }}</span> is the earliest the material supports.{% endif %}
+  </div>
+  <p class="v-sub">{{ result.qty|qty }} × <b>{{ result.part }}</b> {{ result.description|lower }}.
+    {% if result.binding != result.part %}Held there by <b class="mono">{{ result.binding }}</b> {{ result.binding_description|lower }}{% if result.path|length > 2 %} (via {{ result.path[1:-1]|join(' → ') }}){% endif %}.{% else %}It's the part itself that decides it.{% endif %}</p>
+  <p class="v-cap">Material only — build capacity isn't modelled yet. Firm supply only: on hand, open POs and open WOs.</p>
+</section>
+<h3 class="steps-h">What sets the date</h3>
+<div class="table-wrap">
+<table class="dense">
+  <thead><tr><th>Part</th><th class="r">Qty</th><th>Ready</th><th>How</th><th>Path</th></tr></thead>
+  <tbody>
+  {% for s in result.steps %}
+    <tr class="{{ 'bind' if s.part == result.binding else '' }}"><td class="mono">{{ s.part }}</td><td class="r">{{ s.qty|qty }}</td><td>{{ s.date }}</td><td>{{ s.how }}</td><td class="muted small">{{ s.path|join(' → ') }}</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% endif %}
+{% endblock %}

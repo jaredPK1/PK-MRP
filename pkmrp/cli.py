@@ -109,6 +109,7 @@ def _plan_once(erp):
     snap = snapshot.build(run, run["so_lines"])
     snap["ledger"] = _ledger(run, snap)
     snapshot.write(snap)
+    snapshot.write_atp(snapshot.build_atp(run))
     return snap
 
 

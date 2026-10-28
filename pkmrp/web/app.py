@@ -150,6 +150,55 @@ def create_app():
             },
         )
 
+    @app.get("/promise")
+    def promise_page():
+        from ..core import atp
+        from ..core.netting import Part
+
+        data = snapshot.load_atp()
+        part = (request.args.get("part") or "").strip().upper()
+        result, error = None, None
+        try:
+            qty = float(request.args.get("qty") or 1)
+        except ValueError:
+            qty, error = 1.0, "Quantity has to be a number."
+        asked = request.args.get("date") or ""
+        if part and data and not error:
+            if part not in data["parts"]:
+                error = f"{part} isn't a make or buy part in MAX."
+            else:
+                today = date.fromisoformat(data["today"])
+                parts = {
+                    p: Part(p, t, description=desc, mfg_lt=mfg, purchase_lt=pur)
+                    for p, (t, desc, mfg, pur) in data["parts"].items()
+                }
+                lines = {
+                    p: (start, [(date.fromisoformat(d) if d else None, q) for d, q in ev])
+                    for p, (start, ev) in data["timelines"].items()
+                }
+                children = {p: [tuple(k) for k in kids] for p, kids in data["children"].items()}
+                lead = data["lead"]
+
+                def lead_of(p):
+                    return lead.get(p) or (parts[p].purchase_lt if p in parts else 0)
+
+                requested = date.fromisoformat(asked) if asked else None
+                result = atp.promise(part, qty, requested, children, lines, parts, lead_of, today)
+                result["description"] = parts[part].description
+                result["binding_description"] = (
+                    parts[result["binding"]].description if result["binding"] in parts else ""
+                )
+        return render_template(
+            "promise.html",
+            data=data,
+            part=part,
+            qty=qty,
+            asked=asked,
+            result=result,
+            error=error,
+            snap=snapshot.load_latest(),
+        )
+
     @app.get("/why/<path:part>")
     def why(part):
         """The why trace for one buy -- an HTMX fragment."""
