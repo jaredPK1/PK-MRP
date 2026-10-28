@@ -6,7 +6,10 @@
   <p class="lede">The few bought parts whose own history proves a lead time longer than booked orders give warning of. Each gets a 12-month plan — requirement, buffer, a proposed blanket order with monthly releases — and a forecast for its supplier. Everything else is bought against the backlog.
     <b>{{ counts.committed or 0 }}</b> committed · <b>{{ counts.unproven_long or 0 }}</b> MAX says are long but nothing proves it yet · {{ counts.order_driven or 0 }} order-driven.</p>
   <p class="filters">
-    <span class="muted small">Requirement is booked orders only — the pipeline isn't in yet.</span>
+    {% set pl = snap.pipeline or {} %}
+    {% if pl.status == 'ok' %}<span class="muted small">Requirement = booked orders + Book/Bill 2.0 pipeline ({{ pl.bookings }} open bookings, weighted by win probability){% if pl.unmapped %} · {{ pl.unmapped|length }} SKUs not yet matched to a MAX part{% endif %}.</span>
+    {% elif pl.status == 'no_access' %}<span class="muted small">Requirement is booked orders only — PK-MRP can't read the Book/Bill 2.0 pipeline yet (needs a read grant on pk_sales).</span>
+    {% else %}<span class="muted small">Requirement is booked orders only — the pipeline didn't load this run.</span>{% endif %}
     <span class="grow"></span>
     <label class="small">Forecast letter for
       <select onchange="if (this.value !== '') location.href='{{ script_root }}/committed/forecast.csv' + (this.value ? '?vendor=' + encodeURIComponent(this.value) : '')">
@@ -19,7 +22,7 @@
 <div class="table-tools"><input type="search" class="table-filter" placeholder="Filter: part number or description words — e.g. 2300 lens" aria-label="Filter the table"><span class="muted small filter-count"></span></div>
 <div class="table-wrap">
 <table class="dense">
-  <thead><tr><th>Part</th><th>Description</th><th>Vendor</th><th class="r">Slow end</th><th class="r">12-mo need</th><th class="r">Buffer</th><th class="r">Have + on order</th><th class="r">Blanket</th><th>Next release</th><th></th></tr></thead>
+  <thead><tr><th>Part</th><th>Description</th><th>Vendor</th><th class="r">Slow end</th><th class="r">12-mo need</th><th class="r" title="Of the 12-month need, how much comes from the Book/Bill 2.0 pipeline">from pipeline</th><th class="r">Buffer</th><th class="r">Have + on order</th><th class="r">Blanket</th><th>Next release</th><th></th></tr></thead>
   <tbody>
   {% for r in rows if r.segment == 'committed' %}{% set cp = plans.get(r.part) %}
     <tr>
@@ -29,14 +32,15 @@
       <td class="r">{{ r.p80_days }}d</td>
       {% if cp %}
       <td class="r">{{ cp.requirement_12m|qty }}</td>
+      <td class="r muted">{{ cp.pipeline_12m|qty if cp.pipeline_12m else '' }}</td>
       <td class="r">{{ cp.buffer|qty }}</td>
       <td class="r">{{ (cp.on_hand + cp.on_order)|qty }}</td>
       <td class="r"><b>{{ cp.blanket_qty|qty if cp.blanket_qty else '—' }}</b></td>
       <td>{% if cp.releases %}{% set n = cp.releases[0] %}<span class="chip {{ 'late' if n.late else 'soon' }}">{{ n.qty|qty }} by {{ n.order_by }}</span>{% else %}<span class="muted small">covered</span>{% endif %}</td>
       <td><button class="why-btn" hx-get="{{ script_root }}/committed/plan/{{ r.part }}" hx-target="#cp-{{ loop.index }}" hx-swap="innerHTML">12 months</button></td>
-      {% else %}<td colspan="6" class="muted small">no plan</td>{% endif %}
+      {% else %}<td colspan="7" class="muted small">no plan</td>{% endif %}
     </tr>
-    <tr class="cp-row"><td colspan="10" id="cp-{{ loop.index }}" class="cp-cell"></td></tr>
+    <tr class="cp-row"><td colspan="11" id="cp-{{ loop.index }}" class="cp-cell"></td></tr>
   {% endfor %}
   </tbody>
 </table>

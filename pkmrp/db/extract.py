@@ -178,6 +178,40 @@ JOIN Order_Master o ON o.ORDER_10 = rd.ORDER_11
 WHERE rd.ORDER_11 LIKE '7%' AND o.CREDTE_10 >= ?
 """
 
+# Book/Bill 2.0 pipeline (pk_sales on PK-SQL01), same definition as its own
+# forecast (pk-sales-app migration 081, `pipe`): status new/open/needs_review/
+# po_received, Forecast toggle on, no SO yet (SO'd bookings are already in the
+# backlog), not a "Region Actuals" account. Columns per pk-sales-app's
+# repositories; access is a GRANT on pk_sales (deploy/pk_sales_read_grant.sql).
+PIPELINE_LINES_SQL = """
+SELECT b.id AS booking_id, RTRIM(b.booking_number) AS booking, a.name AS customer,
+       b.status AS status, b.probability_win AS p_win, b.probability_go AS p_go,
+       b.billing_year AS bill_year, b.billing_month AS bill_month,
+       li.id AS item_id, RTRIM(ISNULL(p.sku, '')) AS sku, li.description AS description,
+       li.quantity AS qty, CAST(NULL AS int) AS option_of
+FROM pk_sales.dbo.bookings b
+JOIN pk_sales.dbo.accounts a ON a.id = b.account_id
+JOIN pk_sales.dbo.booking_line_items li ON li.booking_id = b.id
+LEFT JOIN pk_sales.dbo.products p ON p.id = li.product_id
+WHERE b.status IN ('new', 'open', 'needs_review', 'po_received')
+  AND b.forecast = 1
+  AND (b.so_number IS NULL OR LTRIM(RTRIM(b.so_number)) = '')
+  AND a.name NOT LIKE 'Region Actuals%'
+UNION ALL
+SELECT b.id, RTRIM(b.booking_number), a.name, b.status, b.probability_win, b.probability_go,
+       b.billing_year, b.billing_month,
+       o.id, RTRIM(ISNULL(p.sku, '')), o.option_name, o.quantity * li.quantity, li.id
+FROM pk_sales.dbo.bookings b
+JOIN pk_sales.dbo.accounts a ON a.id = b.account_id
+JOIN pk_sales.dbo.booking_line_items li ON li.booking_id = b.id
+JOIN pk_sales.dbo.booking_line_item_options o ON o.booking_line_item_id = li.id
+LEFT JOIN pk_sales.dbo.products p ON p.id = o.product_id
+WHERE b.status IN ('new', 'open', 'needs_review', 'po_received')
+  AND b.forecast = 1
+  AND (b.so_number IS NULL OR LTRIM(RTRIM(b.so_number)) = '')
+  AND a.name NOT LIKE 'Region Actuals%'
+"""
+
 VENDORS_SQL = """
 SELECT RTRIM(VENID_08) AS vendor_id, RTRIM(ISNULL(COMNAM_08, '')) AS name,
        RTRIM(ISNULL(STATUS_08, '')) AS status
@@ -201,6 +235,7 @@ ALL_SQL = {
     "wo_requirements": WO_REQ_SQL,
     "po_history": PO_HISTORY_SQL,
     "consign_moves": CONSIGN_MOVES_SQL,
+    "pipeline_lines": PIPELINE_LINES_SQL,
     "po_parts": PO_PARTS_SQL,
     "subcontract_reqs": SUBCONTRACT_REQ_SQL,
     "vendors": VENDORS_SQL,
@@ -249,6 +284,8 @@ _TEXT = {
     "code",
     "location",
     "order_type",
+    "booking",
+    "sku",
 }
 
 
@@ -330,3 +367,9 @@ def po_parts(erp, since):
 def subcontract_reqs(erp, since):
     """Component requirements on subcontract POs created since `since`."""
     return _run(erp, "subcontract_reqs", [since])
+
+
+def pipeline_lines(erp):
+    """Open Book/Bill 2.0 bookings' line items and options, with their SKUs.
+    Raises if the login has no access to pk_sales -- the caller decides."""
+    return _run(erp, "pipeline_lines")

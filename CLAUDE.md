@@ -153,7 +153,7 @@ Columns use a table-number suffix. Text columns are padded, so always `RTRIM` th
 
 PK Dispatch already runs a read-only MRP pass every 15 min (`PK-Dispatch/web/plan.py`: make parts, SO + open-WO demand, lot-for-lot, latest-EFFDTE BOM) for its "should be open now" Planning lists. PK-MRP should become the source for that list, or reuse its netting, not run a second answer beside it.
 
-Pipeline / forecast source: Book/Bill 2.0 at `pk_sales.dbo.bookings`, which holds weighted forecast cards. The schema is unverified. Inspect it first, then write a contract in `extract.py`.
+Pipeline / forecast source: Book/Bill 2.0 at `pk_sales.dbo.bookings`, which holds weighted forecast cards. **Contract written 2026-10-28** (`extract.PIPELINE_LINES_SQL`) from pk-sales-app's own repositories and its forecast SQL (migration 081): bookings in status new/open/needs_review/po_received, `forecast = 1`, no `so_number`, not a "Region Actuals" account; weight = `probability_win`; month = `billing_year`/`billing_month`; items `booking_line_items` -> `products.sku`, options `booking_line_item_options` -> `products.sku` x line qty. **Not yet read live**: app_control_tower has no user in pk_sales (error 916) -- `deploy/pk_sales_read_grant.sql` is the request. Unknown until then: whether sales SKUs are MAX part numbers (unmatched ones go to a worklist, mapped via mrp_settings `pipeline_sku_map`, never guessed).
 
 ### Known data traps (handle them explicitly and test each one)
 

@@ -54,7 +54,9 @@ class PlanSettings:
     single_source_gate: float | None = None  # off: see core/segment.py
 
     # Committed supply (core/committed.py).
-    growth_bias: float = 1.0  # scales the 12-month requirement until pipeline is in
+    growth_bias: float = 1.0  # scales the 12-month requirement (backlog + pipeline)
+    include_pipeline: bool = True  # Book/Bill 2.0 bookings, committed parts only
+    pipeline_use_go: bool = False  # weight by win x go (Book/Bill uses win only)
     service_factor: float = 1.65  # ~95% cycle service on the buffer
 
     # Respect MAX's order modifiers on planned orders.

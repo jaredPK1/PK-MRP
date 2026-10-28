@@ -115,6 +115,7 @@ def build(run, so_df):
         "segment_counts": dict(seg_counts),
         "params": params,
         "committed_plans": [_iso_deep(cp) for cp in run.get("committed_plans", [])],
+        "pipeline": _iso_deep(run.get("pipeline") or {"status": "off"}),
     }
 
 

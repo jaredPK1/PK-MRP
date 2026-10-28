@@ -7,6 +7,7 @@ from datetime import date, timedelta
 from .core import committed as committed_mod
 from .core import consign, leadtime, segment, supply
 from .core import demand as demand_mod
+from .core import pipeline as pipeline_mod
 from .core.bom import children_map
 from .core.netting import Part, plan
 from .core.settings import PlanSettings
@@ -134,6 +135,27 @@ def build_plan(erp, settings=None, today=None, history_months=24):
     months = committed_mod.monthly_requirement(
         committed_parts, so_df, children, parts, settings, today
     )
+    # Book/Bill 2.0 pipeline: committed parts only, never the order-driven plan.
+    pipeline = {"status": "off"}
+    pipe_months = {}
+    if settings.include_pipeline:
+        try:
+            lines_df = timed("pipeline_lines", extract.pipeline_lines, erp)
+            pipe_df, pipeline = pipeline_mod.pipeline_demand(lines_df, set(parts), {}, settings)
+            pipeline["status"] = "ok"
+            pipe_months = committed_mod.monthly_requirement(
+                committed_parts, pipe_df, children, parts, settings, today
+            )
+        except Exception as exc:  # noqa: BLE001 -- backlog-only plan still stands
+            text = str(exc)
+            no_access = any(
+                k in text for k in ("permission", "not able to access", "denied", "4060", "916")
+            )
+            pipeline = {"status": "no_access" if no_access else "error", "error": text[:300]}
+    for p, by_month in pipe_months.items():
+        merged = months.setdefault(p, {})
+        for m, q in by_month.items():
+            merged[m] = merged.get(m, 0.0) + q
     open_by_part = {}
     for rc in receipts:
         if rc.kind == "po":
@@ -157,6 +179,7 @@ def build_plan(erp, settings=None, today=None, history_months=24):
         cp["vendor"] = vendor_name.get(p, "")
         cp["vendor_part"] = vendor_part.get(p, "")
         cp["buyer"] = parts[p].buyer
+        cp["pipeline_12m"] = round(sum(pipe_months.get(p, {}).values()) * settings.growth_bias, 2)
         committed_plans.append(cp)
 
     return {
@@ -174,6 +197,7 @@ def build_plan(erp, settings=None, today=None, history_months=24):
         "vendor_name": vendor_name,
         "segments": segments,
         "committed_plans": committed_plans,
+        "pipeline": pipeline,
         "consigned": consigned,
         "consign_evidence": consign_evidence,
         "bom_codes_skipped": skipped_codes,
