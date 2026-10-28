@@ -1,0 +1,36 @@
+[project]
+name = "pkmrp"
+version = "0.1.0"
+description = "Backlog-driven material planning for Photon Kinetics"
+requires-python = ">=3.11"
+dependencies = [
+    "pyodbc>=5",
+    "pandas>=2.2",
+    "numpy>=1.26",
+    "sqlalchemy>=2.0",
+    "flask>=3.0",
+    "click>=8.1",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "ruff>=0.6"]
+
+[project.scripts]
+pkmrp = "pkmrp.cli:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["pkmrp*"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
