@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% block title %}Today · PK-MRP{% endblock %}
+{% block content %}
+<section class="hero">
+  <p class="date">{{ now.strftime('%A, %B') }} {{ now.day }}</p>
+  <h1>{{ greeting }}, {{ name }}.</h1>
+  <p class="nudge">{{ nudge }}</p>
+</section>
+
+<section class="tiles" aria-label="Today at a glance">
+  <div class="tile">
+    <span class="num">{{ h.buy_now }}</span>
+    <span class="lbl">buys to place this week</span>
+    <span class="sub">{% if h.late %}{{ h.late }} already past their order-by date{% else %}none late{% endif %}</span>
+  </div>
+  <div class="tile">
+    <span class="num">{{ h.orders_waiting }}</span>
+    <span class="lbl">booked orders waiting on them</span>
+    <span class="sub">{{ h.order_value_waiting|money }} of open order value</span>
+  </div>
+  <div class="tile">
+    <span class="num">{{ h.expedites }}</span>
+    <span class="lbl">open POs to pull in</span>
+    <span class="sub">{{ h.push_outs }} could push out · {{ h.cancel_candidates }} not needed</span>
+  </div>
+  {% if progress %}
+  <div class="tile win {% if progress.cleared %}lit{% endif %}" data-cleared="{{ progress.cleared }}">
+    <span class="num">{% if progress.cleared %}✓ {{ progress.cleared }}{% else %}0{% endif %}</span>
+    <span class="lbl">came off the list since {{ progress.since[5:] }}</span>
+    <span class="sub">{% if progress.cleared %}{{ progress.cleared_value|money }} of orders unblocked. Nice.{% else %}{{ progress.new }} new since then{% endif %}</span>
+  </div>
+  {% else %}
+  <div class="tile win">
+    <span class="num">Day 1</span>
+    <span class="lbl">of shadow mode</span>
+    <span class="sub">Tomorrow this shows what came off the list.</span>
+  </div>
+  {% endif %}
+</section>
+
+{% if top %}
+<section class="top" aria-labelledby="top-h">
+  <div class="sec-head">
+    <h2 id="top-h">Today's top {{ top|length }}</h2>
+    <p>Ranked by the booked orders each one is holding up. <kbd>j</kbd>/<kbd>k</kbd> to move, <kbd>Enter</kbd> for why.</p>
+  </div>
+  <ol class="cards">
+    {% for b in top %}
+    <li class="card" tabindex="0" id="buy-{{ loop.index }}">
+      <div class="rank" aria-hidden="true">{{ b.rank }}</div>
+      <div class="body">
+        <div class="row1">
+          <span class="part">{{ b.part }}</span>
+          <span class="chip {{ b.tone }}">{{ b.when }}</span>
+          {% if b.wo_only %}<span class="chip quiet" title="No sales order pegged directly — needed by open work orders or vendor kits">for open WOs</span>{% endif %}
+        </div>
+        <div class="desc">{{ b.description|lower|capitalize }}</div>
+        <div class="facts">
+          <span><b>{{ b.qty|qty }}</b> to buy{% if b.spend %} · {{ b.spend|money }}{% endif %}</span>
+          <span>{{ b.lead_days|round|int }}-day lead <small>· {{ b.lead_source }}</small></span>
+          {% if b.vendor %}<span>vendor {{ b.vendor }}</span>{% endif %}
+          {% if b.buyer %}<span>buyer {{ b.buyer }}</span>{% endif %}
+        </div>
+        {% if b.orders %}
+        <div class="unblocks">
+          Unblocks <b>{{ b.orders }} order{{ '' if b.orders == 1 else 's' }}</b>
+          {% if b.order_value %} worth <b>{{ b.order_value|money }}</b>{% endif %}
+          {% if b.customers %}<span class="cust">· {{ b.customers[:3]|join(', ') }}{% if b.customers|length > 3 %} +{{ b.customers|length - 3 }}{% endif %}</span>{% endif %}
+        </div>
+        {% endif %}
+        <button class="why-btn" hx-get="{{ script_root }}/why/{{ b.part }}" hx-target="#why-{{ loop.index }}" hx-swap="innerHTML">Why this buy?</button>
+        <div class="why" id="why-{{ loop.index }}"></div>
+      </div>
+    </li>
+    {% endfor %}
+  </ol>
+  {% if more %}<p class="more"><a href="{{ script_root }}/buys">{{ more }} more on the full list →</a></p>{% endif %}
+</section>
+{% else %}
+<section class="allclear" data-confetti="1">
+  <div class="big">All clear.</div>
+  <p>Nothing needs placing this week. The backlog is covered.</p>
+</section>
+{% endif %}
+
+<section class="small-print">
+  <h3>Kept off the plan, on purpose</h3>
+  <ul>
+    <li><b>{{ h.unscheduled_lines }}</b> backlog lines parked on placeholder dates (2030+) — they go on a worklist, not into buys.</li>
+    <li><b>{{ h.unplannable_lines }}</b> lines for parts with no BOM and no stock — can't be planned until engineering adds a BOM.</li>
+    <li><b>{{ h.beyond_backlog }}</b> long-lead POs covering demand past the booked backlog — bought ahead on purpose, not cancel candidates.</li>
+    <li><b>{{ h.consigned_pairs }}</b> parts PK supplies to the vendors that build its boards, learned from what was actually sent.</li>
+  </ul>
+</section>
+{% endblock %}

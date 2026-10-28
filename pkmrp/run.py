@@ -26,6 +26,8 @@ def build_plan(erp, settings=None, today=None, history_months=24):
     parts_df = timed("parts", extract.parts, erp)
     bom_df = timed("bom", extract.bom, erp)
     so_df = timed("open_so_lines", extract.open_so_lines, erp)
+    vendors_df = timed("vendors", extract.vendors, erp)
+    pv_df = timed("part_vendors", extract.part_vendors, erp)
     stock_df = timed("stock", extract.stock, erp)
     po_df = timed("open_pos", extract.open_pos, erp)
     wo_df = timed("open_wos", extract.open_wos, erp)
@@ -83,6 +85,17 @@ def build_plan(erp, settings=None, today=None, history_months=24):
     )
     lead = leadtime.for_netting(lt_stats)
 
+    # Who a buy would go to: the vendor on the part's most recent PO (any
+    # status), else an approved source -- by name, as people know them.
+    names = dict(zip(vendors_df["vendor_id"], vendors_df["name"], strict=True))
+    vendor_of = {}
+    for r in pv_df.itertuples(index=False):
+        vendor_of.setdefault(r.part, r.vendor_id)
+    for r in hist_df.sort_values("created").itertuples(index=False):
+        if r.vendor_id:
+            vendor_of[r.part] = r.vendor_id
+    vendor_name = {p: names.get(v, v) for p, v in vendor_of.items()}
+
     def lead_of(p):
         return lead.get(p, (parts[p].purchase_lt if p in parts else 0, ""))[0]
 
@@ -110,6 +123,8 @@ def build_plan(erp, settings=None, today=None, history_months=24):
         "lead_times": lt_stats,
         "result": result,
         "worklists": worklists,
+        "so_lines": so_df,
+        "vendor_name": vendor_name,
         "consigned": consigned,
         "consign_evidence": consign_evidence,
         "bom_codes_skipped": skipped_codes,

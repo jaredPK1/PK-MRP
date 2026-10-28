@@ -1,0 +1,28 @@
+<div class="why-inner">
+  <p class="why-lede">
+    {{ b.qty|qty }} of <b>{{ b.part }}</b> are short by {{ b.need_by }}. With a {{ b.lead_days|round|int }}-day lead time
+    — {{ b.lead_source }} — that means ordering by <b>{{ b.place_by }}</b>{% if b.days_late %} — {{ b.days_late }} days ago{% endif %}.
+  </p>
+  {% if b.sales_orders %}
+  <h4>The orders behind it</h4>
+  <ul class="pegs">
+    {% for p in b.pegs[:12] %}
+    <li><span class="mono">{{ p.ref }}</span> <span class="path">{{ p.path|join(' → ') }}</span>{% if p.value %} <span class="val">{{ p.value|money }}</span>{% endif %}</li>
+    {% endfor %}
+    {% if b.pegs|length > 12 %}<li class="muted">+{{ b.pegs|length - 12 }} more</li>{% endif %}
+  </ul>
+  {% endif %}
+  <h4>How the numbers add up</h4>
+  <table class="ledger">
+    <thead><tr><th>Date</th><th class="r">Qty</th><th>What</th><th>Ref</th></tr></thead>
+    <tbody>
+    {% for e in b.ledger[:30] %}
+      <tr class="{{ e.kind }}"><td>{{ e.date or '' }}</td><td class="r">{{ '%+g'|format(e.qty) }}</td><td>{{ e.kind|replace('_', ' ') }}</td><td class="mono">{{ e.ref }}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% if b.exceptions %}
+  <h4>Also on this part</h4>
+  <ul class="pegs">{% for e in b.exceptions[:6] %}<li>{{ e.kind|replace('_', ' ') }} <span class="mono">{{ e.ref }}</span> — {{ e.detail }}</li>{% endfor %}</ul>
+  {% endif %}
+</div>

@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}All buys · PK-MRP{% endblock %}
+{% block content %}
+<section class="sec-head wide">
+  <h1 class="h1-small">Everything to place this week <span class="muted">· {{ rows|length }}</span></h1>
+  <form method="get" class="filter">
+    <label>Buyer
+      <select name="buyer" onchange="this.form.submit()">
+        <option value="">Everyone</option>
+        {% for x in buyers %}<option {% if x == buyer %}selected{% endif %}>{{ x }}</option>{% endfor %}
+      </select>
+    </label>
+  </form>
+</section>
+<div class="table-wrap">
+<table class="dense">
+  <thead><tr><th class="r">#</th><th>Part</th><th>Description</th><th class="r">Qty</th><th class="r">Spend</th><th>Order by</th><th class="r">Lead</th><th>Vendor</th><th>Buyer</th><th class="r">Orders</th><th class="r">Order value</th></tr></thead>
+  <tbody>
+  {% for b in rows %}
+    <tr>
+      <td class="r muted">{{ b.rank }}</td>
+      <td class="mono">{{ b.part }}</td>
+      <td>{{ b.description|lower|capitalize }}</td>
+      <td class="r">{{ b.qty|qty }}</td>
+      <td class="r">{{ b.spend|money if b.spend else '' }}</td>
+      <td><span class="chip {{ b.tone }}">{{ b.when }}</span></td>
+      <td class="r">{{ b.lead_days|round|int }}d</td>
+      <td>{{ b.vendor }}</td>
+      <td>{{ b.buyer }}</td>
+      <td class="r">{{ b.orders or '' }}</td>
+      <td class="r">{{ b.order_value|money if b.order_value else '' }}</td>
+    </tr>
+  {% else %}
+    <tr><td colspan="11" class="muted">Nothing for this buyer this week.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% endblock %}

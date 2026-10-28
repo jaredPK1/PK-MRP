@@ -80,6 +80,31 @@ def shadow(parts):
         click.echo(_fmt_part(run, p))
 
 
+@main.command("run")
+def run_cmd():
+    """Plan against live MAX and write the snapshot the web app reads."""
+    from . import snapshot
+    from .run import build_plan
+
+    run = build_plan(_erp())
+    snap = snapshot.build(run, run["so_lines"])
+    snapshot.write(snap)
+    h = snap["headline"]
+    click.echo(
+        f"{snap['today']}: {h['buy_now']} buys to place ({h['late']} late), "
+        f"{h['orders_waiting']} orders waiting, written to {snapshot.DATA_DIR}"
+    )
+
+
+@main.command()
+@click.option("--port", default=8000)
+def web(port):
+    """Serve the web app (development server)."""
+    from .web.app import create_app
+
+    create_app().run(host="0.0.0.0", port=port)
+
+
 @main.command()
 def check():
     """Connect to MAX and confirm the read-only path works."""

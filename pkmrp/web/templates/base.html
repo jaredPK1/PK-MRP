@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}PK-MRP{% endblock %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ script_root }}/static/app.css?v={{ version }}">
+  <script src="https://unpkg.com/htmx.org@1.9.12" defer></script>
+</head>
+<body>
+  <header class="bar">
+    <a class="brand" href="{{ script_root }}/" aria-label="PK-MRP home">
+      <span class="mark" aria-hidden="true"></span><span>PK&#8209;MRP</span>
+    </a>
+    <nav>
+      <a href="{{ script_root }}/" class="{% if request.endpoint == 'home' %}on{% endif %}">Today</a>
+      <a href="{{ script_root }}/buys" class="{% if request.endpoint == 'buys_page' %}on{% endif %}">All buys</a>
+    </nav>
+    <span class="grow"></span>
+    <span class="pill shadow" title="PK-MRP is recording what it would recommend and comparing it with what actually happens. Nothing here changes MAX.">Shadow mode</span>
+  </header>
+  <main>{% block content %}{% endblock %}</main>
+  <footer>
+    {% if snap %}Planned from MAX at {{ snap.generated_at[11:16] }} on {{ snap.today }} · {% endif %}
+    Read-only: PK-MRP never writes to MAX. Recommendations are recorded and compared, not acted on, until a part class goes live.
+  </footer>
+  <script src="{{ script_root }}/static/app.js?v={{ version }}" defer></script>
+</body>
+</html>
