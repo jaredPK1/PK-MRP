@@ -4,6 +4,7 @@ report needs. The only place extract (I/O) meets core (pure)."""
 import time
 from datetime import date, timedelta
 
+from .core import committed as committed_mod
 from .core import consign, leadtime, segment, supply
 from .core import demand as demand_mod
 from .core.bom import children_map
@@ -47,6 +48,7 @@ def build_plan(erp, settings=None, today=None, history_months=24):
             r.mult_qty,
             r.unit_cost,
             r.buyer,
+            r.yield_pct,
         )
         for r in parts_df.itertuples(index=False)
     }
@@ -127,6 +129,36 @@ def build_plan(erp, settings=None, today=None, history_months=24):
     )
     timings["netting"] = round(time.time() - t, 2)
 
+    # Committed supply: a 12-month plan for each committed part.
+    committed_parts = [r["part"] for r in segments if r["segment"] == "committed"]
+    months = committed_mod.monthly_requirement(
+        committed_parts, so_df, children, parts, settings, today
+    )
+    open_by_part = {}
+    for rc in receipts:
+        if rc.kind == "po":
+            open_by_part.setdefault(rc.part, []).append((rc.date, rc.qty, rc.ref))
+    vendor_part = {}
+    for r in pv_df.itertuples(index=False):
+        if r.vendor_part and vendor_of.get(r.part) == r.vendor_id:
+            vendor_part[r.part] = r.vendor_part
+    committed_plans = []
+    for p in committed_parts:
+        cp = committed_mod.plan_part(
+            p,
+            parts[p],
+            months.get(p, {}),
+            lt_stats[p]["p80"],
+            stock.get(p, 0.0),
+            open_by_part.get(p, []),
+            settings,
+            today,
+        )
+        cp["vendor"] = vendor_name.get(p, "")
+        cp["vendor_part"] = vendor_part.get(p, "")
+        cp["buyer"] = parts[p].buyer
+        committed_plans.append(cp)
+
     return {
         "today": today,
         "settings": settings,
@@ -141,6 +173,7 @@ def build_plan(erp, settings=None, today=None, history_months=24):
         "po_history": hist_df,
         "vendor_name": vendor_name,
         "segments": segments,
+        "committed_plans": committed_plans,
         "consigned": consigned,
         "consign_evidence": consign_evidence,
         "bom_codes_skipped": skipped_codes,

@@ -108,9 +108,70 @@ def create_app():
     @app.get("/committed")
     def committed_page():
         snap = snapshot.load_latest() or abort(404)
+        plans = {cp["part"]: cp for cp in snap.get("committed_plans", [])}
         rows = snap.get("segments", [])
+        vendors = sorted({cp["vendor"] for cp in plans.values() if cp["vendor"]})
         return render_template(
-            "committed.html", snap=snap, rows=rows, counts=snap.get("segment_counts", {})
+            "committed.html",
+            snap=snap,
+            rows=rows,
+            plans=plans,
+            vendors=vendors,
+            counts=snap.get("segment_counts", {}),
+        )
+
+    @app.get("/committed/plan/<path:part>")
+    def committed_plan(part):
+        snap = snapshot.load_latest() or abort(404)
+        cp = next((c for c in snap.get("committed_plans", []) if c["part"] == part), None)
+        return render_template("_committed_plan.html", cp=cp or abort(404))
+
+    @app.get("/committed/forecast.csv")
+    def forecast_csv():
+        """The supplier forecast letter: 12 months, frozen / firm / indicative."""
+        import csv
+        import io
+
+        from flask import Response
+
+        snap = snapshot.load_latest() or abort(404)
+        vendor = request.args.get("vendor", "")
+        plans = [c for c in snap.get("committed_plans", []) if not vendor or c["vendor"] == vendor]
+        if not plans:
+            abort(404)
+        months = [m["month"][:7] for m in plans[0]["schedule"]]
+        tags = [m["horizon"] for m in plans[0]["schedule"]]
+        buf = io.StringIO()
+        w = csv.writer(buf)
+        w.writerow(
+            [
+                "PK forecast",
+                snap["today"],
+                "frozen = months 1-3, firm = 4-6, "
+                "indicative = 7-12. Quantities are PK's requirement by month.",
+            ]
+        )
+        w.writerow(["vendor", "our part", "your part", "description", *months])
+        w.writerow(["", "", "", "", *tags])
+        for c in sorted(plans, key=lambda c: (c["vendor"], c["part"])):
+            w.writerow(
+                [
+                    c["vendor"],
+                    c["part"],
+                    c["vendor_part"],
+                    c["description"],
+                    *[_qty(m["requirement"]) for m in c["schedule"]],
+                ]
+            )
+        name = (vendor or "all-vendors").replace(" ", "-").replace("/", "-")[:40]
+        return Response(
+            buf.getvalue(),
+            mimetype="text/csv",
+            headers={
+                "Content-Disposition": (
+                    f"attachment; filename=pk-forecast-{name}-{snap['today']}.csv"
+                )
+            },
         )
 
     @app.get("/lead-times")
@@ -150,6 +211,33 @@ def create_app():
             },
         )
 
+    @app.get("/api/parts")
+    def api_parts():
+        """Part search for pickers: number fragments or description words."""
+        from ..core.search import find
+
+        data = snapshot.load_atp()
+        q = (request.args.get("q") or "").strip()
+        if not data or len(q) < 2:
+            return {"parts": []}
+        lines = data["timelines"]
+        catalogue = (
+            (p, v[1], v[0], p in lines and (lines[p][0] > 0 or bool(lines[p][1])))
+            for p, v in data["parts"].items()
+        )
+        out = []
+        for p, desc, ptype, active in find(q, catalogue, limit=12):
+            out.append(
+                {
+                    "part": p,
+                    "description": desc,
+                    "type": "make" if ptype == "A" else "buy",
+                    "on_hand": lines.get(p, [0])[0],
+                    "active": active,
+                }
+            )
+        return {"parts": out}
+
     @app.get("/promise")
     def promise_page():
         from ..core import atp
@@ -163,9 +251,18 @@ def create_app():
         except ValueError:
             qty, error = 1.0, "Quantity has to be a number."
         asked = request.args.get("date") or ""
+        if part and data and not error and part not in data["parts"]:
+            from ..core.search import find
+
+            hits = find(part, ((p, v[1], v[0], False) for p, v in data["parts"].items()), 1)
+            if hits:
+                part = hits[0][0]
         if part and data and not error:
             if part not in data["parts"]:
-                error = f"{part} isn't a make or buy part in MAX."
+                error = (
+                    f"Nothing matches “{part}” — try part of the number "
+                    "or a word from the description."
+                )
             else:
                 today = date.fromisoformat(data["today"])
                 parts = {

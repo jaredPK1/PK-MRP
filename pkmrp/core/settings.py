@@ -53,6 +53,10 @@ class PlanSettings:
     single_source_days: int = 60
     single_source_gate: float | None = None  # off: see core/segment.py
 
+    # Committed supply (core/committed.py).
+    growth_bias: float = 1.0  # scales the 12-month requirement until pipeline is in
+    service_factor: float = 1.65  # ~95% cycle service on the buffer
+
     # Respect MAX's order modifiers on planned orders.
     use_min_mult_qty: bool = True
 

@@ -6,7 +6,11 @@
   <p class="lede">Type the part, how many, and when the customer wants it. You'll get the earliest date the material supports — after every order already booked takes its share — and the part that decides it.</p>
 </section>
 <form class="promise-form" method="get">
-  <label>Part <input name="part" value="{{ part }}" placeholder="01-2300AG-07G" autofocus autocomplete="off" required></label>
+  <label class="picker">Part — number or description
+    <input name="part" value="{{ part }}" placeholder="46-0020 · relay lens · 2300 z stage" autofocus autocomplete="off" required
+           data-suggest="{{ script_root }}/api/parts" role="combobox" aria-expanded="false" aria-autocomplete="list">
+    <ul class="suggest" role="listbox" hidden></ul>
+  </label>
   <label>Qty <input name="qty" type="number" min="1" step="1" value="{{ qty|int }}"></label>
   <label>Customer wants it <input name="date" type="date" value="{{ asked }}"></label>
   <button class="btn primary" type="submit">Check</button>

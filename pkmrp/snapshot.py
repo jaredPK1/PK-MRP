@@ -25,6 +25,15 @@ def _iso(v):
     return v.isoformat() if isinstance(v, (date, datetime)) else v
 
 
+def _iso_deep(v):
+    """Dates to ISO strings, all the way down."""
+    if isinstance(v, dict):
+        return {k: _iso_deep(x) for k, x in v.items()}
+    if isinstance(v, list):
+        return [_iso_deep(x) for x in v]
+    return _iso(v)
+
+
 def so_rollups(so_df):
     """({so: open value in USD}, {so: customer}). Non-USD orders count 0 until
     the exchange-rate convention is confirmed, rather than adding yen to dollars."""
@@ -105,6 +114,7 @@ def build(run, so_df):
         "segments": [r for r in segments if r["segment"] != "order_driven"],
         "segment_counts": dict(seg_counts),
         "params": params,
+        "committed_plans": [_iso_deep(cp) for cp in run.get("committed_plans", [])],
     }
 
 

@@ -146,3 +146,25 @@ footer { max-width: 1080px; margin: 0 auto; padding: 18px 20px 30px; color: var(
 .v-sub { margin: 6px 0 0; color: var(--ink-2); } .v-cap { margin: 8px 0 0; color: var(--muted); font-size: 12.5px; }
 .steps-h { font-size: 14px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin: 20px 0 8px; }
 .dense tr.bind td { background: var(--late-soft); font-weight: 600; }
+.cp-row td { padding: 0; border-bottom: 0; } .cp-cell:empty { display: none; }
+.cp-detail { padding: 10px 16px 14px; background: var(--bg); } .late-text { color: var(--late); font-weight: 600; }
+.filters label select { font: inherit; padding: 5px 8px; border-radius: 8px; border: 1px solid var(--line);
+                        background: var(--surface); color: var(--ink); margin-left: 6px; }
+
+.table-tools { display: flex; align-items: center; gap: 10px; margin: 0 0 10px; }
+.table-filter { font: inherit; font-size: 14px; padding: 8px 12px; border: 1px solid var(--line); border-radius: 10px;
+                background: var(--surface); color: var(--ink); width: min(440px, 100%); }
+.table-filter:focus, .promise-form input:focus { outline: 2px solid var(--teal); outline-offset: 1px; border-color: var(--leaf); }
+.picker { position: relative; }
+.picker input { min-width: 320px; }
+.suggest { position: absolute; top: 100%; left: 0; z-index: 20; list-style: none; margin: 4px 0 0; padding: 4px;
+           min-width: 520px; max-width: 90vw; background: var(--surface); border: 1px solid var(--line); border-radius: 12px;
+           box-shadow: 0 12px 32px rgba(20,24,29,.16); }
+.suggest li { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: baseline; padding: 7px 10px;
+              border-radius: 8px; cursor: pointer; color: var(--ink); font-weight: 400; font-size: 14px; }
+.suggest li b { font-variant-numeric: tabular-nums; }
+.suggest li .d { color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.suggest li .t { color: var(--muted); font-size: 12px; white-space: nowrap; }
+.suggest li.on, .suggest li:hover { background: var(--soon-soft); }
+@media (max-width: 760px) { .picker input { min-width: 0; width: 100%; } .suggest { min-width: 0; width: 100%; } }
+.cp-detail .ledger td, .cp-detail .ledger th { padding: 4px 14px; }

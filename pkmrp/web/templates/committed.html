@@ -3,29 +3,54 @@
 {% block content %}
 <section class="page-intro">
   <h1 class="h1-small">Committed parts</h1>
-  <p class="lede">The few bought parts whose own history proves a lead time longer than booked orders give warning of. These get 12-month supply; everything else is bought against the backlog.
+  <p class="lede">The few bought parts whose own history proves a lead time longer than booked orders give warning of. Each gets a 12-month plan — requirement, buffer, a proposed blanket order with monthly releases — and a forecast for its supplier. Everything else is bought against the backlog.
     <b>{{ counts.committed or 0 }}</b> committed · <b>{{ counts.unproven_long or 0 }}</b> MAX says are long but nothing proves it yet · {{ counts.order_driven or 0 }} order-driven.</p>
+  <p class="filters">
+    <span class="muted small">Requirement is booked orders only — the pipeline isn't in yet.</span>
+    <span class="grow"></span>
+    <label class="small">Forecast letter for
+      <select onchange="if (this.value !== '') location.href='{{ script_root }}/committed/forecast.csv' + (this.value ? '?vendor=' + encodeURIComponent(this.value) : '')">
+        <option value="">choose a vendor…</option>
+        {% for v in vendors %}<option>{{ v }}</option>{% endfor %}
+      </select></label>
+    <a class="btn" href="{{ script_root }}/committed/forecast.csv">All vendors (CSV)</a>
+  </p>
 </section>
+<div class="table-tools"><input type="search" class="table-filter" placeholder="Filter: part number or description words — e.g. 2300 lens" aria-label="Filter the table"><span class="muted small filter-count"></span></div>
 <div class="table-wrap">
 <table class="dense">
-  <thead><tr><th>Part</th><th>Description</th><th>Group</th><th class="r">Typical lead</th><th class="r">Slow end (P80)</th><th class="r">MAX says</th><th class="r">Receipts</th><th class="r">Vendors</th><th class="r">Orders it feeds</th><th>Why</th></tr></thead>
+  <thead><tr><th>Part</th><th>Description</th><th>Vendor</th><th class="r">Slow end</th><th class="r">12-mo need</th><th class="r">Buffer</th><th class="r">Have + on order</th><th class="r">Blanket</th><th>Next release</th><th></th></tr></thead>
   <tbody>
-  {% for r in rows %}
+  {% for r in rows if r.segment == 'committed' %}{% set cp = plans.get(r.part) %}
     <tr>
       <td class="mono">{{ r.part }}</td>
       <td>{{ r.description|lower|capitalize }}</td>
-      <td><span class="chip {{ 'late' if r.segment == 'committed' else 'today' }}">{{ 'committed' if r.segment == 'committed' else 'unproven' }}</span></td>
-      <td class="r">{{ r.p50_days }}d</td>
+      <td class="small">{{ cp.vendor if cp else '' }}</td>
       <td class="r">{{ r.p80_days }}d</td>
-      <td class="r">{{ r.purlt_days }}d</td>
-      <td class="r">{{ r.lines or '—' }}</td>
-      <td class="r">{{ r.vendors_used }}{% if r.single_source %} <small class="muted">only</small>{% endif %}</td>
-      <td class="r">{{ r.orders }}</td>
-      <td class="muted small">{{ r.reasons|join('; ') }}</td>
+      {% if cp %}
+      <td class="r">{{ cp.requirement_12m|qty }}</td>
+      <td class="r">{{ cp.buffer|qty }}</td>
+      <td class="r">{{ (cp.on_hand + cp.on_order)|qty }}</td>
+      <td class="r"><b>{{ cp.blanket_qty|qty if cp.blanket_qty else '—' }}</b></td>
+      <td>{% if cp.releases %}{% set n = cp.releases[0] %}<span class="chip {{ 'late' if n.late else 'soon' }}">{{ n.qty|qty }} by {{ n.order_by }}</span>{% else %}<span class="muted small">covered</span>{% endif %}</td>
+      <td><button class="why-btn" hx-get="{{ script_root }}/committed/plan/{{ r.part }}" hx-target="#cp-{{ loop.index }}" hx-swap="innerHTML">12 months</button></td>
+      {% else %}<td colspan="6" class="muted small">no plan</td>{% endif %}
     </tr>
-  {% else %}<tr><td colspan="10" class="muted">No committed parts.</td></tr>{% endfor %}
+    <tr class="cp-row"><td colspan="10" id="cp-{{ loop.index }}" class="cp-cell"></td></tr>
+  {% endfor %}
   </tbody>
 </table>
 </div>
-<p class="foot-note">Lead times in calendar days. "Typical" is the median of the part's own fully-received POs over 24 months; "slow end" is the 80th percentile.</p>
+<h3 class="steps-h">MAX says long, nothing proves it yet</h3>
+<div class="table-wrap">
+<table class="dense">
+  <thead><tr><th>Part</th><th>Description</th><th class="r">MAX says</th><th class="r">Orders it feeds</th><th>Why it's here</th></tr></thead>
+  <tbody>
+  {% for r in rows if r.segment == 'unproven_long' %}
+    <tr><td class="mono">{{ r.part }}</td><td>{{ r.description|lower|capitalize }}</td><td class="r">{{ r.purlt_days }}d</td><td class="r">{{ r.orders }}</td><td class="muted small">{{ r.reasons|join('; ') }}</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+<p class="foot-note">Lead times in calendar days. "Slow end" is the 80th percentile of the part's own fully-received POs over 24 months.</p>
 {% endblock %}

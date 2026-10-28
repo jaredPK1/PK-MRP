@@ -1,0 +1,14 @@
+<div class="cp-detail">
+  <table class="ledger">
+    <thead><tr><th>Month</th><th></th><th class="r">Need</th><th class="r">Arriving</th><th class="r">Order</th><th>Order by</th></tr></thead>
+    <tbody>
+    {% for m in cp.schedule %}{% set rel = cp.releases|selectattr('month', 'equalto', m.month)|list %}
+      <tr><td>{{ m.month[:7] }}</td><td class="muted small">{{ m.horizon }}</td><td class="r">{{ m.requirement|qty }}</td>
+          <td class="r">{{ m.arriving|qty if m.arriving else '' }}</td>
+          <td class="r">{% if rel %}<b>{{ rel[0].qty|qty }}</b>{% endif %}</td>
+          <td>{% if rel %}<span class="{{ 'late-text' if rel[0].late else '' }}">{{ rel[0].order_by }}</span>{% endif %}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  <p class="muted small">Buffer {{ cp.buffer|qty }} ({{ '%.0f'|format(cp.lead_bdays) }}-business-day slow-end lead){% if cp.yield_gross_up > 1 %}, grossed up {{ cp.yield_gross_up }}× for yield{% endif %}. On hand {{ cp.on_hand|qty }}, on order {{ cp.on_order|qty }}{% if cp.vendor_part %}, vendor part {{ cp.vendor_part }}{% endif %}.</p>
+</div>

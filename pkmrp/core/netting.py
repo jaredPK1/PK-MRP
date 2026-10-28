@@ -43,6 +43,7 @@ class Part:
     mult_qty: float = 0.0
     unit_cost: float = 0.0
     buyer: str = ""
+    yield_pct: float = 0.0  # YIELD_01; 0 = not set
 
 
 @dataclass(frozen=True)
