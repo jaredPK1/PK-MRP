@@ -180,3 +180,13 @@
     input.addEventListener('blur', () => setTimeout(() => { items = []; render(); }, 150));
   });
 })();
+
+
+// Shelf order: copy "vendor-part qty" lines for a quick-order paste.
+document.querySelectorAll('.copy-cart').forEach(function (btn) {
+  btn.addEventListener('click', function () {
+    navigator.clipboard.writeText(btn.dataset.lines).then(
+      () => { const t = btn.textContent; btn.textContent = 'Copied ✓'; setTimeout(() => btn.textContent = t, 1800); },
+      () => { btn.textContent = 'Select and copy below'; });
+  });
+});

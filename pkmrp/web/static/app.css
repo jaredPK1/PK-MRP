@@ -221,3 +221,10 @@ footer { max-width: 1080px; margin: 0 auto; padding: 18px 20px 30px; color: var(
 .done-line[hidden] { display: none; }
 .card > .done-line { grid-column: 1 / -1; }
 .lede.small-gap { margin-top: 8px; }
+
+/* Shelf order */
+.shelf { margin-top: 26px; }
+.cart { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 10px 16px; margin: 0 0 8px; }
+.cart summary { cursor: pointer; font-size: 15px; }
+.cart-tools { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 10px 0 6px; }
+.cart-items { max-width: none; margin-top: 6px; }

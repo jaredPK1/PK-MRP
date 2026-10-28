@@ -26,13 +26,21 @@ def _so_of(ref):
 
 
 def buy_list(
-    planned, parts, lead_stats, so_values, so_customers, today, horizon_workdays=5, vendor_name=None
+    planned,
+    parts,
+    lead_stats,
+    so_values,
+    so_customers,
+    today,
+    horizon_workdays=5,
+    vendor_name=None,
+    exclude=frozenset(),
 ):
     """[{part, ...}] for every part with a buy to place by the horizon, ranked."""
     horizon = plus_workdays(today, horizon_workdays)
     groups = defaultdict(list)
     for o in planned:
-        if o.kind == "buy" and o.place_by <= horizon:
+        if o.kind == "buy" and o.place_by <= horizon and o.part not in exclude:
             groups[o.part].append(o)
 
     out = []

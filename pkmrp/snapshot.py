@@ -81,6 +81,7 @@ def build(run, so_df):
         so_customers,
         today,
         vendor_name=run.get("vendor_name"),
+        exclude=frozenset(run.get("shelf") or ()),
     )
     by_kind = Counter(e.kind for e in res.exceptions)
     so_meta = so_lines_meta(run["so_lines"], run["settings"])
@@ -162,12 +163,13 @@ def build(run, so_df):
         "params": params,
         "committed_plans": [_iso_deep(cp) for cp in run.get("committed_plans", [])],
         "pipeline": _iso_deep(run.get("pipeline") or {"status": "off"}),
+        "shelf_orders": _iso_deep(run.get("shelf_orders") or []),
         "overbuys": _iso_deep(
             overbuys(
-                res.exceptions,
+                [e for e in res.exceptions if e.part not in (run.get("shelf") or {})],
                 run["open_pos"],
                 res.demands,
-                run["stock"],
+                {p: q for p, q in run["stock"].items() if p not in (run.get("shelf") or {})},
                 run["parts"],
                 run.get("segments", []),
                 run.get("vendor_name") or {},

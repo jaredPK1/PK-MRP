@@ -81,6 +81,7 @@
     <dt>P80 / slow end</dt><dd>80% of past orders arrived within this time. Used where being late is costly.</dd>
     <dt>Beyond the backlog</dt><dd>An open PO on a long-lead part that no booked order needs yet — bought ahead on purpose, not a mistake.</dd>
     <dt>Frozen / firm / indicative</dt><dd>On a supplier forecast: months 1–3, 4–6 and 7–12.</dd>
+    <dt>Shelf part</dt><dd>A part of $50 or less from a catalog distributor. It's planned on that distributor's real delivery time (McMaster: about 2 working days) and ordered in the Shelf order, not ranked.</dd>
     <dt>Shadow mode</dt><dd>PK-MRP records its advice and compares it with what was done, but nobody is asked to follow it yet.</dd>
   </dl>
 </section>
@@ -92,6 +93,7 @@
     <li><b>The order is parked on a placeholder date</b> (2030 or later). Those lines stay off the plan until they get a real date.</li>
     <li><b>The part has no BOM, or it's typed bulk (Y) in MAX.</b> Neither can be planned until the part data is fixed — the home page counts them under "Kept off the plan".</li>
     <li><b>It's a long-lead part.</b> Look on Committed instead — those are planned a year out.</li>
+    <li><b>It's a shelf part</b> — something cheap a catalog distributor (McMaster, Digi-Key, Mouser…) ships in days. Those are in the <b>Shelf order</b> box on Today, one cart per vendor, with a button that copies their part numbers for a quick order.</li>
     <li><b>It's due later than this week.</b> All buys shows what to place in the next five working days; later buys come up when their order-by date gets close.</li>
   </ul>
 </section>

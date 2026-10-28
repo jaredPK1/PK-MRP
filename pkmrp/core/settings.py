@@ -59,6 +59,21 @@ class PlanSettings:
     pipeline_use_go: bool = False  # weight by win x go (Book/Bill uses win only)
     service_factor: float = 1.65  # ~95% cycle service on the buffer
 
+    # Shelf parts (core/shelf.py): cheap things catalog distributors ship in
+    # days. Planned on the vendor's measured delivery time, kept off the
+    # ranked buys and Overbuys, ordered as one cart per vendor.
+    shelf_vendors: tuple = (
+        "MCMASTER",
+        "DIGIKEY",
+        "DIGI-KEY",
+        "MOUSER",
+        "NEWARK",
+        "GRAINGER",
+        "FASTENAL",
+    )
+    shelf_max_unit_cost: float = 50.0
+    shelf_default_bdays: int = 5  # when a shelf vendor has too little history
+
     # Respect MAX's order modifiers on planned orders.
     use_min_mult_qty: bool = True
 

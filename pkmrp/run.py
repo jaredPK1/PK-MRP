@@ -8,7 +8,9 @@ from .core import committed as committed_mod
 from .core import consign, leadtime, segment, supply
 from .core import demand as demand_mod
 from .core import pipeline as pipeline_mod
+from .core import shelf as shelf_mod
 from .core.bom import children_map
+from .core.calendar import plus_workdays
 from .core.netting import Part, plan
 from .core.settings import PlanSettings
 from .db import extract
@@ -98,6 +100,17 @@ def build_plan(erp, settings=None, today=None, history_months=24):
         if r.vendor_id:
             vendor_of[r.part] = r.vendor_id
     vendor_name = {p: names.get(v, v) for p, v in vendor_of.items()}
+    vendor_part_all = {}
+    for r in pv_df.itertuples(index=False):
+        if r.vendor_part and vendor_of.get(r.part) == r.vendor_id:
+            vendor_part_all[r.part] = r.vendor_part
+
+    # Shelf parts plan on their distributor's real delivery time, not MAX's.
+    speed = shelf_mod.vendor_speed(hist_df, names)
+    shelf = shelf_mod.shelf_parts(parts, vendor_name, settings)
+    for p, v in shelf.items():
+        days = speed.get(v, settings.shelf_default_bdays)
+        lead[p] = (days, f"{v.title()} usually delivers in {days:g} working days")
 
     def lead_of(p):
         return lead.get(p, (parts[p].purchase_lt if p in parts else 0, ""))[0]
@@ -129,6 +142,9 @@ def build_plan(erp, settings=None, today=None, history_months=24):
         committed,
     )
     timings["netting"] = round(time.time() - t, 2)
+    shelf_orders = shelf_mod.shelf_orders(
+        result.planned, shelf, parts, vendor_part_all, speed, today, plus_workdays(today, 5)
+    )
 
     # Committed supply: a 12-month plan for each committed part.
     committed_parts = [r["part"] for r in segments if r["segment"] == "committed"]
@@ -197,6 +213,8 @@ def build_plan(erp, settings=None, today=None, history_months=24):
         "open_pos": po_df,
         "vendor_name": vendor_name,
         "segments": segments,
+        "shelf": shelf,
+        "shelf_orders": shelf_orders,
         "committed_plans": committed_plans,
         "pipeline": pipeline,
         "consigned": consigned,

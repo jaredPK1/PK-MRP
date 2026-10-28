@@ -88,6 +88,36 @@
 </section>
 {% endif %}
 
+{% if snap.shelf_orders %}
+<section class="shelf" aria-labelledby="shelf-h">
+  <div class="sec-head">
+    <h2 id="shelf-h">Shelf order</h2>
+    <p>Cheap parts the catalog houses ship in days — no need to rank them, just put them in the cart.</p>
+  </div>
+  {% for v in snap.shelf_orders %}
+  <details class="cart">
+    <summary><b>{{ v.vendor|title }}</b> · {{ v.lines }} line{{ '' if v.lines == 1 else 's' }} · about {{ v.spend|money }}{% if v.days %} · usually delivers in {{ v.days|round|int }} working day{{ '' if v.days|round|int == 1 else 's' }}{% endif %}</summary>
+    {% set pasted = v['items']|selectattr('vendor_part')|list %}
+    {% if pasted %}
+    <p class="cart-tools">
+      <button type="button" class="btn copy-cart" data-lines="{% for it in pasted %}{{ it.vendor_part }} {{ it.qty|int }}{% if not loop.last %}&#10;{% endif %}{% endfor %}">Copy for quick order</button>
+      <span class="muted small">{{ pasted|length }} of {{ v.lines }} have {{ v.vendor|title }}'s part number on file — paste as "part qty" lines.{% if pasted|length < v.lines %} The rest are listed with ours below.{% endif %}</span>
+    </p>
+    {% endif %}
+    <table class="ledger cart-items">
+      <thead><tr><th>Their part #</th><th>Our part</th><th>Description</th><th class="r">Qty</th><th class="r">About</th><th>Needed</th></tr></thead>
+      <tbody>
+      {% for it in v['items'] %}
+        <tr><td class="mono">{{ it.vendor_part or '—' }}</td><td class="mono">{{ it.part }}</td><td>{{ it.description|lower|capitalize }}</td>
+            <td class="r">{{ it.qty|qty }}</td><td class="r">{{ it.spend|money }}</td><td>{{ it.need_by|nice_date }}</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </details>
+  {% endfor %}
+</section>
+{% endif %}
+
 <section class="small-print">
   <h3>Kept off the plan, on purpose</h3>
   <ul>
@@ -95,6 +125,7 @@
     <li><b>{{ h.unplannable_lines }}</b> lines for parts with no BOM and no stock — can't be planned until engineering adds a BOM.</li>
     <li><b>{{ h.beyond_backlog }}</b> long-lead POs covering demand past the booked backlog — bought ahead on purpose, not cancel candidates.</li>
     <li><b>{{ h.consigned_pairs }}</b> parts PK supplies to the vendors that build its boards, learned from what was actually sent.</li>
+    <li>Shelf parts — cheap things from catalog distributors — are planned on the distributor's real delivery time and go in the Shelf order above, not the ranked list. Bulk (floor stock) parts aren't planned at all.</li>
   </ul>
 </section>
 {% endblock %}
