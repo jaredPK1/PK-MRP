@@ -8,6 +8,8 @@ import click
 from .config import DbConfig
 from .db.erp import ErpClient
 
+VERSION = "0.2.0"
+
 SHOWCASE = ("46-0020-01G", "04-1999-02G", "53-4104-00G", "31-7100-01SG")
 
 
@@ -80,15 +82,41 @@ def shadow(parts):
         click.echo(_fmt_part(run, p))
 
 
-@main.command("run")
-def run_cmd():
-    """Plan against live MAX and write the snapshot the web app reads."""
+def _ledger(run, snap):
+    """Record the run in the Decision Ledger; never fail the plan over it.
+    Returns the status shown on the page."""
+    from .db import store
+    from .ledger import decisions
+
+    try:
+        engine = store.ops_engine(DbConfig.from_env())
+        missing = store.missing_tables(engine)
+        if missing:
+            return {"status": "waiting_on_dba", "missing": missing}
+        out = decisions.record(engine, run, snap, version=VERSION)
+        return {"status": "ok", **out}
+    except Exception as exc:  # noqa: BLE001 -- the plan still publishes
+        click.echo(f"ledger: {exc}", err=True)
+        return {"status": "error", "error": str(exc)[:300]}
+
+
+def _plan_once(erp):
     from . import snapshot
     from .run import build_plan
 
-    run = build_plan(_erp())
+    run = build_plan(erp)
     snap = snapshot.build(run, run["so_lines"])
+    snap["ledger"] = _ledger(run, snap)
     snapshot.write(snap)
+    return snap
+
+
+@main.command("run")
+def run_cmd():
+    """Plan against live MAX, record it in the ledger, write the snapshot."""
+    from . import snapshot
+
+    snap = _plan_once(_erp())
     h = snap["headline"]
     click.echo(
         f"{snap['today']}: {h['buy_now']} buys to place ({h['late']} late), "
@@ -107,20 +135,17 @@ def loop(every):
     import time
     import traceback
 
-    from . import snapshot
-    from .run import build_plan
-
     erp = None
     while True:
         started = time.time()
         try:
             erp = erp or _erp()
-            run = build_plan(erp)
-            snap = snapshot.build(run, run["so_lines"])
-            snapshot.write(snap)
+            snap = _plan_once(erp)
             h = snap["headline"]
             click.echo(
                 f"planned {snap['generated_at']}: {h['buy_now']} buys, "
+                f"ledger {snap['ledger'].get('status')} "
+                f"(+{snap['ledger'].get('new', 0)} / -{snap['ledger'].get('closed', 0)}), "
                 f"{time.time() - started:.1f}s",
                 err=True,
             )
@@ -139,6 +164,15 @@ def web(port):
     from .web.app import create_app
 
     create_app().run(host="0.0.0.0", port=port)
+
+
+@main.command()
+def schema():
+    """Print the PK_Ops DDL for the DBA (generated from db/store.py)."""
+    from .db.store import ddl
+
+    for stmt in ddl("mssql"):
+        click.echo(stmt + "\n")
 
 
 @main.command()
