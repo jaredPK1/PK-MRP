@@ -4,6 +4,8 @@ report needs. The only place extract (I/O) meets core (pure)."""
 import time
 from datetime import date, timedelta
 
+import pandas as pd
+
 from .core import committed as committed_mod
 from .core import consign, leadtime, segment, supply
 from .core import demand as demand_mod
@@ -36,9 +38,11 @@ def build_plan(erp, settings=None, today=None, history_months=24):
     po_df = timed("open_pos", extract.open_pos, erp)
     wo_df = timed("open_wos", extract.open_wos, erp)
     req_df = timed("wo_requirements", extract.wo_requirements, erp)
-    hist_df = timed(
-        "po_history", extract.po_history, erp, today - timedelta(days=round(history_months * 30.44))
-    )
+    # Ten years of PO lines: lead times reach back for parts bought rarely;
+    # everything else uses the recent window.
+    recent = today - timedelta(days=round(history_months * 30.44))
+    deep_df = timed("po_history", extract.po_history, erp, today - timedelta(days=3653))
+    hist_df = deep_df[deep_df["created"] >= pd.Timestamp(recent)]
 
     parts = {
         r.part: Part(
@@ -86,7 +90,10 @@ def build_plan(erp, settings=None, today=None, history_months=24):
     buy = {p for p, v in parts.items() if v.type in settings.buy_types}
     classes = dict(zip(parts_df["part"], parts_df["class_code"], strict=True))
     lt_stats = leadtime.realized(
-        hist_df, {p: parts[p].purchase_lt for p in buy}, {p: classes.get(p, "") for p in buy}
+        deep_df,
+        {p: parts[p].purchase_lt for p in buy},
+        {p: classes.get(p, "") for p in buy},
+        recent_since=recent,
     )
     lead = leadtime.for_netting(lt_stats)
 

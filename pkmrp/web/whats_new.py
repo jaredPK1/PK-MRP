@@ -7,6 +7,11 @@ Every feature people can see gets a line here in the same change
 WHATS_NEW = (
     (
         "2026-10-28",
+        "Lead times for parts bought rarely",
+        "A part with fewer than 3 orders in the last two years now uses its most recent older orders (up to 5, back ten years) instead of MAX's lead time. 32 of this week's buys changed; a Lee Spring spring went from MAX's 45 working days to its real 16.",
+    ),
+    (
+        "2026-10-28",
         "Shelf parts and the Shelf order",
         "Cheap parts from catalog distributors (McMaster, Digi-Key, Mouser, Newark, Grainger, Fastenal) are planned on the distributor's real delivery time instead of MAX's, leave the top 10 and Overbuys, and appear as one cart per vendor on Today, with a button that copies their part numbers for a quick order.",
     ),

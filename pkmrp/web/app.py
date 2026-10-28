@@ -1,6 +1,7 @@
 """PK-MRP web app. Reads the snapshot `pkmrp run` writes; never queries MAX."""
 
 import os
+import re
 from datetime import date, datetime
 
 from flask import Flask, abort, render_template, request
@@ -69,10 +70,13 @@ def _lead_words(source):
     """'realized (3 lines)' -> 'from its last 3 orders'; 'PURLT_01' -> 'MAX's lead time'."""
     s = source or ""
     if s.startswith("realized"):
-        n = "".join(ch for ch in s if ch.isdigit())
-        return f"from its last {n} orders" if n else "from its order history"
+        m = re.match(r"realized \((\d+) lines?(?: since (\d{4}))?\)", s)
+        if not m:
+            return "from its order history"
+        n, since = m.groups()
+        return f"from its last {n} orders" + (f", back to {since}" if since else "")
     if s.startswith("PURLT"):
-        return "MAX's lead time (no history to check it)"
+        return "MAX's lead time (fewer than 3 orders in 10 years to check it)"
     if s.startswith("MFGLT"):
         return "MAX's build time"
     return s

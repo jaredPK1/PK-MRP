@@ -363,3 +363,26 @@ def test_part_of_a_po_nobody_needs_is_excess_on_po():
     )
     (e,) = r.exceptions
     assert (e.kind, e.qty) == ("excess_on_po", 6)
+
+
+def test_rarely_bought_part_reaches_back_past_the_window():
+    """70-0166-00G: one PO in two years, eight before. Use the older ones."""
+
+    def line(created, received):
+        c, r = pd.Timestamp(created), pd.Timestamp(received)
+        return ("S", "LEE", c, r, r, 50, 50)
+
+    rows = [
+        line("2016-08-17", "2016-08-31"),  # 10 wd, oldest -- beyond DEEP_LINES
+        line("2018-01-25", "2018-02-15"),  # 15 wd
+        line("2019-09-06", "2019-09-25"),  # 13 wd
+        line("2021-10-13", "2021-11-04"),  # 16 wd
+        line("2023-04-12", "2023-04-18"),  # 4 wd
+        line("2026-03-11", "2026-05-15"),  # 47 wd, the only recent one
+    ]
+    s = realized(_hist(rows), {"S": 45}, recent_since=date(2024, 10, 28))["S"]
+    assert s["lines"] == 5 and s["median"] == 15
+    assert s["source"] == "realized (5 lines since 2018)"
+    # without old lines it is still MAX's number
+    only = realized(_hist(rows[-1:]), {"S": 45}, recent_since=date(2024, 10, 28))["S"]
+    assert only["source"] == "PURLT_01"
