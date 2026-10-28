@@ -4,8 +4,8 @@ report needs. The only place extract (I/O) meets core (pure)."""
 import time
 from datetime import date, timedelta
 
+from .core import consign, leadtime, supply
 from .core import demand as demand_mod
-from .core import leadtime, supply
 from .core.bom import children_map
 from .core.netting import Part, plan
 from .core.settings import PlanSettings
@@ -48,13 +48,24 @@ def build_plan(erp, settings=None, today=None, history_months=24):
         )
         for r in parts_df.itertuples(index=False)
     }
-    kept = bom_df[bom_df["type_code"].isin(settings.bom_type_codes)]
+    # Make parts explode their real components (type code N by default);
+    # bought and outside parts explode only the kit PK consigns to the vendor.
+    since = today - timedelta(days=round(history_months * 30.44))
+    moves_df = timed("consign_moves", extract.consign_moves, erp, since)
+    po_parts_df = timed("po_parts", extract.po_parts, erp, since - timedelta(days=365))
+    sub_df = timed("subcontract_reqs", extract.subcontract_reqs, erp, since)
+    consigned, consign_evidence = consign.consigned_edges(moves_df, po_parts_df, sub_df, bom_df)
+    make = {p for p, v in parts.items() if v.type in settings.make_types}
+    kept = bom_df[bom_df["type_code"].isin(settings.bom_type_codes) & bom_df["parent"].isin(make)]
     skipped_codes = (
         bom_df.loc[~bom_df["type_code"].isin(settings.bom_type_codes), "type_code"]
         .value_counts()
         .to_dict()
     )
     children = children_map(zip(kept["parent"], kept["component"], kept["qty_per"], strict=True))
+    for parent, kit in consigned.items():
+        if parent not in make:
+            children[parent] = kit
 
     stock = supply.on_hand(stock_df)
     receipts = supply.open_receipts(po_df, wo_df, today)
@@ -63,22 +74,29 @@ def build_plan(erp, settings=None, today=None, history_months=24):
         so_df, settings, set(children), stock, part_types
     )
     wo_demand = demand_mod.wo_requirement_demand(req_df, today)
+    sub_demand, sub_lines = consign.subcontract_demand(sub_df, today)
 
     buy = {p for p, v in parts.items() if v.type in settings.buy_types}
     classes = dict(zip(parts_df["part"], parts_df["class_code"], strict=True))
     lt_stats = leadtime.realized(
         hist_df, {p: parts[p].purchase_lt for p in buy}, {p: classes.get(p, "") for p in buy}
     )
+    lead = leadtime.for_netting(lt_stats)
+
+    def lead_of(p):
+        return lead.get(p, (parts[p].purchase_lt if p in parts else 0, ""))[0]
+
+    kit_demand = consign.open_kit_demand(po_df, consigned, sub_lines, lead_of, today)
     t = time.time()
     result = plan(
         parts,
         children,
-        so_demand + wo_demand,
+        so_demand + wo_demand + sub_demand + kit_demand,
         stock,
         receipts,
         settings,
         today,
-        leadtime.for_netting(lt_stats),
+        lead,
     )
     timings["netting"] = round(time.time() - t, 2)
 
@@ -92,12 +110,17 @@ def build_plan(erp, settings=None, today=None, history_months=24):
         "lead_times": lt_stats,
         "result": result,
         "worklists": worklists,
+        "consigned": consigned,
+        "consign_evidence": consign_evidence,
         "bom_codes_skipped": skipped_codes,
         "timings": timings,
         "counts": {
             "so_lines": len(so_df),
             "so_demand": len(so_demand),
             "wo_requirements": len(wo_demand),
+            "subcontract_reqs": len(sub_demand),
+            "open_po_kits": len(kit_demand),
+            "consigned_pairs": len(consign_evidence),
             "receipts": len(receipts),
             "planned": len(result.planned),
             "exceptions": len(result.exceptions),

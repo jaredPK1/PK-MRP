@@ -336,3 +336,16 @@ def test_vendor_fallback_is_off_by_default():
     )
     lt = realized(_hist([row] * 12), {"R1": 5, "R2": 5}, {"R1": "RES", "R2": "RES"})
     assert lt["R2"]["source"] == "PURLT_01"
+
+
+def test_unused_receipt_on_a_long_lead_part_is_beyond_backlog_not_cancel():
+    r = plan(
+        {"FPGA": buy("FPGA", lt=370)},
+        {},
+        [],
+        {},
+        [Receipt("FPGA", date(2027, 6, 18), 203, "po", "PO 70111155")],
+        S,
+        TODAY,
+    )
+    assert kinds(r) == ["beyond_backlog"]

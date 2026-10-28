@@ -41,6 +41,13 @@ class PlanSettings:
     # it lands is a push-out candidate.
     push_out_days: int = 30
 
+    # Until core/segment.py exists: a part whose lead time is at least this
+    # many business days (~90 calendar) is bought ahead of the backlog on
+    # purpose, so an open receipt no backlog line needs is "covering beyond
+    # the backlog", not a cancel candidate. The 370-day FPGA's 290 units on
+    # order were placed for demand past the backlog horizon.
+    committed_lead_bdays: int = 63
+
     # Respect MAX's order modifiers on planned orders.
     use_min_mult_qty: bool = True
 

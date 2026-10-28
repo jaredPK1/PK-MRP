@@ -144,6 +144,40 @@ LEFT JOIN rec r ON r.ORDNUM_55 = o.ORDNUM_10 AND r.LINNUM_55 = o.LINNUM_10
 WHERE o.TYPE_10 = 'PO' AND o.CREDTE_10 >= ?
 """
 
+# Components PK sent to a vendor to build with (consigned kits): issues and
+# transfers with no order number whose reference names a PO (70xxxxxx).
+# Chad moves parts into an "OFFSITE @ vendor" location citing the PO, then
+# issues them out of it when the boards come back -- or issues straight from
+# a bin with the PO in REFDES. The PO number is parsed in pandas.
+CONSIGN_MOVES_SQL = """
+SELECT RTRIM(PRTNUM_15) AS component, RTRIM(TNXCDE_15) AS code, TNXQTY_15 AS qty,
+       TNXDTE_15 AS moved, RTRIM(ISNULL(REFDES_15, '')) AS reference,
+       RTRIM(ISNULL(STKID_15, '')) AS location
+FROM Transaction_History
+WHERE TNXCDE_15 IN ('I', 'T') AND RTRIM(ISNULL(ORDNUM_15, '')) = ''
+  AND TNXDTE_15 >= ?
+  AND REFDES_15 LIKE '%70[0-9][0-9][0-9][0-9][0-9][0-9]%'
+"""
+
+# What each PO (any order type: PO, SO subcontract, VO, NI) was buying.
+PO_PARTS_SQL = """
+SELECT DISTINCT RTRIM(ORDNUM_10) AS po, RTRIM(PRTNUM_10) AS parent,
+       RTRIM(TYPE_10) AS order_type
+FROM Order_Master
+WHERE ORDNUM_10 LIKE '70%' AND CREDTE_10 >= ?
+"""
+
+# MAX-native subcontract POs carry their components in Requirement_Detail
+# (ORDER_11 '7...'). Every row since ? is evidence; open rows are demand.
+SUBCONTRACT_REQ_SQL = """
+SELECT RTRIM(o.ORDNUM_10) AS po, RTRIM(o.LINNUM_10) AS line, RTRIM(o.PRTNUM_10) AS parent,
+       RTRIM(rd.PRTNUM_11) AS part, rd.CURQTY_11 - rd.ISSQTY_11 AS qty_open,
+       rd.CURDUE_11 AS due, RTRIM(o.STATUS_10) AS status
+FROM Requirement_Detail rd
+JOIN Order_Master o ON o.ORDER_10 = rd.ORDER_11
+WHERE rd.ORDER_11 LIKE '7%' AND o.CREDTE_10 >= ?
+"""
+
 VENDORS_SQL = """
 SELECT RTRIM(VENID_08) AS vendor_id, RTRIM(ISNULL(COMNAM_08, '')) AS name,
        RTRIM(ISNULL(STATUS_08, '')) AS status
@@ -166,11 +200,15 @@ ALL_SQL = {
     "open_wos": OPEN_WO_SQL,
     "wo_requirements": WO_REQ_SQL,
     "po_history": PO_HISTORY_SQL,
+    "consign_moves": CONSIGN_MOVES_SQL,
+    "po_parts": PO_PARTS_SQL,
+    "subcontract_reqs": SUBCONTRACT_REQ_SQL,
     "vendors": VENDORS_SQL,
     "part_vendors": PART_VENDORS_SQL,
 }
 
 _DATES = {
+    "moved",
     "effective",
     "cur_due",
     "cus_due",
@@ -208,6 +246,9 @@ _TEXT = {
     "name",
     "vendor_part",
     "preferred",
+    "code",
+    "location",
+    "order_type",
 }
 
 
@@ -272,3 +313,20 @@ def vendors(erp):
 def part_vendors(erp):
     """Approved sources per part (Part_Vendor), not who PK actually buys from."""
     return _run(erp, "part_vendors")
+
+
+def consign_moves(erp, since):
+    """Issues/transfers to vendors citing a PO, with the PO number parsed."""
+    df = _run(erp, "consign_moves", [since])
+    df["po"] = df["reference"].str.extract(r"(70\d{6})", expand=False)
+    return df
+
+
+def po_parts(erp, since):
+    """{po -> parent part} for every 70- order created since `since`."""
+    return _run(erp, "po_parts", [since])
+
+
+def subcontract_reqs(erp, since):
+    """Component requirements on subcontract POs created since `since`."""
+    return _run(erp, "subcontract_reqs", [since])

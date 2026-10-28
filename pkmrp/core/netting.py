@@ -268,8 +268,22 @@ def _net_part(part, parts, kids, demands, on_hand, receipts, settings, today, le
                 pegs=_merge_pegs(x["pegs"]),
             )
         )
+    if info.type in settings.buy_types:
+        long_lead = lead_times.get(part, (info.purchase_lt, ""))[0] >= settings.committed_lead_bdays
+    else:
+        long_lead = info.mfg_lt >= settings.committed_lead_bdays
     for i, r in enumerate(recs):
-        if first_use[i] is None and left[i] >= r.qty - 1e-9:
+        if first_use[i] is None and left[i] >= r.qty - 1e-9 and long_lead:
+            result.exceptions.append(
+                Exception_(
+                    part,
+                    "beyond_backlog",
+                    ref=r.ref,
+                    qty=r.qty,
+                    detail=f"due {r.date}; long-lead part, covers demand past the backlog",
+                )
+            )
+        elif first_use[i] is None and left[i] >= r.qty - 1e-9:
             result.exceptions.append(
                 Exception_(
                     part,
@@ -352,10 +366,11 @@ def _net_part(part, parts, kids, demands, on_hand, receipts, settings, today, le
                     pegs=d.pegs,
                 )
             )
-        if is_make:
-            for comp, qpu in bom:
-                pegs = tuple(
-                    Peg(p.kind, p.ref, p.root_part, p.path + (comp,), p.value) for p in d.pegs
-                )
-                new_demand.append(Demand(comp, place_by, qty * qpu, pegs, "planned_make"))
+        # A make explodes its BOM at its start date; a buy explodes only the
+        # kit PK consigns to the vendor (`children` holds just those
+        # components for bought parents), due there when the PO is placed.
+        for comp, qpu in bom:
+            pegs = tuple(Peg(p.kind, p.ref, p.root_part, p.path + (comp,), p.value) for p in d.pegs)
+            source = "planned_make" if is_make else "planned_kit"
+            new_demand.append(Demand(comp, place_by, qty * qpu, pegs, source))
     return new_demand
