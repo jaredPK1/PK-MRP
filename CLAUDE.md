@@ -316,8 +316,18 @@ This extends Committed supply step 6. Forecast letters are standard practice; wh
 | Supply Stress (E) | Debating which single-source risk to fix first |
 | Supplier Heartbeat (F) | One-off forecast emails to suppliers with no follow-through |
 | Settings | Thresholds, part-class modes (`shadow`/`live`), capacities, flags |
+| **Home (splash)** | "Where do I start this morning": today's top 10 buys, this week's progress |
 
-Keep pages dense and plain. Tables come first, and use at most one chart per page.
+### It has to feel good to use (Jared, 2026-10-28)
+
+PK-MRP lands on an overloaded team; if it feels like another ERP screen it won't get opened. Make it pleasant, even fun:
+
+- **A home page worth opening first thing** -- a splash with **today's top 10 buys**: the parts most worth placing today (place-by date passed or today, ranked by the revenue they unblock), each with its quantity, vendor, place-by date and the sales orders it frees, one click to the `why` trace. This replaces "where do I start this morning", so it passes the product rule.
+- **Progress you can feel**: what got done this week (recommended buys placed, parts that went from short to covered, committed parts now covered 12 months out), a short streak or "all clear" state when a list is empty, small celebratory moments when something clears. Never a leaderboard of people (same rule as the Decision Ledger).
+- **Fast and calm**: instant page loads (precomputed by the CLI run, not live queries), plain-language labels instead of MAX column names, friendly empty and error states that say what to do next, shadow-mode badges that make it obvious nothing is live yet.
+- **Polish**: a consistent look (PK colours, as Control Tower uses), good typography, works on a phone for a quick check.
+
+Working pages behind the home page stay dense: tables first, at most one chart per page. Delight goes into the home page and the moments of completion, not into decorating data.
 
 ## Acceptance checks (regression tests against a frozen 2026-10-28 snapshot)
 
