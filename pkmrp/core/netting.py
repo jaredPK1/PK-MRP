@@ -108,6 +108,8 @@ class PlanResult:
     levels: dict = field(default_factory=dict)
     cycle_edges: list = field(default_factory=list)
     committed: set | None = None
+    # every demand netted against each part, kept whole for the why story
+    demands: dict = field(default_factory=lambda: defaultdict(list))
 
 
 def _round_order(short, part, use_min_mult):
@@ -216,6 +218,7 @@ def _net_part(part, parts, kids, demands, on_hand, receipts, settings, today, le
         return []
 
     demands = sorted(demands, key=lambda d: (d.date, d.source, d.qty))
+    result.demands[part] = demands
     recs = sorted(receipts, key=lambda r: (r.date, r.ref))
     left = [r.qty for r in recs]  # unconsumed qty per receipt
     first_use = [None] * len(recs)

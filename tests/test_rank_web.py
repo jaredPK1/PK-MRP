@@ -79,7 +79,43 @@ def client(tmp_path, monkeypatch):
                 "sales_orders": ["20048246"],
                 "planned_lines": 1,
                 "wo_only": False,
-                "ledger": [{"date": None, "qty": 0, "kind": "on_hand", "ref": "x"}],
+                "late_lines": 6,
+                "story": {
+                    "part": "46-0020-01G",
+                    "description": "LENS, 1X RELAY",
+                    "on_hand": 20,
+                    "on_order": 0,
+                    "total_need": 42,
+                    "runs_out": "2026-12-09",
+                    "covered_until": "2026-12-02",
+                    "overdue_need": 8,
+                    "buy_qty": 22,
+                    "vendor": "REXNORD INDUSTRIES",
+                    "lead_days": 79,
+                    "lead_source": "realized (3 lines)",
+                    "arrives_if_ordered_today": "2027-02-20",
+                    "orders_slipping": 4,
+                    "goes_into": [
+                        {"part": "06-2025-00G", "description": "APERTURE WHEEL ASSY", "units": 19}
+                    ],
+                    "waiting": [
+                        {
+                            "kind": "order",
+                            "ref": "SO 20048246",
+                            "customer": "JIANGSU ETERN",
+                            "units": 5,
+                            "need_by": "2026-12-09",
+                            "ships": "2027-01-15",
+                            "value": 12200000,
+                            "system": "00-0988-02G",
+                            "system_description": "2304 MFD UNIT",
+                            "slips": True,
+                            "short_from": "2026-12-09",
+                        }
+                    ],
+                    "waiting_more": 0,
+                    "months": [{"month": "2026-12-01", "need": 22, "arriving": 0, "balance": -2}],
+                },
                 "pegs": [{"ref": "SO 20048246/05", "path": ["SYS", "46-0020-01G"], "value": 0}],
                 "exceptions": [],
             }
@@ -108,7 +144,9 @@ def test_home_greets_ranks_and_celebrates(client):
 
 def test_why_fragment_and_full_list(client):
     why = client.get("/why/46-0020-01G").get_data(as_text=True)
-    assert "SO 20048246/05" in why and "ordering by" in why
+    assert "Runs out" in why and "Rexnord Industries" in why and "Jiangsu Etern" in why
+    assert "from its last 3 orders" in why and "4 orders need it before then" in why
+    assert "Aperture wheel assy" in why and "slips" in why
     assert client.get("/why/NOPE").status_code == 404
     assert "46-0020-01G" in client.get("/buys").get_data(as_text=True)
 

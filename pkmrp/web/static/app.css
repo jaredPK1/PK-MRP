@@ -168,3 +168,20 @@ footer { max-width: 1080px; margin: 0 auto; padding: 18px 20px 30px; color: var(
 .suggest li.on, .suggest li:hover { background: var(--soon-soft); }
 @media (max-width: 760px) { .picker input { min-width: 0; width: 100%; } .suggest { min-width: 0; width: 100%; } }
 .cp-detail .ledger td, .cp-detail .ledger th { padding: 4px 14px; }
+
+/* The why story */
+.story-head { margin-bottom: 10px; }
+.story-big { font-size: 22px; font-weight: 700; color: var(--ink); letter-spacing: -.01em; }
+.story-big.late { color: var(--late); }
+.story-line { margin: 2px 0 0; color: var(--ink-2); }
+.story-action { display: grid; gap: 4px; background: var(--soon-soft); border-radius: 10px; padding: 10px 14px; margin: 8px 0 4px; }
+.story-action .lbl { display: inline-block; width: 52px; font-size: 11px; font-weight: 700; text-transform: uppercase;
+                     letter-spacing: .06em; color: var(--muted); }
+.story-action .warn { color: var(--late); }
+.into { margin: 0; padding-left: 18px; } .into li { margin: 2px 0; }
+.ledger.who tr.slip td { background: var(--late-soft); }
+.ledger .neg { color: var(--late); font-weight: 600; }
+.ledger.months { max-width: 420px; }
+.why-cell .why-inner { padding: 12px 16px; background: var(--bg); }
+.ledger.who { max-width: none; } .ledger.who td.mono { white-space: nowrap; }
+.ledger.who td:nth-child(5), .ledger.who td:nth-child(6) { white-space: nowrap; }

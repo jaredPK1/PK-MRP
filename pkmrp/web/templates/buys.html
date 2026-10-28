@@ -15,7 +15,7 @@
 <div class="table-tools"><input type="search" class="table-filter" placeholder="Filter: part number or description words — e.g. 2300 lens" aria-label="Filter the table"><span class="muted small filter-count"></span></div>
 <div class="table-wrap">
 <table class="dense">
-  <thead><tr><th class="r">#</th><th>Part</th><th>Description</th><th class="r">Qty</th><th class="r">Spend</th><th>Order by</th><th class="r">Lead</th><th>Vendor</th><th>Buyer</th><th class="r">Orders</th><th class="r">Order value</th></tr></thead>
+  <thead><tr><th class="r">#</th><th>Part</th><th>Description</th><th class="r">Qty</th><th class="r">Spend</th><th>Order by</th><th class="r">Lead</th><th>Vendor</th><th>Buyer</th><th class="r">Orders</th><th class="r">Order value</th><th></th></tr></thead>
   <tbody>
   {% for b in rows %}
     <tr>
@@ -30,9 +30,11 @@
       <td>{{ b.buyer }}</td>
       <td class="r">{{ b.orders or '' }}</td>
       <td class="r">{{ b.order_value|money if b.order_value else '' }}</td>
+      <td><button class="why-btn" hx-get="{{ script_root }}/why/{{ b.part }}" hx-target="#why-row-{{ loop.index }}" hx-swap="innerHTML">Why?</button></td>
     </tr>
+    <tr class="cp-row"><td colspan="12" id="why-row-{{ loop.index }}" class="cp-cell why-cell"></td></tr>
   {% else %}
-    <tr><td colspan="11" class="muted">Nothing for this buyer this week.</td></tr>
+    <tr><td colspan="12" class="muted">Nothing for this buyer this week.</td></tr>
   {% endfor %}
   </tbody>
 </table>

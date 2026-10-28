@@ -45,10 +45,39 @@ def _qty(v):
     return f"{v:,.0f}" if v == int(v) else f"{v:,.2f}"
 
 
+def _nice_date(v):
+    """'2026-12-09' -> 'Wed 9 Dec' (with the year when it isn't this year)."""
+    if not v:
+        return ""
+    d = date.fromisoformat(v) if isinstance(v, str) else v
+    return f"{d:%a} {d.day} {d:%b}" + (f" {d.year}" if d.year != date.today().year else "")
+
+
+def _month_name(v):
+    d = date.fromisoformat(v) if isinstance(v, str) else v
+    return f"{d:%b}" + (f" {d.year}" if d.year != date.today().year else "")
+
+
+def _lead_words(source):
+    """'realized (3 lines)' -> 'from its last 3 orders'; 'PURLT_01' -> 'MAX's lead time'."""
+    s = source or ""
+    if s.startswith("realized"):
+        n = "".join(ch for ch in s if ch.isdigit())
+        return f"from its last {n} orders" if n else "from its order history"
+    if s.startswith("PURLT"):
+        return "MAX's lead time (no history to check it)"
+    if s.startswith("MFGLT"):
+        return "MAX's build time"
+    return s
+
+
 def create_app():
     app = Flask(__name__)
     app.jinja_env.filters["money"] = _money
     app.jinja_env.filters["qty"] = _qty
+    app.jinja_env.filters["nice_date"] = _nice_date
+    app.jinja_env.filters["month_name"] = _month_name
+    app.jinja_env.filters["lead_words"] = _lead_words
 
     @app.context_processor
     def _ctx():
@@ -301,7 +330,7 @@ def create_app():
         """The why trace for one buy -- an HTMX fragment."""
         snap = snapshot.load_latest() or abort(404)
         b = next((b for b in snap["buys"] if b["part"] == part), None) or abort(404)
-        return render_template("_why.html", b=b)
+        return render_template("_why.html", b=b, today_iso=date.today().isoformat())
 
     app.config["DATA_DIR"] = os.environ.get("DATA_DIR", snapshot.DATA_DIR)
     return app

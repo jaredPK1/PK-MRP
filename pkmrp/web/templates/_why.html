@@ -1,28 +1,62 @@
+{% set s = b.story %}
 <div class="why-inner">
-  <p class="why-lede">
-    {{ b.qty|qty }} of <b>{{ b.part }}</b> are short by {{ b.need_by }}. With a {{ b.lead_days|round|int }}-day lead time
-    — {{ b.lead_source }} — that means ordering by <b>{{ b.place_by }}</b>{% if b.days_late %} — {{ b.days_late }} days ago{% endif %}.
-  </p>
-  {% if b.sales_orders %}
-  <h4>The orders behind it</h4>
-  <ul class="pegs">
-    {% for p in b.pegs[:12] %}
-    <li><span class="mono">{{ p.ref }}</span> <span class="path">{{ p.path|join(' → ') }}</span>{% if p.value %} <span class="val">{{ p.value|money }}</span>{% endif %}</li>
-    {% endfor %}
-    {% if b.pegs|length > 12 %}<li class="muted">+{{ b.pegs|length - 12 }} more</li>{% endif %}
+  <div class="story-head">
+    {% if s.runs_out %}
+      <div class="story-big {{ 'late' if s.runs_out < today_iso else '' }}">{% if s.runs_out < today_iso %}Already short{% else %}Runs out {{ s.runs_out|nice_date }}{% endif %}</div>
+    {% else %}
+      <div class="story-big">Short {{ b.qty|qty }}</div>
+    {% endif %}
+    <p class="story-line">
+      {% if s.on_hand %}{{ s.on_hand|qty }} on hand{% else %}Nothing on hand{% endif %}{% if s.on_order %}, {{ s.on_order|qty }} on order{% endif %}{% if s.covered_until %} — enough for orders through {{ s.covered_until|nice_date }}{% endif %}.
+      Booked orders need {{ s.total_need|qty }} in all{% if s.overdue_need %}, {{ s.overdue_need|qty }} of them already past due{% endif %}.
+    </p>
+  </div>
+
+  <div class="story-action">
+    <div><span class="lbl">Do</span> Order <b>{{ b.qty|qty }}</b>{% if s.vendor %} from <b>{{ s.vendor|title }}</b>{% endif %}{% if b.spend %} · about {{ b.spend|money }}{% endif %}{% if s.later_qty %} — that's what can't wait; the other {{ s.later_qty|qty }} can be ordered by {{ s.later_place_by|nice_date }}{% endif %}.</div>
+    <div><span class="lbl">Lands</span> around <b>{{ s.arrives_if_ordered_today|nice_date }}</b> if placed today — {{ s.lead_days|round|int }} working days, {{ s.lead_source|lead_words }}</div>
+    {% if s.orders_slipping %}<div class="warn"><span class="lbl">Watch</span> {{ s.orders_slipping }} order{{ '' if s.orders_slipping == 1 else 's' }} need{{ 's' if s.orders_slipping == 1 else '' }} it before then and stock doesn't cover {{ 'it' if s.orders_slipping == 1 else 'them' }} — {{ 'it slips' if s.orders_slipping == 1 else 'they slip' }} unless an open PO is pulled in or a faster source is found.</div>
+    {% else %}<div><span class="lbl">Watch</span> Nothing slips if it's ordered today.</div>{% endif %}
+  </div>
+
+  {% if s.goes_into %}
+  <h4>Goes into</h4>
+  <ul class="into">
+    {% for g in s.goes_into %}<li><span class="mono">{{ g.part }}</span> {{ g.description|lower|capitalize }} <span class="muted">· {{ g.units|qty }} needed</span></li>{% endfor %}
   </ul>
   {% endif %}
-  <h4>How the numbers add up</h4>
-  <table class="ledger">
-    <thead><tr><th>Date</th><th class="r">Qty</th><th>What</th><th>Ref</th></tr></thead>
+
+  {% if s.waiting %}
+  <h4>Who's waiting</h4>
+  <table class="ledger who">
+    <thead><tr><th>Order</th><th>Customer</th><th>Goes in</th><th class="r">Units</th><th>Part needed</th><th>Ships</th><th class="r">Order value</th></tr></thead>
     <tbody>
-    {% for e in b.ledger[:30] %}
-      <tr class="{{ e.kind }}"><td>{{ e.date or '' }}</td><td class="r">{{ '%+g'|format(e.qty) }}</td><td>{{ e.kind|replace('_', ' ') }}</td><td class="mono">{{ e.ref }}</td></tr>
+    {% for w in s.waiting %}
+      <tr class="{{ 'slip' if w.slips else '' }}">
+        <td class="mono">{{ w.ref }}</td>
+        <td>{{ w.customer|title if w.customer else w.kind }}</td>
+        <td class="small" title="{{ w.system }}">{{ w.system_description|lower|capitalize|truncate(34, True, '…') }}</td>
+        <td class="r">{{ w.units|qty }}</td>
+        <td>{% if w.short_from %}{{ w.short_from|nice_date }}{% if w.slips %} <span class="chip late">slips</span>{% else %} <span class="chip today">to buy</span>{% endif %}{% else %}{{ w.need_by|nice_date }} <span class="chip soon">covered</span>{% endif %}</td>
+        <td>{{ w.ships|nice_date if w.ships else '' }}</td>
+        <td class="r">{{ w.value|money if w.value else '' }}</td>
+      </tr>
     {% endfor %}
     </tbody>
   </table>
-  {% if b.exceptions %}
-  <h4>Also on this part</h4>
-  <ul class="pegs">{% for e in b.exceptions[:6] %}<li>{{ e.kind|replace('_', ' ') }} <span class="mono">{{ e.ref }}</span> — {{ e.detail }}</li>{% endfor %}</ul>
+  {% if s.waiting_more %}<p class="muted small">+{{ s.waiting_more }} more</p>{% endif %}
+  {% endif %}
+
+  {% if s.months %}
+  <h4>Month by month</h4>
+  <table class="ledger months">
+    <thead><tr><th>Month</th><th class="r">Needed</th><th class="r">Arriving</th><th class="r">Balance</th></tr></thead>
+    <tbody>
+    {% for m in s.months %}
+      <tr><td>{{ m.month|month_name }}</td><td class="r">{{ m.need|qty if m.need else '' }}</td><td class="r">{{ m.arriving|qty if m.arriving else '' }}</td>
+          <td class="r {{ 'neg' if m.balance < 0 else '' }}">{{ m.balance|qty }}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
   {% endif %}
 </div>

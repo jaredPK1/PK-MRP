@@ -14,11 +14,12 @@ import tempfile
 from collections import Counter
 from datetime import date, datetime
 
+from .core.calendar import plus_workdays
 from .core.params import purlt_proposals
 from .core.rank import buy_list
+from .core.story import build_story
 
 DATA_DIR = os.environ.get("DATA_DIR", os.path.join(os.getcwd(), "data"))
-WHY_DETAIL_FOR = 60  # full why trace kept for the top N buys
 
 
 def _iso(v):
@@ -32,6 +33,27 @@ def _iso_deep(v):
     if isinstance(v, list):
         return [_iso_deep(x) for x in v]
     return _iso(v)
+
+
+def so_lines_meta(so_df, settings):
+    """{so: {'customer', 'value' (USD), 'lines': {line: ship date}}} for stories."""
+    values, customers = so_rollups(so_df)
+    out = {}
+    col = settings.demand_date
+    for r in so_df.itertuples(index=False):
+        m = out.setdefault(
+            r.so,
+            {
+                "customer": customers.get(r.so, ""),
+                "value": round(values.get(r.so, 0.0), 2),
+                "lines": {},
+            },
+        )
+        due = getattr(r, col, None)
+        due = due if due == due else r.cur_due
+        if due is not None and due == due:
+            m["lines"][r.line] = due.date() if hasattr(due, "date") else due
+    return out
 
 
 def so_rollups(so_df):
@@ -60,23 +82,46 @@ def build(run, so_df):
         vendor_name=run.get("vendor_name"),
     )
     by_kind = Counter(e.kind for e in res.exceptions)
-    for b in buys[:WHY_DETAIL_FOR]:
+    so_meta = so_lines_meta(run["so_lines"], run["settings"])
+    receipts_by_part = {}
+    for r in run["receipts"]:
+        receipts_by_part.setdefault(r.part, []).append((r.date, r.qty, r.ref))
+    parts = run["parts"]
+
+    def describe(p):
+        return parts[p].description if p in parts else ""
+
+    late_by_part = Counter(e.part for e in res.exceptions if e.kind == "late_to_place")
+    horizon = plus_workdays(today, 5)  # rank.buy_list's horizon
+    for b in buys:
         part = b["part"]
-        b["ledger"] = [
-            {"date": _iso(d), "qty": q, "kind": k, "ref": ref}
-            for d, q, k, ref in res.ledger.get(part, [])
-        ][:120]
+        b["story"] = _iso_deep(
+            build_story(
+                part,
+                res.demands.get(part, []),
+                receipts_by_part.get(part, []),
+                run["stock"].get(part, 0.0),
+                b["qty"],
+                b["lead_days"],
+                b["lead_source"],
+                b["vendor"],
+                today,
+                describe,
+                so_meta,
+                later_buys=[
+                    (o.place_by, o.qty)
+                    for o in res.planned
+                    if o.part == part and o.kind == "buy" and o.place_by > horizon
+                ],
+            )
+        )
+        b["late_lines"] = late_by_part.get(part, 0)
         b["pegs"] = [
-            {"ref": p.ref, "path": list(p.path), "value": p.value}
+            {"ref": p.ref}
             for o in res.planned
             if o.part == part and o.kind == "buy"
             for p in o.pegs
         ][:60]
-        b["exceptions"] = [
-            {"kind": e.kind, "ref": e.ref, "detail": e.detail}
-            for e in res.exceptions
-            if e.part == part
-        ][:20]
     unscheduled = run["worklists"]["unscheduled"]
     segments = run.get("segments") or []
     seg_counts = Counter(r["segment"] for r in segments)
