@@ -3,8 +3,8 @@
 {% block content %}
 <section class="hero">
   <p class="date">{{ now.strftime('%A, %B') }} {{ now.day }}</p>
-  <h1>{{ greeting }}, {{ name }}.</h1>
-  <p class="nudge">{{ nudge }}</p>
+  <h1>{{ voice.greeting }}</h1>
+  <p class="nudge">{% if voice.by %}&ldquo;{{ voice.line }}&rdquo; <span class="by">&mdash; {{ voice.by }}</span>{% else %}{{ voice.line }}{% endif %}</p>
 </section>
 
 <section class="tiles" aria-label="Today at a glance">

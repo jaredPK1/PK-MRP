@@ -19,7 +19,7 @@ main { max-width: 1080px; margin: 0 auto; padding: 0 20px 40px; }
 .bar { display: flex; align-items: center; gap: 22px; padding: 12px 24px; background: var(--surface);
        border-bottom: 1px solid var(--line); position: sticky; top: 0; z-index: 5; }
 .brand { display: flex; align-items: center; gap: 9px; font-weight: 700; color: var(--ink); font-size: 17px; }
-.mark { width: 22px; height: 22px; border-radius: 6px; background: linear-gradient(135deg, var(--leaf), var(--teal)); }
+.mark { width: 26px; height: 26px; display: block; }
 .bar nav { display: flex; gap: 4px; }
 .bar nav a { padding: 6px 12px; border-radius: 8px; color: var(--muted); font-weight: 500; white-space: nowrap; }
 .bar nav a.on { background: var(--soon-soft); color: var(--leaf-dark); }
@@ -30,7 +30,8 @@ main { max-width: 1080px; margin: 0 auto; padding: 0 20px 40px; }
 .hero { padding: 36px 0 18px; }
 .hero .date { margin: 0; color: var(--muted); font-weight: 500; letter-spacing: .02em; }
 .hero h1 { margin: 4px 0 6px; font-size: clamp(28px, 4vw, 40px); letter-spacing: -.02em; }
-.hero .nudge { margin: 0; color: var(--ink-2); font-size: 17px; }
+.hero .nudge { margin: 0; color: var(--ink-2); font-size: 17px; max-width: 46em; }
+.hero .nudge .by { color: var(--muted); font-size: 14px; white-space: nowrap; }
 
 .tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 10px 0 30px; }
 .tile { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 16px 18px;

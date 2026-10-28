@@ -101,7 +101,7 @@ def test_home_greets_ranks_and_celebrates(client):
     html = client.get("/", headers={"X-Auth-Request-Email": "rob.smith@pkinetics.com"}).get_data(
         as_text=True
     )
-    assert "Rob." in html and "46-0020-01G" in html and "Today's top 1" in html
+    assert "Rob" in html and "46-0020-01G" in html and "Today's top 1" in html
     assert "came off the list since 10-27" in html and "✓ 1" in html
     assert "Shadow mode" in html
 
@@ -120,3 +120,36 @@ def test_no_snapshot_is_a_friendly_page(tmp_path, monkeypatch):
     monkeypatch.setattr(snapshot, "DATA_DIR", str(tmp_path / "none"))
     r = create_app().test_client().get("/")
     assert r.status_code == 200 and "Warming up" in r.get_data(as_text=True)
+
+
+def test_voice_follows_the_clock_and_holds_within_the_hour():
+    from datetime import datetime
+
+    from pkmrp.web import voice
+
+    wed = lambda h, m=0: datetime(2026, 10, 28, h, m)  # noqa: E731
+    assert [voice.part_of_day(wed(h)) for h in (5, 9, 12, 15, 19, 23)] == [
+        "early",
+        "morning",
+        "midday",
+        "afternoon",
+        "evening",
+        "late",
+    ]
+    assert voice.part_of_day(datetime(2026, 10, 31, 10)) == "weekend"
+    a, b = voice.speak(wed(9, 5), "Rob"), voice.speak(wed(9, 50), "Rob")
+    assert a == b and "Rob" in a["greeting"]
+    sat = voice.speak(datetime(2026, 10, 31, 10), "Rob")
+    assert sat["part"] == "weekend"
+    seen = {voice.speak(wed(h), "Rob")["line"] for h in range(6, 22)}
+    assert len(seen) > 4  # it actually changes through the day
+
+
+def test_voice_never_says_zero():
+    from datetime import datetime
+
+    from pkmrp.web import voice
+
+    for h in range(24):
+        out = voice.speak(datetime(2026, 10, 28, h), "Rob", {"orders": 0, "cleared": 0})
+        assert "0 booked" not in out["line"] and "{" not in out["line"]

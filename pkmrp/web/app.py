@@ -1,32 +1,17 @@
 """PK-MRP web app. Reads the snapshot `pkmrp run` writes; never queries MAX."""
 
 import os
-import random
 from datetime import date, datetime
 
 from flask import Flask, abort, render_template, request
 
 from .. import snapshot
-
-# One of these under the greeting -- the app should be pleasant to open.
-NUDGES = (
-    "Coffee first. Then these.",
-    "The backlog is the plan. Here's the plan.",
-    "Ten parts between the backlog and the dock.",
-    "Short list, big orders behind it.",
-    "Buy these and the kitting bench stays quiet.",
-    "Every one of these is somebody's shipment.",
-)
+from . import voice
 
 
 def _first_name(email):
     local = (email or "").split("@", 1)[0]
     return local.split(".")[0].capitalize() if local else "there"
-
-
-def _greeting(now):
-    h = now.hour
-    return "Good morning" if h < 12 else "Good afternoon" if h < 17 else "Good evening"
 
 
 def _money(v):
@@ -85,16 +70,27 @@ def create_app():
         for b in buys:
             b["when"], b["tone"] = _when(b["place_by"], today)
         email = request.headers.get("X-Auth-Request-Email", "")
+        name = _first_name(email)
+        h = snap["headline"]
+        progress = snapshot.progress(snap, prev)
+        facts = {
+            "orders": h["orders_waiting"],
+            "buys": h["buy_now"],
+            "cleared": (progress or {}).get("cleared"),
+            "top_part": buys[0]["part"] if buys else None,
+            "top_value": _money(buys[0]["order_value"])
+            if buys and buys[0]["order_value"]
+            else None,
+        }
         return render_template(
             "home.html",
             snap=snap,
             top=buys[:10],
             more=max(len(buys) - 10, 0),
-            h=snap["headline"],
-            progress=snapshot.progress(snap, prev),
-            name=_first_name(email),
-            greeting=_greeting(now),
-            nudge=random.Random(snap["today"]).choice(NUDGES),
+            h=h,
+            progress=progress,
+            name=name,
+            voice=voice.speak(now, name, facts),
             now=now,
         )
 
