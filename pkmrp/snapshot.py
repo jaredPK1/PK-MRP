@@ -14,6 +14,7 @@ import tempfile
 from collections import Counter
 from datetime import date, datetime
 
+from .core.params import purlt_proposals
 from .core.rank import buy_list
 
 DATA_DIR = os.environ.get("DATA_DIR", os.path.join(os.getcwd(), "data"))
@@ -68,6 +69,12 @@ def build(run, so_df):
             if e.part == part
         ][:20]
     unscheduled = run["worklists"]["unscheduled"]
+    segments = run.get("segments") or []
+    seg_counts = Counter(r["segment"] for r in segments)
+    params = purlt_proposals(run["parts"], run["lead_times"], segments)
+    names = run.get("vendor_name") or {}
+    for r in params:
+        r["vendor"] = names.get(r["part"], r["vendor"])
     return {
         "generated_at": datetime.now().isoformat(timespec="seconds"),
         "today": today.isoformat(),
@@ -90,8 +97,14 @@ def build(run, so_df):
             "unscheduled_lines": len(unscheduled),
             "unplannable_lines": len(run["worklists"]["unplannable"]),
             "consigned_pairs": run["counts"].get("consigned_pairs", 0),
+            "committed": seg_counts.get("committed", 0),
+            "unproven_long": seg_counts.get("unproven_long", 0),
+            "lead_time_fixes": len(params),
         },
         "buys": [{k: _iso(v) for k, v in b.items()} for b in buys],
+        "segments": [r for r in segments if r["segment"] != "order_driven"],
+        "segment_counts": dict(seg_counts),
+        "params": params,
     }
 
 

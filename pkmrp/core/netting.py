@@ -106,6 +106,7 @@ class PlanResult:
     ledger: dict = field(default_factory=lambda: defaultdict(list))
     levels: dict = field(default_factory=dict)
     cycle_edges: list = field(default_factory=list)
+    committed: set | None = None
 
 
 def _round_order(short, part, use_min_mult):
@@ -131,7 +132,9 @@ def _merge_pegs(pegs_iter):
     return tuple(out)
 
 
-def plan(parts, children, demands, on_hand, receipts, settings, today, lead_times=None):
+def plan(
+    parts, children, demands, on_hand, receipts, settings, today, lead_times=None, committed=None
+):
     """Net everything. Arguments:
 
     parts       {part: Part}
@@ -143,6 +146,7 @@ def plan(parts, children, demands, on_hand, receipts, settings, today, lead_time
     """
     lead_times = lead_times or {}
     result = PlanResult()
+    result.committed = committed
     levels, dropped = low_level_codes(children)
     kids = without_edges(children, dropped)
     result.levels, result.cycle_edges = levels, dropped
@@ -268,7 +272,9 @@ def _net_part(part, parts, kids, demands, on_hand, receipts, settings, today, le
                 pegs=_merge_pegs(x["pegs"]),
             )
         )
-    if info.type in settings.buy_types:
+    if result.committed is not None:  # segmentation ran: it decides
+        long_lead = part in result.committed
+    elif info.type in settings.buy_types:
         long_lead = lead_times.get(part, (info.purchase_lt, ""))[0] >= settings.committed_lead_bdays
     else:
         long_lead = info.mfg_lt >= settings.committed_lead_bdays

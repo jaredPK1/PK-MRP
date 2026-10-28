@@ -119,3 +119,12 @@ footer { max-width: 1080px; margin: 0 auto; padding: 18px 20px 30px; color: var(
   .card { grid-template-columns: 44px 1fr; } .rank { font-size: 22px; }
   main { padding: 0 14px 30px; }
 }
+
+.page-intro { margin: 26px 0 14px; } .page-intro .lede { color: var(--ink-2); max-width: 60em; margin: 6px 0 0; }
+.filters { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 14px 0 0; }
+.filters .chip { text-decoration: none; }
+.btn { font-weight: 600; font-size: 13px; padding: 6px 12px; border-radius: 8px; border: 1px solid var(--line);
+       background: var(--surface); color: var(--ink); }
+.btn:hover { border-color: var(--leaf); text-decoration: none; }
+.small { font-size: 12.5px; } .foot-note { color: var(--muted); font-size: 12.5px; margin-top: 10px; }
+.dense td.mono { white-space: nowrap; }

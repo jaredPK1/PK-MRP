@@ -105,6 +105,51 @@ def create_app():
         buyers = sorted({b["buyer"] for b in snap["buys"] if b["buyer"]})
         return render_template("buys.html", snap=snap, rows=rows, buyers=buyers, buyer=buyer)
 
+    @app.get("/committed")
+    def committed_page():
+        snap = snapshot.load_latest() or abort(404)
+        rows = snap.get("segments", [])
+        return render_template(
+            "committed.html", snap=snap, rows=rows, counts=snap.get("segment_counts", {})
+        )
+
+    @app.get("/lead-times")
+    def params_page():
+        snap = snapshot.load_latest() or abort(404)
+        rows = snap.get("params", [])
+        direction = request.args.get("direction", "")
+        if direction in ("longer", "shorter"):
+            rows = [r for r in rows if r["direction"] == direction]
+        return render_template(
+            "params.html",
+            snap=snap,
+            rows=rows,
+            direction=direction,
+            all_rows=snap.get("params", []),
+        )
+
+    @app.get("/lead-times.csv")
+    def params_csv():
+        import csv
+        import io
+
+        from flask import Response
+
+        from ..core.params import CSV_COLUMNS
+
+        snap = snapshot.load_latest() or abort(404)
+        buf = io.StringIO()
+        w = csv.DictWriter(buf, fieldnames=CSV_COLUMNS, extrasaction="ignore")
+        w.writeheader()
+        w.writerows(snap.get("params", []))
+        return Response(
+            buf.getvalue(),
+            mimetype="text/csv",
+            headers={
+                "Content-Disposition": f"attachment; filename=pk-mrp-lead-times-{snap['today']}.csv"
+            },
+        )
+
     @app.get("/why/<path:part>")
     def why(part):
         """The why trace for one buy -- an HTMX fragment."""

@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Committed parts · PK-MRP{% endblock %}
+{% block content %}
+<section class="page-intro">
+  <h1 class="h1-small">Committed parts</h1>
+  <p class="lede">The few bought parts whose own history proves a lead time longer than booked orders give warning of. These get 12-month supply; everything else is bought against the backlog.
+    <b>{{ counts.committed or 0 }}</b> committed · <b>{{ counts.unproven_long or 0 }}</b> MAX says are long but nothing proves it yet · {{ counts.order_driven or 0 }} order-driven.</p>
+</section>
+<div class="table-wrap">
+<table class="dense">
+  <thead><tr><th>Part</th><th>Description</th><th>Group</th><th class="r">Typical lead</th><th class="r">Slow end (P80)</th><th class="r">MAX says</th><th class="r">Receipts</th><th class="r">Vendors</th><th class="r">Orders it feeds</th><th>Why</th></tr></thead>
+  <tbody>
+  {% for r in rows %}
+    <tr>
+      <td class="mono">{{ r.part }}</td>
+      <td>{{ r.description|lower|capitalize }}</td>
+      <td><span class="chip {{ 'late' if r.segment == 'committed' else 'today' }}">{{ 'committed' if r.segment == 'committed' else 'unproven' }}</span></td>
+      <td class="r">{{ r.p50_days }}d</td>
+      <td class="r">{{ r.p80_days }}d</td>
+      <td class="r">{{ r.purlt_days }}d</td>
+      <td class="r">{{ r.lines or '—' }}</td>
+      <td class="r">{{ r.vendors_used }}{% if r.single_source %} <small class="muted">only</small>{% endif %}</td>
+      <td class="r">{{ r.orders }}</td>
+      <td class="muted small">{{ r.reasons|join('; ') }}</td>
+    </tr>
+  {% else %}<tr><td colspan="10" class="muted">No committed parts.</td></tr>{% endfor %}
+  </tbody>
+</table>
+</div>
+<p class="foot-note">Lead times in calendar days. "Typical" is the median of the part's own fully-received POs over 24 months; "slow end" is the 80th percentile.</p>
+{% endblock %}

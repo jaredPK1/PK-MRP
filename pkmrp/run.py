@@ -4,7 +4,7 @@ report needs. The only place extract (I/O) meets core (pure)."""
 import time
 from datetime import date, timedelta
 
-from .core import consign, leadtime, supply
+from .core import consign, leadtime, segment, supply
 from .core import demand as demand_mod
 from .core.bom import children_map
 from .core.netting import Part, plan
@@ -100,6 +100,19 @@ def build_plan(erp, settings=None, today=None, history_months=24):
         return lead.get(p, (parts[p].purchase_lt if p in parts else 0, ""))[0]
 
     kit_demand = consign.open_kit_demand(po_df, consigned, sub_lines, lead_of, today)
+
+    from .snapshot import so_rollups
+
+    so_values, _ = so_rollups(so_df)
+    t = time.time()
+    gated = segment.gated_orders(so_df, children, settings, today)
+    approved, used = segment.sources(pv_df, hist_df)
+    segments = segment.classify(parts, lt_stats, approved, used, gated, so_values, settings)
+    # Open receipts on these are bought ahead on purpose: "beyond_backlog",
+    # never cancel candidates. Unproven long-lead parts too -- suggesting a
+    # cancel on a part MAX says takes 300 days is the worse mistake.
+    committed = {r["part"] for r in segments if r["segment"] in ("committed", "unproven_long")}
+    timings["segment"] = round(time.time() - t, 2)
     t = time.time()
     result = plan(
         parts,
@@ -110,6 +123,7 @@ def build_plan(erp, settings=None, today=None, history_months=24):
         settings,
         today,
         lead,
+        committed,
     )
     timings["netting"] = round(time.time() - t, 2)
 
@@ -125,6 +139,7 @@ def build_plan(erp, settings=None, today=None, history_months=24):
         "worklists": worklists,
         "so_lines": so_df,
         "vendor_name": vendor_name,
+        "segments": segments,
         "consigned": consigned,
         "consign_evidence": consign_evidence,
         "bom_codes_skipped": skipped_codes,

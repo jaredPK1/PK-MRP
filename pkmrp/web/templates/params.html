@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}Lead times · PK-MRP{% endblock %}
+{% block content %}
+<section class="page-intro">
+  <h1 class="h1-small">Lead times to fix in MAX</h1>
+  <p class="lede">Parts whose real lead time, from their own receipts, is more than 25% off what MAX has. Each proposal is the slow end of that history (P80) — or the median, when there are fewer than 5 receipts to go on — rounded up to 5 business days. Someone keys the ones they agree with into MAX — PK-MRP never writes there.</p>
+  {% set longer = all_rows|selectattr('direction', 'equalto', 'longer')|list|length %}
+  <p class="filters">
+    <a class="chip {{ 'soon' if not direction else 'quiet' }}" href="?">All {{ all_rows|length }}</a>
+    <a class="chip {{ 'late' if direction == 'longer' else 'quiet' }}" href="?direction=longer">MAX too short · {{ longer }}</a>
+    <a class="chip {{ 'today' if direction == 'shorter' else 'quiet' }}" href="?direction=shorter">MAX too long · {{ all_rows|length - longer }}</a>
+    <span class="grow"></span>
+    <a class="btn" href="{{ script_root }}/lead-times.csv">Download CSV</a>
+  </p>
+</section>
+<div class="table-wrap">
+<table class="dense">
+  <thead><tr><th>Part</th><th>Description</th><th>Buyer</th><th>Vendor</th><th class="r">MAX now</th><th class="r">Propose</th><th class="r">Change</th><th class="r">Median</th><th class="r">P80</th><th class="r">Receipts</th></tr></thead>
+  <tbody>
+  {% for r in rows %}
+    <tr>
+      <td class="mono">{{ r.part }}</td>
+      <td>{{ r.description|lower|capitalize }}</td>
+      <td>{{ r.buyer }}</td>
+      <td>{{ r.vendor }}</td>
+      <td class="r">{{ r.current_bdays|int }}</td>
+      <td class="r"><b>{{ r.proposed_bdays }}</b>{% if r.basis == 'median' %} <small class="muted" title="Fewer than 5 receipts: proposed from the median">m</small>{% endif %}</td>
+      <td class="r"><span class="chip {{ 'late' if r.direction == 'longer' else 'today' }}">{{ '%+d'|format(r.change) }}</span></td>
+      <td class="r">{{ r.median_bdays }}</td>
+      <td class="r">{{ r.p80_bdays }}</td>
+      <td class="r">{{ r.lines }}</td>
+    </tr>
+  {% else %}<tr><td colspan="10" class="muted">Every lead time with enough history is within 25%. Lovely.</td></tr>{% endfor %}
+  </tbody>
+</table>
+</div>
+<p class="foot-note">Business days, as MAX stores PURLT. Lines ordered deliberately early are left out of the history.</p>
+{% endblock %}

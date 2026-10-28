@@ -48,6 +48,11 @@ class PlanSettings:
     # order were placed for demand past the backlog horizon.
     committed_lead_bdays: int = 63
 
+    # Segmentation (core/segment.py). Calendar days.
+    committed_p80_days: int = 90
+    single_source_days: int = 60
+    single_source_gate: float | None = None  # off: see core/segment.py
+
     # Respect MAX's order modifiers on planned orders.
     use_min_mult_qty: bool = True
 
