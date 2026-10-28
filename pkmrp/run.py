@@ -56,6 +56,12 @@ def build_plan(erp, settings=None, today=None, history_months=24):
             r.unit_cost,
             r.buyer,
             r.yield_pct,
+            pack_qty=(
+                float(r.purchase_cnv)
+                if r.type in settings.buy_types and float(r.purchase_cnv or 0) > 1
+                else 0.0
+            ),
+            pack_uom=r.purchase_uom,
         )
         for r in parts_df.itertuples(index=False)
     }

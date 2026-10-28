@@ -44,6 +44,8 @@ class Part:
     unit_cost: float = 0.0
     buyer: str = ""
     yield_pct: float = 0.0  # YIELD_01; 0 = not set
+    pack_qty: float = 0.0  # stocking units per purchase unit (PURCNV_01) when > 1
+    pack_uom: str = ""  # the purchase unit, e.g. PK, RL
 
 
 @dataclass(frozen=True)
@@ -117,8 +119,11 @@ def _round_order(short, part, use_min_mult):
     if use_min_mult:
         if part.min_qty and q < part.min_qty:
             q = part.min_qty
-        if part.mult_qty and part.mult_qty > 0:
-            q = math.ceil(q / part.mult_qty - 1e-9) * part.mult_qty
+        # MAX's order multiple, else whole purchase units (a 100-pack screw
+        # is bought 100 at a time even with no multiple keyed)
+        mult = part.mult_qty if part.mult_qty and part.mult_qty > 0 else part.pack_qty
+        if mult and mult > 0:
+            q = math.ceil(q / mult - 1e-9) * mult
     return q
 
 

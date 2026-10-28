@@ -414,3 +414,16 @@ def test_lines_dated_out_are_judged_against_the_parts_own_history():
     s = realized(_hist(old + recent), {"C": 152}, recent_since=date(2024, 10, 28))["C"]
     assert s["early_lines"] == 2
     assert s["median"] == 43 and s["source"] == "realized (5 lines since 2019)"
+
+
+def test_pack_parts_round_to_whole_packs_when_no_multiple_is_keyed():
+    from pkmrp.core.netting import _round_order
+
+    s = PlanSettings()
+    screw = Part("SCREW", "B", pack_qty=100, pack_uom="PK")
+    assert _round_order(88, screw, s.use_min_mult_qty) == 100
+    assert _round_order(101, screw, s.use_min_mult_qty) == 200
+    # MAX's own multiple wins when it is keyed
+    keyed = Part("SCREW", "B", mult_qty=50, pack_qty=100)
+    assert _round_order(88, keyed, s.use_min_mult_qty) == 100
+    assert _round_order(30, keyed, s.use_min_mult_qty) == 50

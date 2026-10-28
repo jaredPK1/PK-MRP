@@ -85,13 +85,19 @@ def shelf_orders(planned, shelf, parts, vendor_part, speed, today, horizon):
         for p, it in sorted(items.items(), key=lambda kv: kv[1]["need_by"]):
             info = parts.get(p)
             cost = float(info.unit_cost or 0) if info else 0.0
-            qty = max(1, math.ceil(it["qty"] - 1e-9))  # catalogs sell whole units
+            pack = info.pack_qty if info and info.pack_qty else 0.0
+            # catalogs sell whole purchase units: packs when MAX buys in packs
+            buy_units = max(1, math.ceil(it["qty"] / (pack or 1) - 1e-9))
+            qty = buy_units * (pack or 1)
             rows.append(
                 {
                     "part": p,
                     "description": info.description if info else "",
                     "vendor_part": vendor_part.get(p, ""),
                     "qty": qty,
+                    "buy_units": buy_units,
+                    "pack_qty": pack,
+                    "pack_uom": info.pack_uom if info and pack else "",
                     "spend": round(qty * cost, 2),
                     "need_by": it["need_by"],
                 }

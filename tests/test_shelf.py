@@ -69,3 +69,22 @@ def test_a_vendor_that_delivers_fast_is_a_shelf_vendor_without_being_listed():
     vend = {"SLEEVE": "WEBSTAURANT STORE.COM", "LENS": "OZ OPTICS LTD"}
     speed = {"WEBSTAURANT STORE.COM": 5, "OZ OPTICS LTD": 7.5}
     assert shelf_parts(parts, vend, S, speed) == {"SLEEVE": "WEBSTAURANT STORE.COM"}
+
+
+def test_pack_parts_buy_whole_packs_and_paste_pack_counts():
+    pegs = (Peg("so", "SO 1/01", "SYS"),)
+    planned = [
+        PlannedOrder("SCREW", "buy", 88, date(2026, 11, 3), date(2026, 10, 29), 1, "x", pegs)
+    ]
+    parts = {"SCREW": Part("SCREW", "B", unit_cost=0.119, pack_qty=100, pack_uom="PK")}
+    (cart,) = shelf_orders(
+        planned,
+        {"SCREW": "McMASTER-CARR"},
+        parts,
+        {"SCREW": "91251A052"},
+        {},
+        TODAY,
+        date(2026, 11, 4),
+    )
+    it = cart["items"][0]
+    assert it["buy_units"] == 1 and it["qty"] == 100 and it["pack_uom"] == "PK"

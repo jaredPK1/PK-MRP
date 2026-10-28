@@ -7,6 +7,11 @@ Every feature people can see gets a line here in the same change
 WHATS_NEW = (
     (
         "2026-10-28",
+        "Packs, reels and boxes",
+        'Parts MAX buys in packs (a screw in 100-packs, a reel of 5,000) are now bought in whole packs, shown as "100 to buy (1 PK of 100)", and the Shelf order copies pack counts for the quick-order paste. Pack parts\' order history counts toward their lead time again — MAX records their receipts in packs, which had made them look short-received.',
+    ),
+    (
+        "2026-10-28",
         "Fast vendors count as shelf, too",
         "Any vendor whose POs usually arrive within 6 working days (median of PK's own orders) now counts as a shelf vendor, listed or not — Webstaurant, Amazon Business, Zoro, Newegg, Fastener Superstore and more. Webstaurant's shelving parts plan on 5 days instead of MAX's 45.",
     ),

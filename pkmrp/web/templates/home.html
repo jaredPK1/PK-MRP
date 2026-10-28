@@ -58,7 +58,7 @@
         </div>
         <div class="desc">{{ b.description|lower|capitalize }}</div>
         <div class="facts">
-          <span><b>{{ b.qty|qty }}</b> to buy{% if b.spend %} · {{ b.spend|money }}{% endif %}</span>
+          <span><b>{{ b.qty|qty }}</b> to buy{% if b.packs %} <span class="muted">({{ b.packs }} {{ b.pack_uom or 'pack' }} of {{ b.pack_qty|qty }})</span>{% endif %}{% if b.spend %} · {{ b.spend|money }}{% endif %}</span>
           <span>{{ b.lead_days|round|int }}-day lead <small>· {{ b.lead_source|lead_words }}</small></span>
           {% if b.vendor %}<span>vendor {{ b.vendor }}</span>{% endif %}
           {% if b.buyer %}<span>buyer {{ b.buyer }}</span>{% endif %}
@@ -100,8 +100,8 @@
     {% set pasted = v['items']|selectattr('vendor_part')|list %}
     {% if pasted %}
     <p class="cart-tools">
-      <button type="button" class="btn copy-cart" data-lines="{% for it in pasted %}{{ it.vendor_part }} {{ it.qty|int }}{% if not loop.last %}&#10;{% endif %}{% endfor %}">Copy for quick order</button>
-      <span class="muted small">{{ pasted|length }} of {{ v.lines }} have {{ v.vendor|title }}'s part number on file — paste as "part qty" lines.{% if pasted|length < v.lines %} The rest are listed with ours below.{% endif %}</span>
+      <button type="button" class="btn copy-cart" data-lines="{% for it in pasted %}{{ it.vendor_part }} {{ it.buy_units }}{% if not loop.last %}&#10;{% endif %}{% endfor %}">Copy for quick order</button>
+      <span class="muted small">{{ pasted|length }} of {{ v.lines }} have {{ v.vendor|title }}'s part number on file — paste as "part qty" lines, in their selling units (packs where MAX buys in packs).{% if pasted|length < v.lines %} The rest are listed with ours below.{% endif %}</span>
     </p>
     {% endif %}
     <table class="ledger cart-items">
@@ -109,7 +109,7 @@
       <tbody>
       {% for it in v['items'] %}
         <tr><td class="mono">{{ it.vendor_part or '—' }}</td><td class="mono">{{ it.part }}</td><td>{{ it.description|lower|capitalize }}</td>
-            <td class="r">{{ it.qty|qty }}</td><td class="r">{{ it.spend|money }}</td><td>{{ it.need_by|nice_date }}</td></tr>
+            <td class="r">{% if it.pack_qty %}{{ it.buy_units }} {{ it.pack_uom or 'pack' }} <span class="muted">({{ it.qty|qty }})</span>{% else %}{{ it.qty|qty }}{% endif %}</td><td class="r">{{ it.spend|money }}</td><td>{{ it.need_by|nice_date }}</td></tr>
       {% endfor %}
       </tbody>
     </table>

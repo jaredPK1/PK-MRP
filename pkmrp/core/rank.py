@@ -67,6 +67,16 @@ def buy_list(
                 "qty": qty,
                 "unit_cost": unit_cost,
                 "spend": round(qty * unit_cost, 2),
+                "pack_qty": info.pack_qty if info else 0.0,
+                "pack_uom": info.pack_uom if info else "",
+                # only when the buy is whole packs (a keyed multiple can disagree)
+                "packs": (
+                    round(qty / info.pack_qty)
+                    if info
+                    and info.pack_qty
+                    and abs(qty / info.pack_qty - round(qty / info.pack_qty)) < 1e-6
+                    else None
+                ),
                 "place_by": place_by,
                 "need_by": need_by,
                 "days_late": max((today - place_by).days, 0),

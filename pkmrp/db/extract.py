@@ -42,7 +42,9 @@ SELECT RTRIM(PRTNUM_01) AS part,
        ISNULL(YIELD_01, 0) AS yield_pct,
        CASE WHEN ISNULL(CSTCNV_01, 0) = 0 THEN COST_01
             ELSE COST_01 / CSTCNV_01 END AS unit_cost,
-       RTRIM(ISNULL(CSTUOM_01, '')) AS cost_uom
+       RTRIM(ISNULL(CSTUOM_01, '')) AS cost_uom,
+       RTRIM(ISNULL(PURUOM_01, '')) AS purchase_uom,
+       ISNULL(PURCNV_01, 1) AS purchase_cnv
 FROM Part_Master
 """
 
@@ -123,6 +125,10 @@ WHERE o.TYPE_10 = 'MF' AND o.STATUS_10 = '3'
 
 # Every PO line created on or after ? with its receipts, for realized lead
 # time and delivery performance. Any status: closed lines are the history.
+# PO quantities are in stocking units but PO_Receipts.TNXQTY_55 is in the
+# purchase unit (a 5,000 EA line of 100-packs receives 50), so receipts are
+# scaled by PURCNV_01 -- unscaled, every pack line looked short-received
+# and 1,607 closed lines dropped out of the lead-time history.
 PO_HISTORY_SQL = """
 WITH rec AS (
     SELECT ORDNUM_55, LINNUM_55, DELNUM_55,
@@ -136,11 +142,13 @@ SELECT RTRIM(o.ORDNUM_10) AS po, RTRIM(o.LINNUM_10) AS line, RTRIM(o.DELNUM_10) 
        RTRIM(o.STATUS_10) AS status,
        o.CREDTE_10 AS created, o.ORGDUE_10 AS org_due, o.CURDUE_10 AS cur_due,
        o.ORGQTY_10 AS qty_ordered, o.CURQTY_10 AS qty_current,
-       r.first_receipt, r.last_receipt, ISNULL(r.qty_received, 0) AS qty_received,
+       r.first_receipt, r.last_receipt,
+       ISNULL(r.qty_received, 0) * ISNULL(NULLIF(pm.PURCNV_01, 0), 1) AS qty_received,
        ISNULL(r.receipts, 0) AS receipts
 FROM Order_Master o
 LEFT JOIN rec r ON r.ORDNUM_55 = o.ORDNUM_10 AND r.LINNUM_55 = o.LINNUM_10
                AND r.DELNUM_55 = o.DELNUM_10
+LEFT JOIN Part_Master pm ON pm.PRTNUM_01 = o.PRTNUM_10
 WHERE o.TYPE_10 = 'PO' AND o.CREDTE_10 >= ?
 """
 
@@ -263,6 +271,7 @@ _TEXT = {
     "planner",
     "order_policy",
     "cost_uom",
+    "purchase_uom",
     "parent",
     "component",
     "type_code",
