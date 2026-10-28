@@ -7,6 +7,11 @@ Every feature people can see gets a line here in the same change
 WHATS_NEW = (
     (
         "2026-10-28",
+        "Uline, and parts whose description names the store",
+        "Uline is a shelf vendor (PK's orders arrive next day). A part MAX has no vendor for but whose description names a catalog store — \"BOX, ULINE S-4589, 8X8X3\" — now goes to that store's Shelf order instead of the ranked list.",
+    ),
+    (
+        "2026-10-28",
         "Packs, reels and boxes",
         'Parts MAX buys in packs (a screw in 100-packs, a reel of 5,000) are now bought in whole packs, shown as "100 to buy (1 PK of 100)", and the Shelf order copies pack counts for the quick-order paste. Pack parts\' order history counts toward their lead time again — MAX records their receipts in packs, which had made them look short-received.',
     ),

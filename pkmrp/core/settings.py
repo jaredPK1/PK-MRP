@@ -70,6 +70,10 @@ class PlanSettings:
         "NEWARK",
         "GRAINGER",
         "FASTENAL",
+        "ULINE",
+        "AMAZON",
+        "WEBSTAURANT",
+        "ZORO",
     )
     shelf_max_unit_cost: float = 50.0
     shelf_default_bdays: int = 5  # when a shelf vendor has too little history

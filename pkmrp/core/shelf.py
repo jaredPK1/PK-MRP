@@ -29,6 +29,25 @@ def is_shelf_vendor(name, settings):
     return any(k.replace("-", "").replace(" ", "") in up for k in settings.shelf_vendors)
 
 
+def _squash(text):
+    return (text or "").upper().replace("-", "").replace(" ", "")
+
+
+def vendor_in_description(description, settings, vendor_names, speed):
+    """The catalog vendor a description names ("BOX, ULINE S-4589, 8X8X3"),
+    as its Vendor_Master name, for a part MAX has no vendor for. Among names
+    that match, the one PK has a delivery record with (not AMAZON CONSULTING)."""
+    desc = _squash(description)
+    for key in settings.shelf_vendors:
+        k = _squash(key)
+        if k not in desc:
+            continue
+        hits = sorted({n for n in vendor_names if k in _squash(n)}, key=lambda n: n not in speed)
+        if hits:
+            return hits[0]
+    return ""
+
+
 def vendor_speed(po_history, vendor_name_by_id, min_lines=10):
     """{vendor name: median working days, PO created -> last receipt} over
     fully received lines, for vendors with enough of them."""

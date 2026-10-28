@@ -88,3 +88,13 @@ def test_pack_parts_buy_whole_packs_and_paste_pack_counts():
     )
     it = cart["items"][0]
     assert it["buy_units"] == 1 and it["qty"] == 100 and it["pack_uom"] == "PK"
+
+
+def test_a_description_that_names_the_store_supplies_the_vendor():
+    from pkmrp.core.shelf import vendor_in_description
+
+    names = ["ULINE", "AMAZON CONSULTING INC", "AMAZON BUSINESS", "REXNORD"]
+    speed = {"ULINE": 1, "AMAZON BUSINESS": 3}
+    assert vendor_in_description("BOX, ULINE S-4589, 8X8X3", S, names, speed) == "ULINE"
+    assert vendor_in_description("CABLE, AMAZON BASICS", S, names, speed) == "AMAZON BUSINESS"
+    assert vendor_in_description("SPLIT HUB CLAMP", S, names, speed) == ""

@@ -120,6 +120,14 @@ def build_plan(erp, settings=None, today=None, history_months=24):
 
     # Shelf parts plan on their distributor's real delivery time, not MAX's.
     speed = shelf_mod.vendor_speed(deep_df, names)
+    # no PO and no approved source, but the description names the store
+    for p, info in parts.items():
+        if info.type in settings.buy_types and not vendor_name.get(p):
+            named = shelf_mod.vendor_in_description(
+                info.description, settings, names.values(), speed
+            )
+            if named:
+                vendor_name[p] = named
     shelf = shelf_mod.shelf_parts(parts, vendor_name, settings, speed)
     for p, v in shelf.items():
         days = speed.get(v, settings.shelf_default_bdays)
