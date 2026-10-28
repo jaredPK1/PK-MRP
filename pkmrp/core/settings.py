@@ -73,6 +73,10 @@ class PlanSettings:
     )
     shelf_max_unit_cost: float = 50.0
     shelf_default_bdays: int = 5  # when a shelf vendor has too little history
+    # Any vendor PK's own POs show delivering this fast (median, 10+ fully
+    # received lines over ten years) is a shelf vendor too: Webstaurant,
+    # Amazon Business, Zoro... At 10 days it caught Protolabs and OZ Optics.
+    shelf_fast_bdays: float = 6
 
     # Respect MAX's order modifiers on planned orders.
     use_min_mult_qty: bool = True

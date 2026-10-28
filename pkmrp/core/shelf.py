@@ -5,7 +5,8 @@ the 40-day lead is MAX's number; McMaster's real one, over 1,114 PO lines
 since 2025, is about 4 calendar days. So a bought part is `shelf` when
 
   * its vendor is a catalog distributor (settings.shelf_vendors, matched on
-    the name), and
+    the name) or delivers that fast anyway (median of PK's own POs at or
+    under settings.shelf_fast_bdays: Webstaurant, Amazon, Zoro...), and
   * it costs no more than settings.shelf_max_unit_cost each.
 
 Shelf parts plan on the vendor's own measured delivery time (median of its
@@ -45,8 +46,11 @@ def vendor_speed(po_history, vendor_name_by_id, min_lines=10):
     return {v: median(d) for v, d in days.items() if len(d) >= min_lines}
 
 
-def shelf_parts(parts, vendor_of_part, settings):
-    """{part: vendor name} for every bought part that is shelf stock."""
+def shelf_parts(parts, vendor_of_part, settings, speed=None):
+    """{part: vendor name} for every bought part that is shelf stock: from a
+    listed catalog distributor, or a vendor whose measured delivery (`speed`)
+    is settings.shelf_fast_bdays or less."""
+    speed = speed or {}
     out = {}
     for p, info in parts.items():
         if info.type not in settings.buy_types:
@@ -54,7 +58,10 @@ def shelf_parts(parts, vendor_of_part, settings):
         vendor = vendor_of_part.get(p, "")
         if (
             vendor
-            and is_shelf_vendor(vendor, settings)
+            and (
+                is_shelf_vendor(vendor, settings)
+                or speed.get(vendor, float("inf")) <= settings.shelf_fast_bdays
+            )
             and float(info.unit_cost or 0) <= settings.shelf_max_unit_cost
         ):
             out[p] = vendor

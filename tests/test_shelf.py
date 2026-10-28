@@ -62,3 +62,10 @@ def test_one_cart_per_vendor_with_their_part_numbers():
     (cart,) = carts
     assert cart["lines"] == 1 and cart["items"][0]["qty"] == 124  # the 11-05 one is next week
     assert cart["items"][0]["vendor_part"] == "91251A052" and cart["days"] == 3
+
+
+def test_a_vendor_that_delivers_fast_is_a_shelf_vendor_without_being_listed():
+    parts = {"SLEEVE": Part("SLEEVE", "B", unit_cost=1.99), "LENS": Part("LENS", "B", unit_cost=9)}
+    vend = {"SLEEVE": "WEBSTAURANT STORE.COM", "LENS": "OZ OPTICS LTD"}
+    speed = {"WEBSTAURANT STORE.COM": 5, "OZ OPTICS LTD": 7.5}
+    assert shelf_parts(parts, vend, S, speed) == {"SLEEVE": "WEBSTAURANT STORE.COM"}

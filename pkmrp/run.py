@@ -113,8 +113,8 @@ def build_plan(erp, settings=None, today=None, history_months=24):
             vendor_part_all[r.part] = r.vendor_part
 
     # Shelf parts plan on their distributor's real delivery time, not MAX's.
-    speed = shelf_mod.vendor_speed(hist_df, names)
-    shelf = shelf_mod.shelf_parts(parts, vendor_name, settings)
+    speed = shelf_mod.vendor_speed(deep_df, names)
+    shelf = shelf_mod.shelf_parts(parts, vendor_name, settings, speed)
     for p, v in shelf.items():
         days = speed.get(v, settings.shelf_default_bdays)
         lead[p] = (days, f"{v.title()} usually delivers in {days:g} working days")

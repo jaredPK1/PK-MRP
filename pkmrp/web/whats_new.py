@@ -7,6 +7,11 @@ Every feature people can see gets a line here in the same change
 WHATS_NEW = (
     (
         "2026-10-28",
+        "Fast vendors count as shelf, too",
+        "Any vendor whose POs usually arrive within 6 working days (median of PK's own orders) now counts as a shelf vendor, listed or not — Webstaurant, Amazon Business, Zoro, Newegg, Fastener Superstore and more. Webstaurant's shelving parts plan on 5 days instead of MAX's 45.",
+    ),
+    (
+        "2026-10-28",
         "POs dated far out no longer stretch lead times",
         "A PO asked for more than twice the part's usual lead time, that arrived by that date but slower than usual, is left out of the lead time — judged against the part's own history, not MAX's number (which is often the inflated one). The Rexnord hub clamp went from 79 working days to 43.",
     ),
