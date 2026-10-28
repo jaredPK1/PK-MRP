@@ -1,0 +1,28 @@
+# Canonical compose service block for pk-mrp.
+# Mirror this VERBATIM into both:
+#   pk-server-manager/docker-compose.yml   (under services:)
+#   pk-server-manager/apps/pk-mrp/service.yml
+#
+# One container runs the planner loop and gunicorn (docker-entrypoint.sh).
+build:
+  context: ../PK-MRP
+  dockerfile: Dockerfile
+  additional_contexts:
+    shared: ./shared
+container_name: pk-mrp
+restart: unless-stopped
+init: true
+env_file: ./env/pk-mrp.env
+environment:
+- PK_ACCESS_DB_NAME=${PERMS_DB_NAME:-pk_app_permissions}
+- INTERNAL_PROXY_SECRET=${INTERNAL_PROXY_SECRET}
+networks:
+- pk-net
+volumes:
+- pk-mrp-data:/app/data
+healthcheck:
+  test: ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"]
+  interval: 30s
+  timeout: 5s
+  retries: 3
+  start_period: 30s

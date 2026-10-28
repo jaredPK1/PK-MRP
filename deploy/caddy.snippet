@@ -1,0 +1,5 @@
+		handle /pk-mrp/* {
+			reverse_proxy pk-mrp:8000 {
+				header_up X-Script-Name /pk-mrp
+			}
+		}

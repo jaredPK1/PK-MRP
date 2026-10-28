@@ -1,0 +1,11 @@
+{
+  "name": "pk-mrp",
+  "title": "PK-MRP",
+  "description": "Backlog-driven buys: today's top buys, what they unblock, and why (shadow mode)",
+  "container": "pk-mrp",
+  "path": "/pk-mrp/",
+  "repo_dir": "PK-MRP",
+  "compose_service": "pk-mrp",
+  "icon": "shopping-cart",
+  "category": "Operations & Production"
+}

@@ -10,6 +10,8 @@ dependencies = [
     "sqlalchemy>=2.0",
     "flask>=3.0",
     "click>=8.1",
+    "gunicorn>=22",
+    "pymssql>=2.3",  # pk_access (PK sign-in) reads the permissions DB with it
 ]
 
 [project.optional-dependencies]

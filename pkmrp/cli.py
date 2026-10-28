@@ -97,6 +97,42 @@ def run_cmd():
 
 
 @main.command()
+@click.option("--every", default=60, help="Minutes between runs.")
+def loop(every):
+    """Plan now and then every N minutes, forever (the container's planner).
+
+    A failed run is logged and retried next time; the last good snapshot
+    stays on the page, with its time shown, rather than an empty one.
+    """
+    import time
+    import traceback
+
+    from . import snapshot
+    from .run import build_plan
+
+    erp = None
+    while True:
+        started = time.time()
+        try:
+            erp = erp or _erp()
+            run = build_plan(erp)
+            snap = snapshot.build(run, run["so_lines"])
+            snapshot.write(snap)
+            h = snap["headline"]
+            click.echo(
+                f"planned {snap['generated_at']}: {h['buy_now']} buys, "
+                f"{time.time() - started:.1f}s",
+                err=True,
+            )
+        except Exception:  # noqa: BLE001 -- keep the loop alive
+            traceback.print_exc()
+            if erp is not None:
+                erp.close()
+            erp = None
+        time.sleep(max(60, every * 60 - (time.time() - started)))
+
+
+@main.command()
 @click.option("--port", default=8000)
 def web(port):
     """Serve the web app (development server)."""

@@ -18,4 +18,14 @@ RUN pip install --no-cache-dir -e ".[dev]" && \
     apt-get purge -y --auto-remove build-essential && rm -rf /var/lib/apt/lists/*
 COPY tests ./tests
 
-CMD ["pkmrp", "--help"]
+# Shared access-control module (build context 'shared' -> pk-server-manager/shared).
+# The dev image builds without it; the app then runs without sign-in checks.
+COPY --from=shared /pk_access.py ./pk_access.py
+COPY docker-entrypoint.sh .
+ENV DATA_DIR=/app/data
+RUN mkdir -p /app/data
+
+EXPOSE 8000
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
+    CMD curl -f http://localhost:8000/health || exit 1
+CMD ["./docker-entrypoint.sh"]
