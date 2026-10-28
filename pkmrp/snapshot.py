@@ -124,6 +124,14 @@ def build(run, so_df):
             if o.part == part and o.kind == "buy"
             for p in o.pegs
         ][:60]
+    # No PO ever, no approved vendor, no store in the description: the dates
+    # rest on MAX's default lead time and nobody can place it yet. A buyer
+    # quotes these; they don't belong in the ranked list.
+    needs_source = [b for b in buys if not b["vendor"]]
+    buys = [b for b in buys if b["vendor"]]
+    for i, b in enumerate(buys, 1):
+        b["rank"] = i
+    needs_source.sort(key=lambda b: (-b["order_value"], b["need_by"], b["part"]))
     unscheduled = run["worklists"]["unscheduled"]
     segments = run.get("segments") or []
     seg_counts = Counter(r["segment"] for r in segments)
@@ -156,8 +164,10 @@ def build(run, so_df):
             "committed": seg_counts.get("committed", 0),
             "unproven_long": seg_counts.get("unproven_long", 0),
             "lead_time_fixes": len(params),
+            "needs_source": len(needs_source),
         },
         "buys": [{k: _iso(v) for k, v in b.items()} for b in buys],
+        "needs_source": [{k: _iso(v) for k, v in b.items()} for b in needs_source],
         "segments": [r for r in segments if r["segment"] != "order_driven"],
         "segment_counts": dict(seg_counts),
         "params": params,

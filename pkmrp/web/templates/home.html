@@ -88,6 +88,29 @@
 </section>
 {% endif %}
 
+{% if snap.needs_source %}
+<section class="shelf needs-source" aria-labelledby="src-h">
+  <div class="sec-head">
+    <h2 id="src-h">Needs a source <span class="muted">· {{ snap.needs_source|length }}</span></h2>
+    <p>Booked orders need these, but nobody has bought them before and MAX has no vendor for them — so there's no real lead time or price yet. Get quotes; once a vendor is set up in MAX they join the ranked list.</p>
+  </div>
+  <details class="cart">
+    <summary><b>{{ snap.needs_source|length }} part{{ '' if snap.needs_source|length == 1 else 's' }} to quote</b>{% set v = snap.needs_source|sum(attribute='order_value') %}{% if v %} · orders worth {{ v|money }} wait on at least one{% endif %}{% set nc = snap.needs_source|rejectattr('unit_cost')|list|length %}{% if nc %} · {{ nc }} with no cost in MAX{% endif %}</summary>
+    <table class="ledger cart-items">
+      <thead><tr><th>Part</th><th>Description</th><th class="r">Qty</th><th>First needed</th><th class="r">Orders</th><th class="r">Order value</th><th>Buyer</th><th></th></tr></thead>
+      <tbody>
+      {% for b in snap.needs_source %}
+        <tr><td class="mono">{{ b.part }}</td><td>{{ b.description|lower|capitalize }}</td><td class="r">{{ b.qty|qty }}</td>
+            <td>{{ b.need_by|nice_date }}</td><td class="r">{{ b.orders or 'WO' }}</td><td class="r">{{ b.order_value|money if b.order_value else '' }}</td><td>{{ b.buyer }}</td>
+            <td><button class="why-btn" data-why="{{ script_root }}/why/{{ b.part }}" data-target="#src-why-{{ loop.index }}" aria-expanded="false">Why?</button></td></tr>
+        <tr class="cp-row"><td colspan="8" id="src-why-{{ loop.index }}" class="cp-cell why-cell" hidden></td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </details>
+</section>
+{% endif %}
+
 {% if snap.shelf_orders %}
 <section class="shelf" aria-labelledby="shelf-h">
   <div class="sec-head">

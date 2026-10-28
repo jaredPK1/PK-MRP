@@ -7,6 +7,11 @@ Every feature people can see gets a line here in the same change
 WHATS_NEW = (
     (
         "2026-10-28",
+        "Needs a source",
+        "Parts nobody has bought before and that have no vendor in MAX — new magnets, fittings, 3D-printed brackets — left the ranked list (where MAX's placeholder lead time made them look months late) for their own list on Today, sorted by the orders waiting, with a Why? on each. Quote them, set the vendor up, and they join the ranking.",
+    ),
+    (
+        "2026-10-28",
         "Uline, and parts whose description names the store",
         "Uline is a shelf vendor (PK's orders arrive next day). A part MAX has no vendor for but whose description names a catalog store — \"BOX, ULINE S-4589, 8X8X3\" — now goes to that store's Shelf order instead of the ranked list.",
     ),

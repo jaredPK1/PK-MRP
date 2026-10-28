@@ -363,7 +363,8 @@ def create_app():
     def why(part):
         """The why trace for one buy -- an HTMX fragment."""
         snap = snapshot.load_latest() or abort(404)
-        b = next((b for b in snap["buys"] if b["part"] == part), None) or abort(404)
+        rows = snap["buys"] + snap.get("needs_source", [])
+        b = next((b for b in rows if b["part"] == part), None) or abort(404)
         return render_template("_why.html", b=b, today_iso=date.today().isoformat())
 
     app.config["DATA_DIR"] = os.environ.get("DATA_DIR", snapshot.DATA_DIR)

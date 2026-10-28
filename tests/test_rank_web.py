@@ -121,6 +121,16 @@ def client(tmp_path, monkeypatch):
             }
         ],
     }
+    snap["needs_source"] = [
+        dict(
+            snap["buys"][0],
+            part="88-0719-00G",
+            description="MAGNET, .250 DIA NEODYMIUM",
+            vendor="",
+            unit_cost=0.0,
+            story=dict(snap["buys"][0]["story"], vendor=""),
+        )
+    ]
     snapshot.write(snap)
     prev = dict(
         snap,
@@ -198,3 +208,10 @@ def test_overbuys_and_training_pages(client):
     assert "How to use PK-MRP" in html and "46-0020-01G" in html and "What&#39;s new" not in html
     assert "Overbuys page" in html
     assert client.get("/overbuys").status_code == 200
+
+
+def test_parts_with_no_source_get_their_own_list(client):
+    html = client.get("/").get_data(as_text=True)
+    assert "Needs a source" in html and "88-0719-00G" in html and "1 with no cost in MAX" in html
+    why = client.get("/why/88-0719-00G").get_data(as_text=True)
+    assert "Nobody has bought this before" in why and "no cost for it" in why

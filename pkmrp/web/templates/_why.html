@@ -13,6 +13,9 @@
   </div>
 
   <div class="story-action">
+    {% if not b.vendor %}
+    <div class="warn"><span class="lbl">Source</span> Nobody has bought this before and MAX has no approved vendor for it. Get a quote first; the dates below use MAX's default lead time of {{ s.lead_days|round|int }} working days{% if not b.unit_cost %}, and MAX has no cost for it{% endif %}.</div>
+    {% endif %}
     <div><span class="lbl">Do</span> Order <b>{{ b.qty|qty }}</b>{% if b.packs %} ({{ b.packs }} {{ b.pack_uom or 'pack' }} of {{ b.pack_qty|qty }}){% endif %}{% if s.vendor %} from <b>{{ s.vendor|title }}</b>{% endif %}{% if b.spend %} · about {{ b.spend|money }}{% endif %}{% if s.later_qty %} — that's what can't wait; the other {{ s.later_qty|qty }} can be ordered by {{ s.later_place_by|nice_date }}{% endif %}.</div>
     <div><span class="lbl">Lands</span> around <b>{{ s.arrives_if_ordered_today|nice_date }}</b> if placed today — {{ s.lead_days|round|int }} working days, {{ s.lead_source|lead_words }}</div>
     {% if s.orders_slipping %}<div class="warn"><span class="lbl">Watch</span> {{ s.orders_slipping }} order{{ '' if s.orders_slipping == 1 else 's' }} need{{ 's' if s.orders_slipping == 1 else '' }} it before then and stock doesn't cover {{ 'it' if s.orders_slipping == 1 else 'them' }} — {{ 'it slips' if s.orders_slipping == 1 else 'they slip' }} unless an open PO is pulled in or a faster source is found.</div>
