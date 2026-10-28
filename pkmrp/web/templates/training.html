@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+{% block title %}Training · PK-MRP{% endblock %}
+{% block content %}
+<section class="page-intro training">
+  <h1 class="h1-small">How to use PK-MRP</h1>
+  <p class="lede">PK-MRP plans purchasing from the orders customers have actually placed. It tells you what to buy today, why, and what it's holding up — and it never changes anything in MAX. Ten minutes here and you'll know your way around.</p>
+</section>
+
+<nav class="toc">
+  <a href="#morning">Your morning</a><a href="#pages">The pages</a><a href="#card">Reading a buy</a>
+  <a href="#how">How it decides</a><a href="#words">Words you'll see</a><a href="#missing">Why isn't my part here?</a>
+  <a href="#new">What's new</a>
+</nav>
+
+<section class="lesson">
+  <h2>It's in shadow mode</h2>
+  <p>For now PK-MRP is <b>watching, not driving</b>. It records what it would recommend and, later, what was actually bought, so we can see whether its advice is better. Keep buying the way you do today; use it as a second opinion. When a group of parts is switched to "live", buyers act on it directly — you'll see that here first.</p>
+</section>
+
+<section class="lesson" id="morning">
+  <h2>Your morning, in three steps</h2>
+  <ol class="steps">
+    <li><b>Open Today.</b> The top 10 buys are ranked by the booked orders each one is holding up. Start at number 1.</li>
+    <li><b>Open "Why this buy?"</b> on anything that surprises you. It says when the part runs out, how many to order and from whom, when it would land, and which orders slip.</li>
+    <li><b>Check Overbuys once a week.</b> It lists open POs nobody needs and what was placed in the last 30 days beyond need — the cheapest money we'll ever save.</li>
+  </ol>
+</section>
+
+<section class="lesson" id="pages">
+  <h2>The pages</h2>
+  <dl class="pages">
+    <dt>Today</dt><dd>This week's buys, top 10 first, and what came off the list since the last run. <span class="who">Buyers, every morning.</span></dd>
+    <dt>All buys</dt><dd>Everything to place within five working days, filter by buyer or search by part or description. <span class="who">Buyers.</span></dd>
+    <dt>Promise</dt><dd>Type a part, a quantity and the date a customer wants: the earliest date material supports, and the part that decides it. Material only — build capacity isn't in yet. <span class="who">Order Admin, before dating an order.</span></dd>
+    <dt>Committed</dt><dd>The few long-lead parts that get a 12-month plan: requirement, buffer, a proposed blanket order with monthly releases, and a forecast letter for the supplier. <span class="who">Buyers and supply chain, monthly.</span></dd>
+    <dt>Lead times</dt><dd>Where MAX's lead time is more than 25% off what the part really takes, with a proposed value and a CSV to key in. <span class="who">Whoever maintains part data, quarterly.</span></dd>
+    <dt>Overbuys</dt><dd>Open POs nobody needs, POs bought for more than will be needed, POs arriving early, and stock with no order behind it — in dollars, by buyer. <span class="who">Buyers and supply chain, weekly.</span></dd>
+  </dl>
+  <p class="tip">Every list has a search box: type part of a number (dashes optional) or words from the description, in any order — "relay lens", "2300 z stage", "fpga".</p>
+</section>
+
+<section class="lesson" id="card">
+  <h2>Reading a buy</h2>
+  {% if example %}
+  {% set s = example.story %}
+  <p>Today's number 1 is <b class="mono">{{ example.part }}</b> — {{ example.description|lower }}. Its card says:</p>
+  <div class="example">
+    <p><b>{{ example.qty|qty }} to buy</b> · {{ example.when }} · {{ example.lead_days|round|int }}-day lead · vendor {{ example.vendor|title }}</p>
+    <p>Unblocks <b>{{ example.orders }} orders</b>{% if example.order_value %} worth <b>{{ example.order_value|money }}</b>{% endif %}</p>
+  </div>
+  <ul class="reading">
+    <li><b>The chip</b> ("{{ example.when }}") is the order-by date: the latest you can place it and still have it land when the first order needs it. Red means that date has passed.</li>
+    <li><b>Lead</b> is how long it really takes — from the part's own last orders when it has them, otherwise MAX's number.</li>
+    <li><b>Unblocks</b> counts the customer orders waiting on it and what they're worth.</li>
+    {% if s %}<li><b>Why this buy?</b> opens the story: {% if s.runs_out %}it runs out {{ s.runs_out|nice_date }}, {% endif %}order {{ example.qty|qty }} from {{ s.vendor|title or 'the usual vendor' }}, lands around {{ s.arrives_if_ordered_today|nice_date }}{% if s.orders_slipping %}, and {{ s.orders_slipping }} orders slip unless a PO is pulled in{% endif %}. Below that: who's waiting, what it goes into, and month by month.</li>{% endif %}
+  </ul>
+  {% else %}<p class="muted">The example appears once the first plan has run.</p>{% endif %}
+</section>
+
+<section class="lesson" id="how">
+  <h2>How it decides</h2>
+  <ul class="reading">
+    <li><b>The backlog is the plan.</b> Everyday parts are bought only against orders customers have placed, never against a forecast. That's what stops overbuying.</li>
+    <li><b>A few parts are committed.</b> When a part's own history shows it takes longer than orders give warning of (over about 90 days), it gets a 12-month plan instead. There are about 120 of these.</li>
+    <li><b>It walks the bill of materials.</b> An order for a system becomes demand for every assembly and part inside it, timed by how long each level takes to build.</li>
+    <li><b>Stock and open orders come first.</b> It only proposes a buy for what stock and open POs and WOs don't cover.</li>
+    <li><b>Kits we supply to vendors count.</b> For boards a contract manufacturer builds, it plans the parts we send them — learned from what's actually been sent.</li>
+    <li><b>Lead times come from history.</b> The median and slow end of each part's real POs, not just MAX's setting.</li>
+  </ul>
+</section>
+
+<section class="lesson" id="words">
+  <h2>Words you'll see</h2>
+  <dl class="glossary">
+    <dt>Order by</dt><dd>The last day to place a PO and still have it arrive in time.</dd>
+    <dt>Covered / to buy / slips</dt><dd>For an order waiting on a part: stock or an open PO covers it; a buy placed today lands in time; or it's needed before any new buy could arrive.</dd>
+    <dt>Committed</dt><dd>A long-lead part bought on a 12-month plan, not order by order.</dd>
+    <dt>Unproven long-lead</dt><dd>MAX says it takes a long time, but there's no history yet to prove it. Checked, not committed.</dd>
+    <dt>P80 / slow end</dt><dd>80% of past orders arrived within this time. Used where being late is costly.</dd>
+    <dt>Beyond the backlog</dt><dd>An open PO on a long-lead part that no booked order needs yet — bought ahead on purpose, not a mistake.</dd>
+    <dt>Frozen / firm / indicative</dt><dd>On a supplier forecast: months 1–3, 4–6 and 7–12.</dd>
+    <dt>Shadow mode</dt><dd>PK-MRP records its advice and compares it with what was done, but nobody is asked to follow it yet.</dd>
+  </dl>
+</section>
+
+<section class="lesson" id="missing">
+  <h2>"Why isn't my part on the list?"</h2>
+  <ul class="reading">
+    <li><b>Stock or an open PO already covers it.</b> Search it on All buys or check the order on Promise.</li>
+    <li><b>The order is parked on a placeholder date</b> (2030 or later). Those lines stay off the plan until they get a real date.</li>
+    <li><b>The part has no BOM, or it's typed bulk (Y) in MAX.</b> Neither can be planned until the part data is fixed — the home page counts them under "Kept off the plan".</li>
+    <li><b>It's a long-lead part.</b> Look on Committed instead — those are planned a year out.</li>
+    <li><b>It's due later than this week.</b> All buys shows what to place in the next five working days; later buys come up when their order-by date gets close.</li>
+  </ul>
+</section>
+
+<section class="lesson" id="new">
+  <h2>What's new</h2>
+  <ul class="whats-new">
+    {% for when, what, detail in whats_new %}<li><span class="muted small">{{ when }}</span> <b>{{ what }}</b> — {{ detail }}</li>{% endfor %}
+  </ul>
+</section>
+{% endblock %}

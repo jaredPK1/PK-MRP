@@ -191,3 +191,10 @@ def test_voice_never_says_zero():
     for h in range(24):
         out = voice.speak(datetime(2026, 10, 28, h), "Rob", {"orders": 0, "cleared": 0})
         assert "0 booked" not in out["line"] and "{" not in out["line"]
+
+
+def test_overbuys_and_training_pages(client):
+    html = client.get("/training").get_data(as_text=True)
+    assert "How to use PK-MRP" in html and "46-0020-01G" in html and "What&#39;s new" not in html
+    assert "Overbuys page" in html
+    assert client.get("/overbuys").status_code == 200

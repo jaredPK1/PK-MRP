@@ -185,3 +185,22 @@ footer { max-width: 1080px; margin: 0 auto; padding: 18px 20px 30px; color: var(
 .why-cell .why-inner { padding: 12px 16px; background: var(--bg); }
 .ledger.who { max-width: none; } .ledger.who td.mono { white-space: nowrap; }
 .ledger.who td:nth-child(5), .ledger.who td:nth-child(6) { white-space: nowrap; }
+.tile.warn { border-color: var(--late); } .tile.warn .num { color: var(--late); }
+.buyers { display: flex; flex-wrap: wrap; gap: 6px; }
+
+/* Training */
+.toc { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 18px; }
+.toc a { font-size: 13px; font-weight: 600; padding: 5px 11px; border-radius: 999px; background: var(--surface);
+         border: 1px solid var(--line); color: var(--ink-2); }
+.toc a:hover { border-color: var(--leaf); text-decoration: none; }
+.lesson { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 16px 22px; margin: 0 0 14px; }
+.lesson h2 { font-size: 19px; margin: 0 0 8px; } .lesson p { color: var(--ink-2); max-width: 62em; }
+.steps { margin: 0; padding-left: 22px; } .steps li { margin: 6px 0; color: var(--ink-2); }
+.pages, .glossary { display: grid; grid-template-columns: 170px 1fr; gap: 8px 18px; margin: 0; }
+.pages dt, .glossary dt { font-weight: 700; } .pages dd, .glossary dd { margin: 0; color: var(--ink-2); }
+.who { color: var(--muted); font-size: 13px; } .tip { font-size: 14px; background: var(--soon-soft); padding: 8px 12px; border-radius: 9px; }
+.reading { margin: 0; padding-left: 18px; color: var(--ink-2); } .reading li { margin: 5px 0; }
+.example { border: 1px dashed var(--line); border-radius: 10px; padding: 8px 14px; margin: 8px 0; background: var(--bg); }
+.example p { margin: 2px 0; }
+.whats-new { margin: 0; padding-left: 18px; } .whats-new li { margin: 5px 0; color: var(--ink-2); }
+@media (max-width: 760px) { .pages, .glossary { grid-template-columns: 1fr; } .pages dd, .glossary dd { margin-bottom: 6px; } }

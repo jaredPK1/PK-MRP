@@ -314,6 +314,17 @@ def _net_part(part, parts, kids, demands, on_hand, receipts, settings, today, le
                     detail=f"due {r.date}, first needed {first_use[i]}",
                 )
             )
+        if first_use[i] is not None and left[i] > 1e-9 and not long_lead:
+            # Part of this receipt is needed; the rest no booked order nets against.
+            result.exceptions.append(
+                Exception_(
+                    part,
+                    "excess_on_po" if r.kind == "po" else "excess_on_wo",
+                    ref=r.ref,
+                    qty=left[i],
+                    detail=f"due {r.date}; {r.qty - left[i]:g} of {r.qty:g} needed",
+                )
+            )
 
     if not shortages:
         return []

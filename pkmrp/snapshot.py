@@ -15,6 +15,7 @@ from collections import Counter
 from datetime import date, datetime
 
 from .core.calendar import plus_workdays
+from .core.overbuy import overbuys
 from .core.params import purlt_proposals
 from .core.rank import buy_list
 from .core.story import build_story
@@ -161,6 +162,18 @@ def build(run, so_df):
         "params": params,
         "committed_plans": [_iso_deep(cp) for cp in run.get("committed_plans", [])],
         "pipeline": _iso_deep(run.get("pipeline") or {"status": "off"}),
+        "overbuys": _iso_deep(
+            overbuys(
+                res.exceptions,
+                run["open_pos"],
+                res.demands,
+                run["stock"],
+                run["parts"],
+                run.get("segments", []),
+                run.get("vendor_name") or {},
+                today,
+            )
+        ),
     }
 
 

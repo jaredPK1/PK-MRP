@@ -349,3 +349,17 @@ def test_unused_receipt_on_a_long_lead_part_is_beyond_backlog_not_cancel():
         TODAY,
     )
     assert kinds(r) == ["beyond_backlog"]
+
+
+def test_part_of_a_po_nobody_needs_is_excess_on_po():
+    r = plan(
+        {"LENS": buy()},
+        {},
+        [Demand("LENS", date(2026, 12, 15), 4, peg(), "so")],
+        {},
+        [Receipt("LENS", date(2026, 12, 1), 10, "po", "PO 7")],
+        S,
+        TODAY,
+    )
+    (e,) = r.exceptions
+    assert (e.kind, e.qty) == ("excess_on_po", 6)

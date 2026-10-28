@@ -194,6 +194,7 @@ def build_plan(erp, settings=None, today=None, history_months=24):
         "worklists": worklists,
         "so_lines": so_df,
         "po_history": hist_df,
+        "open_pos": po_df,
         "vendor_name": vendor_name,
         "segments": segments,
         "committed_plans": committed_plans,

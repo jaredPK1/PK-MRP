@@ -363,3 +363,4 @@ These figures came out of the exploratory analysis. The pipeline should reproduc
 - Keep functions small and pure in `core/`. Do I/O at the edges.
 - Every PR states which manual task it removes.
 - Commit only when asked.
+- **Every feature people can see goes on the Training page in the same change** (Jared, 2026-10-28): a line in `WHATS_NEW` in `pkmrp/web/whats_new.py`, and the relevant section of `templates/training.html` (pages, words, "why isn't my part here?") updated if it changes how something works.

@@ -7,6 +7,7 @@ from flask import Flask, abort, render_template, request
 
 from .. import snapshot
 from . import voice
+from .whats_new import WHATS_NEW
 
 
 def _first_name(email):
@@ -133,6 +134,28 @@ def create_app():
             b["when"], b["tone"] = _when(b["place_by"], today)
         buyers = sorted({b["buyer"] for b in snap["buys"] if b["buyer"]})
         return render_template("buys.html", snap=snap, rows=rows, buyers=buyers, buyer=buyer)
+
+    @app.get("/overbuys")
+    def overbuys_page():
+        snap = snapshot.load_latest() or abort(404)
+        ob = snap.get("overbuys") or {
+            "po": [],
+            "stock": [],
+            "by_buyer": [],
+            "totals": {},
+            "new_days": 30,
+        }
+        only_new = request.args.get("new") == "1"
+        rows = [r for r in ob.get("po", []) if r["new"] or not only_new]
+        return render_template("overbuys.html", snap=snap, ob=ob, rows=rows, only_new=only_new)
+
+    @app.get("/training")
+    def training_page():
+        snap = snapshot.load_latest()
+        example = (snap or {}).get("buys", [None])[0] if snap and snap.get("buys") else None
+        if example:
+            example["when"], example["tone"] = _when(example["place_by"], date.today())
+        return render_template("training.html", snap=snap, example=example, whats_new=WHATS_NEW)
 
     @app.get("/committed")
     def committed_page():

@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}Overbuys · PK-MRP{% endblock %}
+{% block content %}
+{% set t = ob.totals or {} %}
+<section class="page-intro">
+  <h1 class="h1-small">Overbuys</h1>
+  <p class="lede">Money committed beyond what booked orders need — open POs nobody needs (or not yet), and stock sitting with no order behind it. Everyday parts only: the long-lead committed parts buy ahead on purpose and aren't here. Valued at MAX standard cost.</p>
+</section>
+<section class="tiles">
+  <div class="tile"><span class="num">{{ t.not_needed|money }}</span><span class="lbl">on open POs no order needs</span><span class="sub">candidates to cancel</span></div>
+  <div class="tile"><span class="num">{{ t.more_than_needed|money }}</span><span class="lbl">bought beyond what's needed</span><span class="sub">the unneeded part of a needed PO — cut the quantity</span></div>
+  <div class="tile"><span class="num">{{ t.early|money }}</span><span class="lbl">arriving well before it's needed</span><span class="sub">candidates to push out</span></div>
+  <div class="tile {% if t.new %}warn{% endif %}"><span class="num">{{ t.new|money }}</span><span class="lbl">placed in the last {{ ob.new_days }} days, not needed</span><span class="sub">{{ t.new_lines }} PO line{{ '' if t.new_lines == 1 else 's' }} — the new overbuys</span></div>
+</section>
+
+{% if ob.by_buyer %}
+<h3 class="steps-h">By buyer</h3>
+<p class="buyers">{% for b in ob.by_buyer %}<span class="chip quiet" title="{{ b.po_lines }} PO lines">{{ b.buyer }} · {{ b.po_value|money }}{% if b.new_value %} <b class="late-text">· {{ b.new_value|money }} new</b>{% endif %}</span> {% endfor %}</p>
+{% endif %}
+
+<h3 class="steps-h">Open POs to cut, cancel or push</h3>
+<p class="filters">
+  <a class="chip {{ 'soon' if not only_new else 'quiet' }}" href="?">All {{ ob.po|length }}</a>
+  <a class="chip {{ 'late' if only_new else 'quiet' }}" href="?new=1">Placed in the last {{ ob.new_days }} days</a>
+</p>
+<div class="table-tools"><input type="search" class="table-filter" placeholder="Filter: part, description, buyer or vendor" aria-label="Filter the table"><span class="muted small filter-count"></span></div>
+<div class="table-wrap">
+<table class="dense">
+  <thead><tr><th>Part</th><th>Description</th><th>PO line</th><th>Problem</th><th class="r">Qty</th><th class="r">Value</th><th>Buyer</th><th>Vendor</th><th>Placed</th><th>Due</th></tr></thead>
+  <tbody>
+  {% for r in rows %}
+    <tr>
+      <td class="mono">{{ r.part }}</td>
+      <td>{{ r.description|lower|capitalize }}</td>
+      <td class="mono">{{ r.ref[3:] }}</td>
+      <td><span class="chip {{ 'late' if r.kind == 'cancel_candidate' else ('today' if r.kind == 'excess_on_po' else 'quiet') }}">{{ r.what }}{% if r.days_early %} · {{ r.days_early }}d{% endif %}</span>{% if r.new %} <span class="chip late">new</span>{% endif %}</td>
+      <td class="r">{{ r.qty|qty }}</td>
+      <td class="r"><b>{{ r.value|money }}</b></td>
+      <td>{{ r.buyer }}</td>
+      <td class="small">{{ r.vendor|title }}</td>
+      <td>{{ r.placed|nice_date if r.placed else '' }}</td>
+      <td>{{ r.due|nice_date if r.due else '' }}</td>
+    </tr>
+  {% else %}<tr><td colspan="10" class="muted">Nothing here — every open PO line is needed. Lovely.</td></tr>{% endfor %}
+  </tbody>
+</table>
+</div>
+
+<h3 class="steps-h">Stock no booked order needs <span class="muted">· {{ t.stock_extra|money }}, of which {{ t.stock_idle|money }} has no order at all</span></h3>
+<div class="table-wrap">
+<table class="dense">
+  <thead><tr><th>Part</th><th>Description</th><th>Buyer</th><th class="r">On hand</th><th class="r">Orders need</th><th class="r">Extra</th><th class="r">Value</th></tr></thead>
+  <tbody>
+  {% for r in ob.stock[:150] %}
+    <tr><td class="mono">{{ r.part }}</td><td>{{ r.description|lower|capitalize }}</td><td>{{ r.buyer }}</td>
+        <td class="r">{{ r.on_hand|qty }}</td><td class="r">{{ r.needed|qty if r.needed else '—' }}</td><td class="r">{{ r.extra|qty }}</td><td class="r"><b>{{ r.value|money }}</b></td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+<p class="foot-note">Some of this is legitimate — service spares, stock already at a contract manufacturer, minimum buys. The point is to see it, not to cancel blindly. "New" means the PO line was created in the last {{ ob.new_days }} days.</p>
+{% endblock %}
