@@ -1,9 +1,17 @@
 """Realized purchase lead time, from PO history.
 
 Realized = business days from PO creation to the last receipt, on lines
-received in full. A line ordered deliberately early (its original due date
-more than EARLY_FACTOR x PURLT_01 after creation) overstates the supplier's
-lead time, so it is kept visible but left out of the statistics.
+received in full. A line dated out on purpose -- its original due date more
+than EARLY_FACTOR x the part's usual lead after creation, and it arrived by
+that date, taking longer than usual -- shows only that the vendor paced
+itself to a far date, not how long it
+needs, so it is counted but left out of the statistics. One dated out that
+arrived fast is good evidence and stays. "Usual" is the
+median of all the part's lines over the ten years (robust to a few dated-out
+ones), or PURLT_01 when there are too few lines; never PURLT_01 alone, which
+is itself often the inflated number (69-0144-00G: PURLT 152, two POs dated
+152 days out, arriving in 93 and 79 against a history of about 20). A line
+that arrived *after* its asked date is a real slip and always counts.
 
 Per part: median and P80 over the window, the line count, the most recent
 vendor, and the ratio of the median to PURLT_01. Parts with fewer than
@@ -45,33 +53,43 @@ def realized(po_history, purchase_lt, part_class=None, vendor_fallback=False, re
     groups the fallback by vendor *and* commodity class. Lines created before
     `recent_since` are used only for parts with too few recent ones."""
     part_class = part_class or {}
-    per_part = defaultdict(list)
-    older = defaultdict(list)  # (created, days) before recent_since
-    early = defaultdict(int)
-    vendor_last = {}
-    vendor_days = defaultdict(list)
-    rows = po_history.sort_values("created").itertuples(index=False)
-    for r in rows:
+    lines = defaultdict(list)  # part -> [(created, asked, days, vendor)]
+    for r in po_history.sort_values("created").itertuples(index=False):
         created, last = as_date(r.created), as_date(r.last_receipt)
         if not created or not last or last < created:
             continue
         cur = float(r.qty_current or 0)
         if cur <= 0 or float(r.qty_received or 0) < FULL_RECEIPT * cur:
             continue
-        days = workdays_between(created, last)
-        plt = float(purchase_lt.get(r.part) or 0)
         org = as_date(r.org_due)
-        if plt > 0 and org and workdays_between(created, org) > EARLY_FACTOR * plt:
-            if not recent_since or created >= recent_since:
-                early[r.part] += 1
-            continue
-        if recent_since and created < recent_since:
-            older[r.part].append((created, days))
-            vendor_last.setdefault(r.part, r.vendor_id)
-            continue
-        per_part[r.part].append(days)
-        vendor_days[(r.vendor_id, part_class.get(r.part, ""))].append(days)
-        vendor_last[r.part] = r.vendor_id
+        asked = workdays_between(created, org) if org and org >= created else None
+        lines[r.part].append((created, asked, workdays_between(created, last), r.vendor_id))
+
+    per_part = defaultdict(list)
+    older = defaultdict(list)  # (created, days) before recent_since
+    early = defaultdict(int)
+    vendor_last = {}
+    vendor_days = defaultdict(list)
+    for part, ls in lines.items():
+        plt = float(purchase_lt.get(part) or 0)
+        usual = median(d for _, _, d, _ in ls) if len(ls) >= MIN_LINES else plt
+        for created, asked, days, vendor in ls:
+            if (
+                usual > 0
+                and asked is not None
+                and asked > EARLY_FACTOR * usual
+                and usual < days <= asked
+            ):
+                if not recent_since or created >= recent_since:
+                    early[part] += 1
+                continue
+            if recent_since and created < recent_since:
+                older[part].append((created, days))
+                vendor_last.setdefault(part, vendor)
+                continue
+            per_part[part].append(days)
+            vendor_days[(vendor, part_class.get(part, ""))].append(days)
+            vendor_last[part] = vendor
 
     vendor_median = {k: median(d) for k, d in vendor_days.items() if len(d) >= MIN_GROUP_LINES}
     out = {}

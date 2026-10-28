@@ -51,7 +51,7 @@
   </div>
   <ul class="reading">
     <li><b>The chip</b> ("{{ example.when }}") is the order-by date: the latest you can place it and still have it land when the first order needs it. Red means that date has passed.</li>
-    <li><b>Lead</b> is how long it really takes — from the part's own orders in the last two years, reaching back up to ten years for parts bought rarely ("back to 2018"). Only a part with fewer than 3 orders ever uses MAX's number.</li>
+    <li><b>Lead</b> is how long it really takes — from the part's own orders in the last two years, reaching back up to ten years for parts bought rarely ("back to 2018"). Only a part with fewer than 3 orders ever uses MAX's number. A PO deliberately dated far out (say MAX said 152 days, so the buyer asked for October in March) that arrived slower than usual isn't counted — the vendor was pacing to the date, not showing how long it needs.</li>
     <li><b>Unblocks</b> counts the customer orders waiting on it and what they're worth.</li>
     {% if s %}<li><b>Why this buy?</b> opens the story: {% if s.runs_out %}it runs out {{ s.runs_out|nice_date }}, {% endif %}order {{ example.qty|qty }} from {{ s.vendor|title or 'the usual vendor' }}, lands around {{ s.arrives_if_ordered_today|nice_date }}{% if s.orders_slipping %}, and {{ s.orders_slipping }} orders slip unless a PO is pulled in{% endif %}. Below that: who's waiting, what it goes into, and month by month.</li>{% endif %}
   </ul>

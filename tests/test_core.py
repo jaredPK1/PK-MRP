@@ -380,9 +380,37 @@ def test_rarely_bought_part_reaches_back_past_the_window():
         line("2023-04-12", "2023-04-18"),  # 4 wd
         line("2026-03-11", "2026-05-15"),  # 47 wd, the only recent one
     ]
+    # it was asked for 05-13 and came two days late: a real data point
+    rows[-1] = (
+        "S",
+        "LEE",
+        pd.Timestamp("2026-03-11"),
+        pd.Timestamp("2026-05-13"),
+        pd.Timestamp("2026-05-15"),
+        50,
+        50,
+    )
     s = realized(_hist(rows), {"S": 45}, recent_since=date(2024, 10, 28))["S"]
     assert s["lines"] == 5 and s["median"] == 15
     assert s["source"] == "realized (5 lines since 2018)"
     # without old lines it is still MAX's number
     only = realized(_hist(rows[-1:]), {"S": 45}, recent_since=date(2024, 10, 28))["S"]
     assert only["source"] == "PURLT_01"
+
+
+def test_lines_dated_out_are_judged_against_the_parts_own_history():
+    """69-0144-00G: MAX says 152, two POs were dated 152 out and arrived in
+    93 and 79; a third asked for 35 and took 75 (a real slip, kept)."""
+
+    def line(created, asked_wd, got_wd):
+        c = pd.Timestamp(created)
+        return ("C", "REX", c, c + pd.offsets.BDay(asked_wd), c + pd.offsets.BDay(got_wd), 20, 20)
+
+    old = [
+        line(f"20{y}-03-01", 40, g)
+        for y, g in zip((18, 19, 21, 22, 23), (13, 55, 43, 21, 21), strict=True)
+    ]
+    recent = [line("2026-03-30", 152, 93), line("2026-05-20", 152, 79), line("2026-07-15", 35, 75)]
+    s = realized(_hist(old + recent), {"C": 152}, recent_since=date(2024, 10, 28))["C"]
+    assert s["early_lines"] == 2
+    assert s["median"] == 43 and s["source"] == "realized (5 lines since 2019)"
