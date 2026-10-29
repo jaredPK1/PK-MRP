@@ -170,7 +170,7 @@ WHERE TNXCDE_15 IN ('I', 'T') AND RTRIM(ISNULL(ORDNUM_15, '')) = ''
 # What each PO (any order type: PO, SO subcontract, VO, NI) was buying.
 PO_PARTS_SQL = """
 SELECT DISTINCT RTRIM(ORDNUM_10) AS po, RTRIM(PRTNUM_10) AS parent,
-       RTRIM(TYPE_10) AS order_type
+       RTRIM(TYPE_10) AS order_type, RTRIM(ISNULL(VENID_10, '')) AS vendor_id
 FROM Order_Master
 WHERE ORDNUM_10 LIKE '70%' AND CREDTE_10 >= ?
 """

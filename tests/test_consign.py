@@ -89,3 +89,27 @@ def test_planned_board_buy_explodes_only_its_consigned_kit():
     fpga = next(o for o in r.planned if o.part == "FPGA")
     assert fpga.qty == 4 and fpga.need_by == board.place_by
     assert fpga.pegs[0].path == ("BOARD", "FPGA")
+
+
+def test_a_kit_belongs_to_the_vendor_it_was_sent_to():
+    """62-3206-00G: the blank went to KJS on a subcontract PO; the finished
+    part is now bought complete from Duyck, whose PO needs no blank."""
+    from pkmrp.core.consign import kit_for, kit_vendors, open_kit_demand
+
+    bom = pd.DataFrame({"parent": ["62-3206-00G"], "component": ["62-3206-00G-UNF"],
+                        "qty_per": [1.0], "type_code": ["N"]})
+    po_parts = pd.DataFrame({"po": ["70109801", "70111150"], "parent": ["62-3206-00G"] * 2,
+                             "vendor_id": ["KJS", "DUYCK"]})
+    moves = pd.DataFrame({"component": [], "po": [], "moved": []})
+    sub = pd.DataFrame({"po": ["70109801"], "parent": ["62-3206-00G"], "part": ["62-3206-00G-UNF"]})
+    kids, ev = consigned_edges(moves, po_parts, sub, bom)
+    assert ev[("62-3206-00G", "62-3206-00G-UNF")]["vendors"] == ["KJS"]
+    vend = kit_vendors(ev)
+    assert kit_for("62-3206-00G", kids["62-3206-00G"], "DUYCK", vend) == []
+    assert kit_for("62-3206-00G", kids["62-3206-00G"], "KJS", vend) == [("62-3206-00G-UNF", 1.0)]
+    # a pair learned with no vendor at all still applies (older evidence)
+    assert kit_for("X", [("Y", 1.0)], "ANY", {}) == [("Y", 1.0)]
+    open_pos = pd.DataFrame({"po": ["70111150"], "line": ["13"], "part": ["62-3206-00G"],
+                             "vendor_id": ["DUYCK"], "qty_due": [10.0],
+                             "cur_due": [pd.Timestamp("2026-11-24")]})
+    assert open_kit_demand(open_pos, kids, set(), lambda p: 5, TODAY, vend) == []

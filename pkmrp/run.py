@@ -105,9 +105,18 @@ def build_plan(
         .to_dict()
     )
     children = children_map(zip(kept["parent"], kept["component"], kept["qty_per"], strict=True))
+    # A planned buy explodes a kit only if it goes to a vendor PK kits: the
+    # part's most recent PO vendor (who a new buy would go to).
+    kit_vendors = consign.kit_vendors(consign_evidence)
+    last_vendor = {}
+    for r in hist_df.sort_values("created").itertuples(index=False):
+        if r.vendor_id:
+            last_vendor[r.part] = r.vendor_id
     for parent, kit in consigned.items():
         if parent not in make:
-            children[parent] = kit
+            sent = consign.kit_for(parent, kit, last_vendor.get(parent, ""), kit_vendors)
+            if sent:
+                children[parent] = sent
 
     stock = supply.on_hand(stock_df)
     receipts = supply.open_receipts(po_df, wo_df, today)
@@ -161,7 +170,7 @@ def build_plan(
     def lead_of(p):
         return lead.get(p, (parts[p].purchase_lt if p in parts else 0, ""))[0]
 
-    kit_demand = consign.open_kit_demand(po_df, consigned, sub_lines, lead_of, today)
+    kit_demand = consign.open_kit_demand(po_df, consigned, sub_lines, lead_of, today, kit_vendors)
 
     from .snapshot import so_rollups
 
