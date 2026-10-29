@@ -1,5 +1,7 @@
+{% from "_notes.html" import part_note with context %}
 {% set s = b.story %}
 <div class="why-inner">
+  {% if notes_for(b.part) %}<p class="why-notes">{% for n in notes_for(b.part) %}<span class="chip note-chip tag-{{ n.tag }}">{{ note_words[n.tag] }}</span> {{ n.text }} <span class="muted small">— {{ n.by.split('@')[0] }}, {{ n.at[:10]|nice_date }}</span><br>{% endfor %}</p>{% endif %}
   <div class="story-head">
     {% if s.runs_out %}
       <div class="story-big {{ 'late' if s.runs_out < today_iso else '' }}">{% if s.runs_out < today_iso %}Already short{% else %}Runs out {{ s.runs_out|nice_date }}{% endif %}</div>

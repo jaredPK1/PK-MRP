@@ -20,6 +20,7 @@ pkmrp/core/consign.py
 pkmrp/core/demand.py
 pkmrp/core/leadtime.py
 pkmrp/core/netting.py
+pkmrp/core/notes.py
 pkmrp/core/overbuy.py
 pkmrp/core/params.py
 pkmrp/core/pipeline.py
@@ -52,6 +53,7 @@ tests/test_core.py
 tests/test_erp_guard.py
 tests/test_extract.py
 tests/test_ledger.py
+tests/test_notes.py
 tests/test_outcomes.py
 tests/test_overbuy.py
 tests/test_pipeline.py

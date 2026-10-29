@@ -1,0 +1,11 @@
+{# A part's notes as chips, and "+ note" to add one. Import with context. #}
+{% macro part_note(part, add=True) %}{% set ns = notes_for(part) %}
+{% for n in ns %}<a class="chip note-chip tag-{{ n.tag }}" href="{{ script_root }}/notes#n-{{ n.id }}" title="{{ note_words[n.tag] }}{% if n.text %}: {{ n.text }}{% endif %} — {{ n.by.split('@')[0] }}, {{ n.at[:10]|nice_date }}">{{ note_short[n.tag] }}</a>{% endfor %}
+{% if add and can_note() %}<details class="note-add"><summary class="small" title="Note something about {{ part }} that MAX doesn't say — it stays on the part">+ note</summary>
+  <form method="post" action="{{ script_root }}/notes" class="note-form">
+    <input type="hidden" name="part" value="{{ part }}"><input type="hidden" name="next" value="{{ here }}">
+    <select name="tag" required aria-label="What kind of note"><option value="">What's going on?</option>{% for code, words in note_tags %}<option value="{{ code }}">{{ words }}</option>{% endfor %}</select>
+    <input name="text" maxlength="500" placeholder="Details (ECN #, who, when…)" aria-label="Details">
+    <button class="btn" name="action" value="add">Save note</button>
+  </form>
+</details>{% endif %}{% endmacro %}

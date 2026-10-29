@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_notes.html" import part_note with context %}
 {% block title %}Lead times · PK-MRP{% endblock %}
 {% block content %}
 <section class="page-intro">
@@ -21,7 +22,7 @@
   <tbody>
   {% for r in rows %}
     <tr>
-      <td class="mono">{{ r.part }}</td>
+      <td class="mono">{{ r.part }} {{ part_note(r.part, False) }}</td>
       <td class="dcol">{{ r.description|lower|capitalize }}</td>
       <td>{{ r.buyer }}</td>
       <td>{{ r.vendor }}</td>

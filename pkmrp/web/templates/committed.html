@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_notes.html" import part_note with context %}
 {% block title %}Committed parts · PK-MRP{% endblock %}
 {% block content %}
 <section class="page-intro">
@@ -26,7 +27,7 @@
   <tbody>
   {% for r in rows if r.segment == 'committed' %}{% set cp = plans.get(r.part) %}
     <tr>
-      <td class="mono">{{ r.part }}</td>
+      <td class="mono">{{ r.part }} {{ part_note(r.part) }}</td>
       <td class="dcol">{{ r.description|lower|capitalize }}</td>
       <td class="small">{{ cp.vendor if cp else '' }}</td>
       <td class="r">{{ (r.p80_days * 5 / 7)|round|int }} wd</td>
@@ -52,7 +53,7 @@
   <thead><tr><th>Part</th><th>Description</th><th class="r">MAX has</th><th class="r">Orders it feeds</th><th>Why it's here</th></tr></thead>
   <tbody>
   {% for r in rows if r.segment == 'unproven_long' %}
-    <tr><td class="mono">{{ r.part }}</td><td class="dcol">{{ r.description|lower|capitalize }}</td><td class="r">{{ (r.purlt_days * 5 / 7)|round|int }} wd</td><td class="r">{{ r.orders }}</td><td class="muted small">{{ r.reasons|join('; ') }}</td></tr>
+    <tr><td class="mono">{{ r.part }} {{ part_note(r.part) }}</td><td class="dcol">{{ r.description|lower|capitalize }}</td><td class="r">{{ (r.purlt_days * 5 / 7)|round|int }} wd</td><td class="r">{{ r.orders }}</td><td class="muted small">{{ r.reasons|join('; ') }}</td></tr>
   {% endfor %}
   </tbody>
 </table>

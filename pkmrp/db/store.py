@@ -166,8 +166,12 @@ def ops_engine(cfg):
 
     from sqlalchemy import create_engine
 
+    # login timeout: every page reads part notes, so an unreachable PK_Ops
+    # must fail fast rather than hold the page
     return create_engine(
-        "mssql+pyodbc:///?odbc_connect=" + quote_plus(cfg.ops_conn_str()), pool_pre_ping=True
+        "mssql+pyodbc:///?odbc_connect=" + quote_plus(cfg.ops_conn_str()),
+        pool_pre_ping=True,
+        connect_args={"timeout": 5},
     )
 
 

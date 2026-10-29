@@ -7,6 +7,11 @@ Every feature people can see gets a line here in the same change
 WHATS_NEW = (
     (
         "2026-10-29",
+        "Notes on a part",
+        "Know something MAX doesn't say? Click + note next to any part number — Engineering working on a replacement, obsolete, ECN being created, on hold, supplier problem, or your own words. The note stays on the part, plan after plan, and shows as a chip wherever the part appears (Today, All buys, Overbuys, Committed, By vendor, Promise and the Why panel), so nobody has to flag it again. The Notes page lists them all, with filters; Remove when it's no longer true. Notes don't change the plan. Anyone signed in can add one.",
+    ),
+    (
+        "2026-10-29",
         "Pages use your whole screen",
         "Tables were squeezed into a narrow column even on a wide monitor, so descriptions wrapped to three lines and the last columns slid off the edge. Pages now spread out to fit the screen, dates stay on one line, and Clear… on Overbuys is pinned to the right so it's always in view. Also fixed: Promise was showing an error for every part.",
     ),

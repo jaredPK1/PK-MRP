@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_notes.html" import part_note with context %}
 {% block title %}All buys · PK-MRP{% endblock %}
 {% block content %}
 <section class="sec-head wide">
@@ -21,7 +22,7 @@
   {% for b in rows %}
     <tr>
       <td class="r muted">{{ b.rank }}</td>
-      <td class="mono">{{ b.part }}</td>
+      <td class="mono">{{ b.part }} {{ part_note(b.part) }}</td>
       <td class="dcol">{{ b.description|lower|capitalize }}</td>
       <td class="r">{{ b.qty|qty }}{% if b.packs %}<br><span class="muted small">{{ b.packs }} {{ b.pack_uom or 'pack' }} of {{ b.pack_qty|qty }}</span>{% endif %}</td>
       <td class="r">{{ b.spend|money if b.spend else '' }}</td>

@@ -1,14 +1,14 @@
 """PK-MRP web app. Reads the snapshot `pkmrp run` writes; never queries MAX.
 The one thing it writes is PK-MRP's own settings in PK_Ops: the Pipeline
-page's confirmed SKU -> part map (editing role) and overbuys people cleared
-with a reason (anyone signed in)."""
+page's confirmed SKU -> part map (editing role), and overbuys people cleared
+with a reason and notes on parts (anyone signed in)."""
 
 import json
 import os
 import re
 from datetime import date, datetime
 
-from flask import Flask, abort, redirect, render_template, request, url_for
+from flask import Flask, abort, g, redirect, render_template, request, url_for
 
 from .. import snapshot
 from . import voice
@@ -92,6 +92,7 @@ def _lead_words(source):
 
 SKU_MAP_KEY = "pipeline_sku_map"
 CLEARED_KEY = "overbuy_cleared"
+NOTES_KEY = "part_notes"
 CELEBRATE_AT = 10  # overbuys one person clears in a day earns a celebration
 
 
@@ -114,9 +115,31 @@ def create_app():
     app.jinja_env.filters["wdays"] = _wdays
     app.jinja_env.filters["pick"] = _pick
 
+    def part_notes():
+        """{part: [note]} from PK_Ops, read once per request; {} if unreadable."""
+        if "part_notes" not in g:
+            from ..db import store
+
+            try:
+                g.part_notes, g.notes_error = store.get_setting(ops_engine(), NOTES_KEY, {}), None
+            except Exception as exc:  # noqa: BLE001 -- pages work without notes
+                g.part_notes, g.notes_error = {}, str(exc)[:200]
+        return g.part_notes
+
     @app.context_processor
     def _ctx():
-        return {"script_root": request.script_root, "version": "0.1.0"}
+        from ..core.notes import TAG_SHORT, TAG_WORDS, TAGS
+
+        return {
+            "script_root": request.script_root,
+            "version": "0.1.0",
+            "notes_for": lambda part: part_notes().get(part, []),
+            "note_tags": TAGS,
+            "note_words": TAG_WORDS,
+            "note_short": TAG_SHORT,
+            "can_note": lambda: signed_in() and not g.get("notes_error"),
+            "here": request.script_root + request.full_path.rstrip("?"),
+        }
 
     @app.get("/health")
     def health():
@@ -206,7 +229,7 @@ def create_app():
             reasons=REASONS,
             reason_words={k: dict(v) for k, v in REASONS.items()},
             key_of=clear_key,
-            clearable=can_clear() and error is None,
+            clearable=signed_in() and error is None,
             error=error,
             saved=request.args.get("saved"),
             mine_today=mine_today,
@@ -218,7 +241,7 @@ def create_app():
         from ..core.overbuy import REASONS, clear_key
         from ..db import store
 
-        if not can_clear():
+        if not signed_in():
             abort(403)
         key = request.form.get("key") or ""
         action = request.form.get("action")
@@ -611,9 +634,9 @@ def create_app():
         role = getattr(request, "pk_role", app.config.get("DEFAULT_ROLE"))
         return role in ("admin", "developer")
 
-    def can_clear():
+    def signed_in():
         # Anyone signed in to PK-MRP (buyers are viewers) may clear an overbuy
-        # with a reason; it changes no plan, and who did it is kept.
+        # or note a part; neither changes a plan, and who did it is kept.
         return bool(getattr(request, "pk_role", app.config.get("DEFAULT_ROLE")))
 
     def sku_map():
@@ -680,6 +703,64 @@ def create_app():
             current[sku] = {"part": part, "qty_per": per, **stamp}
         store.put_setting(engine, SKU_MAP_KEY, current, who)
         return redirect(url_for("pipeline_page", saved=sku) + "#saved")
+
+    @app.get("/notes")
+    def notes_page():
+        from ..core.notes import TAGS, listing
+
+        snap = snapshot.load_latest()
+        atp = snapshot.load_atp() or {}
+        descriptions = {p: v[1] for p, v in (atp.get("parts") or {}).items()}
+        tag = request.args.get("tag") or None
+        notes = part_notes()
+        return render_template(
+            "notes.html",
+            snap=snap,
+            rows=listing(notes, descriptions, tag),
+            counts={t: sum(1 for ns in notes.values() for n in ns if n["tag"] == t) for t, _ in TAGS},
+            total=sum(len(ns) for ns in notes.values()),
+            tag=tag,
+            error=g.get("notes_error"),
+            saved=request.args.get("saved"),
+        )
+
+    @app.post("/notes")
+    def notes_save():
+        from ..core import notes as pn
+        from ..db import store
+
+        if not signed_in():
+            abort(403)
+        part = (request.form.get("part") or "").strip().upper()
+        action = request.form.get("action")
+        back = request.form.get("next") or ""
+        if not back.startswith("/") or back.startswith("//"):
+            back = url_for("notes_page")
+        if not part or action not in ("add", "remove"):
+            abort(400)
+        engine = ops_engine()
+        current = store.get_setting(engine, NOTES_KEY, {})
+        who = request.headers.get("X-Auth-Request-Email", "") or "unknown"
+        if action == "remove":
+            current = pn.remove(current, part, request.form.get("id") or "")
+        else:
+            atp = snapshot.load_atp()
+            if atp and part not in atp["parts"]:
+                abort(400, f"{part} isn't a part in MAX.")
+            try:
+                current = pn.add(
+                    current,
+                    part,
+                    request.form.get("tag"),
+                    request.form.get("text"),
+                    who,
+                    datetime.now().isoformat(timespec="minutes"),
+                )
+            except ValueError as exc:
+                abort(400, str(exc))
+        store.put_setting(engine, NOTES_KEY, current, who)
+        sep = "&" if "?" in back else "?"
+        return redirect(f"{back.split('#')[0]}{sep}noted={part}")
 
     app.config["DATA_DIR"] = os.environ.get("DATA_DIR", snapshot.DATA_DIR)
     return app

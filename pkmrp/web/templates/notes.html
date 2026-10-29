@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% from "_notes.html" import part_note with context %}
+{% block title %}Notes · PK-MRP{% endblock %}
+{% block content %}
+<section class="page-intro">
+  <h1 class="h1-small">Part notes</h1>
+  <p class="lede"><b>The question this page answers: what do we know about a part that MAX doesn't say?</b> Engineering working on a replacement, the part going obsolete, an ECN on the way, a supplier problem. A note is said once and stays on the part — it shows as a chip next to the part number on every page, every plan — until someone removes it. Notes don't change the plan.</p>
+  {% if error %}<p class="lede small-gap promise-error">Can't read notes from PK_Ops right now ({{ error }}).</p>{% endif %}
+  {% if request.args.get('noted') %}<p class="lede small-gap" id="saved"><span class="chip soon">Saved</span> {{ request.args.get('noted') }}</p>{% endif %}
+</section>
+
+{% if can_note() %}
+<form method="post" action="{{ script_root }}/notes" class="note-form note-new">
+  <input type="hidden" name="next" value="{{ script_root }}/notes">
+  <label class="picker small">Part
+    <input name="part" required placeholder="number or description" autocomplete="off" data-suggest="{{ script_root }}/api/parts" role="combobox" aria-expanded="false" aria-autocomplete="list">
+    <ul class="suggest" role="listbox" hidden></ul></label>
+  <select name="tag" required aria-label="What kind of note"><option value="">What's going on?</option>{% for code, words in note_tags %}<option value="{{ code }}">{{ words }}</option>{% endfor %}</select>
+  <input name="text" maxlength="500" placeholder="Details (ECN #, who, when…)" aria-label="Details" class="note-text">
+  <button class="btn" name="action" value="add">Add note</button>
+</form>
+{% endif %}
+
+<p class="filters">
+  <a class="chip {{ 'soon' if not tag else 'quiet' }}" href="?">All {{ total }}</a>
+  {% for code, words in note_tags %}{% if counts[code] %}<a class="chip {{ 'soon' if tag == code else 'quiet' }}" href="?tag={{ code }}">{{ words }} · {{ counts[code] }}</a> {% endif %}{% endfor %}
+</p>
+<div class="table-tools"><input type="search" class="table-filter" placeholder="Filter: part, description, note or who" aria-label="Filter the table"><span class="muted small filter-count"></span></div>
+<div class="table-wrap">
+<table class="dense">
+  <thead><tr><th>Part</th><th>Description</th><th>What</th><th>Details</th><th>Who</th><th>When</th><th></th></tr></thead>
+  <tbody>
+  {% for r in rows %}
+    <tr id="n-{{ r.id }}">
+      <td class="mono">{{ r.part }} <a class="small" href="{{ script_root }}/promise?part={{ r.part|urlencode }}">promise</a></td>
+      <td class="dcol">{{ r.description|lower|capitalize }}</td>
+      <td><span class="chip note-chip tag-{{ r.tag }}">{{ note_words[r.tag] }}</span></td>
+      <td>{{ r.text }}</td>
+      <td class="small">{{ r.by.split('@')[0] }}</td>
+      <td>{{ r.at[:10]|nice_date }}</td>
+      <td>{% if can_note() %}<form method="post" action="{{ script_root }}/notes"><input type="hidden" name="part" value="{{ r.part }}"><input type="hidden" name="id" value="{{ r.id }}"><input type="hidden" name="next" value="{{ here }}"><button class="btn" name="action" value="remove" title="Remove this note — e.g. the ECN is released">Remove</button></form>{% endif %}</td>
+    </tr>
+  {% else %}<tr><td colspan="7" class="muted">No notes yet. Add one above, or use <b>+ note</b> next to any part number.</td></tr>{% endfor %}
+  </tbody>
+</table>
+</div>
+{% endblock %}

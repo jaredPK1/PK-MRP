@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_notes.html" import part_note with context %}
 {% block title %}Today · PK-MRP{% endblock %}
 {% block content %}
 <section class="hero">
@@ -55,6 +56,7 @@
           <span class="part">{{ b.part }}</span>
           <span class="chip {{ b.tone }}">{{ b.when }}</span>
           {% if b.wo_only %}<span class="chip quiet" title="No sales order pegged directly — needed by open work orders or vendor kits">for open WOs</span>{% endif %}
+          {{ part_note(b.part) }}
         </div>
         <div class="desc">{{ b.description|lower|capitalize }}</div>
         <div class="facts">
@@ -100,7 +102,7 @@
       <thead><tr><th>Part</th><th>Description</th><th class="r">Qty</th><th>First needed</th><th class="r">Orders</th><th class="r">Order value</th><th>Buyer</th><th></th></tr></thead>
       <tbody>
       {% for b in snap.needs_source %}
-        <tr><td class="mono">{{ b.part }}</td><td class="dcol">{{ b.description|lower|capitalize }}</td><td class="r">{{ b.qty|qty }}</td>
+        <tr><td class="mono">{{ b.part }} {{ part_note(b.part) }}</td><td class="dcol">{{ b.description|lower|capitalize }}</td><td class="r">{{ b.qty|qty }}</td>
             <td>{{ b.need_by|nice_date }}</td><td class="r">{{ b.orders or 'WO' }}</td><td class="r">{{ b.order_value|money if b.order_value else '' }}</td><td>{{ b.buyer }}</td>
             <td><button class="why-btn" data-why="{{ script_root }}/why/{{ b.part }}" data-target="#src-why-{{ loop.index }}" aria-expanded="false">Why?</button></td></tr>
         <tr class="cp-row"><td colspan="8" id="src-why-{{ loop.index }}" class="cp-cell why-cell" hidden></td></tr>
@@ -131,7 +133,7 @@
       <thead><tr><th>Their part #</th><th>Our part</th><th>Description</th><th class="r">Qty</th><th class="r">About</th><th>Needed</th></tr></thead>
       <tbody>
       {% for it in v['items'] %}
-        <tr><td class="mono">{{ it.vendor_part or '—' }}</td><td class="mono">{{ it.part }}</td><td class="dcol">{{ it.description|lower|capitalize }}</td>
+        <tr><td class="mono">{{ it.vendor_part or '—' }}</td><td class="mono">{{ it.part }} {{ part_note(it.part, False) }}</td><td class="dcol">{{ it.description|lower|capitalize }}</td>
             <td class="r">{% if it.pack_qty %}{{ it.buy_units }} {{ it.pack_uom or 'pack' }} <span class="muted">({{ it.qty|qty }})</span>{% else %}{{ it.qty|qty }}{% endif %}</td><td class="r">{{ it.spend|money }}</td><td>{{ it.need_by|nice_date }}</td></tr>
       {% endfor %}
       </tbody>

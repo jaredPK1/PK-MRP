@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_notes.html" import part_note with context %}
 {% block title %}Promise check · PK-MRP{% endblock %}
 {% block content %}
 <section class="page-intro">
@@ -24,7 +25,7 @@
     {% elif result.requested %}<span class="v-big">Not by then.</span> Earliest is <b>{{ result.date }}</b> — {{ result.days_late }} days after the ask.
     {% else %}<span class="v-big">{{ result.date }}</span> is the earliest the material supports.{% endif %}
   </div>
-  <p class="v-sub">{{ result.qty|qty }} × <b>{{ result.part }}</b> {{ result.description|lower }}.
+  <p class="v-sub">{{ result.qty|qty }} × <b>{{ result.part }}</b> {{ result.description|lower }}. {{ part_note(result.part) }}
     {% if result.binding != result.part %}Held there by <b class="mono">{{ result.binding }}</b> {{ result.binding_description|lower }}{% if result.path|length > 2 %} (via {{ result.path[1:-1]|join(' → ') }}){% endif %}.{% else %}It's the part itself that decides it.{% endif %}</p>
   <p class="v-cap">Material only — build capacity isn't modelled yet. Firm supply only: on hand, open POs and open WOs.</p>
 </section>
@@ -34,7 +35,7 @@
   <thead><tr><th>Part</th><th class="r">Qty</th><th>Ready</th><th>How</th><th>Path</th></tr></thead>
   <tbody>
   {% for s in result.steps %}
-    <tr class="{{ 'bind' if s.part == result.binding else '' }}"><td class="mono">{{ s.part }}</td><td class="r">{{ s.qty|qty }}</td><td>{{ s.date }}</td><td>{{ s.how }}</td><td class="muted small">{{ s.path|join(' → ') }}</td></tr>
+    <tr class="{{ 'bind' if s.part == result.binding else '' }}"><td class="mono">{{ s.part }} {{ part_note(s.part, False) }}</td><td class="r">{{ s.qty|qty }}</td><td>{{ s.date }}</td><td>{{ s.how }}</td><td class="muted small">{{ s.path|join(' → ') }}</td></tr>
   {% endfor %}
   </tbody>
 </table>

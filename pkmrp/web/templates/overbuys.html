@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_notes.html" import part_note with context %}
 {% block title %}Overbuys · PK-MRP{% endblock %}
 {% block content %}
 {% macro clear_form(r, kind) %}{% if clearable %}
@@ -44,7 +45,7 @@
   <tbody>
   {% for r in rows %}
     <tr>
-      <td class="mono">{{ r.part }}</td>
+      <td class="mono">{{ r.part }} {{ part_note(r.part) }}</td>
       <td class="dcol">{{ r.description|lower|capitalize }}</td>
       <td class="mono">{{ r.ref[3:] }}</td>
       <td><span class="chip {{ 'late' if r.kind == 'cancel_candidate' else ('today' if r.kind == 'excess_on_po' else 'quiet') }}">{{ r.what }}{% if r.days_early %} · {{ r.days_early }}d{% endif %}</span>{% if r.new %} <span class="chip late">new</span>{% endif %}</td>
@@ -67,7 +68,7 @@
   <thead><tr><th>Part</th><th>Description</th><th>Buyer</th><th class="r">On hand</th><th class="r">Orders need</th><th class="r">Extra</th><th class="r">Value</th><th class="act"></th></tr></thead>
   <tbody>
   {% for r in ob.stock[:150] %}
-    <tr><td class="mono">{{ r.part }}</td><td class="dcol">{{ r.description|lower|capitalize }}</td><td>{{ r.buyer }}</td>
+    <tr><td class="mono">{{ r.part }} {{ part_note(r.part) }}</td><td class="dcol">{{ r.description|lower|capitalize }}</td><td>{{ r.buyer }}</td>
         <td class="r">{{ r.on_hand|qty }}</td><td class="r">{{ r.needed|qty if r.needed else '—' }}</td><td class="r">{{ r.extra|qty }}</td><td class="r"><b>{{ r.value|money }}</b></td><td class="act">{{ clear_form(r, 'stock') }}</td></tr>
   {% endfor %}
   </tbody>
@@ -82,7 +83,7 @@
   <thead><tr><th>Part</th><th>Description</th><th>Where</th><th class="r">Value</th><th>Why</th><th>Who</th><th>When</th><th></th></tr></thead>
   <tbody>
   {% for r in gone %}{% set kind = 'po' if r.ref else 'stock' %}
-    <tr><td class="mono">{{ r.part }}</td><td class="dcol">{{ r.description|lower|capitalize }}</td>
+    <tr><td class="mono">{{ r.part }} {{ part_note(r.part, False) }}</td><td class="dcol">{{ r.description|lower|capitalize }}</td>
         <td class="mono small">{{ r.ref[3:] if r.ref else 'stock' }}</td><td class="r">{{ r.value|money }}</td>
         <td>{{ reason_words[kind].get(r.cleared.reason, r.cleared.reason) }}{% if r.cleared.note %}<div class="muted small">{{ r.cleared.note }}</div>{% endif %}</td>
         <td class="small">{{ r.cleared.by.split('@')[0] }}</td><td>{{ r.cleared.at[:10]|nice_date }}</td>
