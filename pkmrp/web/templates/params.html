@@ -22,7 +22,7 @@
   {% for r in rows %}
     <tr>
       <td class="mono">{{ r.part }}</td>
-      <td>{{ r.description|lower|capitalize }}</td>
+      <td class="dcol">{{ r.description|lower|capitalize }}</td>
       <td>{{ r.buyer }}</td>
       <td>{{ r.vendor }}</td>
       <td class="r">{{ r.current_bdays|int }}</td>

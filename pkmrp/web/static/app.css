@@ -14,7 +14,7 @@
 body { margin: 0; font-family: "DM Sans", system-ui, sans-serif; color: var(--ink); background: var(--bg);
        -webkit-font-smoothing: antialiased; }
 a { color: var(--leaf); text-decoration: none; } a:hover { text-decoration: underline; }
-main { max-width: 1080px; margin: 0 auto; padding: 0 20px 40px; }
+main { max-width: 1600px; margin: 0 auto; padding: 0 20px 40px; }
 
 .bar { display: flex; align-items: center; gap: 22px; padding: 12px 24px; background: var(--surface);
        border-bottom: 1px solid var(--line); position: sticky; top: 0; z-index: 5; }
@@ -100,12 +100,12 @@ kbd { font: 12px/1 "DM Sans", sans-serif; border: 1px solid var(--line); border-
                  background: var(--surface); color: var(--ink); margin-left: 6px; }
 .table-wrap { overflow-x: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; }
 .dense { border-collapse: collapse; width: 100%; font-size: 13.5px; }
-.dense th { text-align: left; font-size: 12px; color: var(--muted); font-weight: 600; padding: 9px 10px;
+.dense th { text-align: left; font-size: 12px; color: var(--muted); font-weight: 600; padding: 9px 8px;
             border-bottom: 1px solid var(--line); position: sticky; top: 0; background: var(--surface); }
-.dense td { padding: 7px 10px; border-bottom: 1px solid var(--line); }
+.dense td { padding: 7px 8px; border-bottom: 1px solid var(--line); }
 .dense tr:hover td { background: var(--bg); }
 
-footer { max-width: 1080px; margin: 0 auto; padding: 18px 20px 30px; color: var(--muted); font-size: 12.5px; }
+footer { max-width: 1600px; margin: 0 auto; padding: 18px 20px 30px; color: var(--muted); font-size: 12.5px; }
 
 .confetti { position: fixed; top: -10px; width: 8px; height: 12px; border-radius: 2px; pointer-events: none;
             animation: fall 2.4s cubic-bezier(.2,.6,.4,1) forwards; z-index: 50; }
@@ -303,6 +303,16 @@ footer { max-width: 1080px; margin: 0 auto; padding: 18px 20px 30px; color: var(
                   100% { opacity: 0; transform: translateY(-38vh) scale(2.6); } }
 @media (prefers-reduced-motion: reduce) { .gift { animation: none; } .gift-lid { transition: none; } }
 .clear-ob summary { cursor: pointer; color: var(--leaf); white-space: nowrap; }
-.clear-ob .cand { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 6px 0 0; min-width: 260px; }
+.clear-ob .cand { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 6px 0 0; width: 210px; }
+.clear-ob select { width: 100%; }
+.clear-ob input { flex: 1; min-width: 0; }
 .clear-ob select, .clear-ob input { font: inherit; font-size: 13px; padding: 3px 6px; border: 1px solid var(--line);
                                     border-radius: 6px; background: var(--surface); color: var(--ink); }
+
+/* Tables use the width they're given: descriptions get room, numbers and dates
+   don't wrap, and a row's action stays in view while the table scrolls. */
+.dense td.dcol { min-width: 12em; }
+.dense td.r, .dense th.r { white-space: nowrap; }
+.dense th.act, .dense td.act { position: sticky; right: 0; background: var(--surface);
+                               box-shadow: -8px 0 8px -8px rgba(0,0,0,.18); }
+.dense tr:hover td.act { background: var(--bg); }

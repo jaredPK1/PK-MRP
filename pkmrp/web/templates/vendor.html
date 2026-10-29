@@ -28,7 +28,7 @@
       <td>{% if ln.status == 'late' %}<span class="chip late">late</span>{% elif ln.status == 'now' %}<span class="chip today">due now</span>{% else %}<span class="chip soon">coming up</span>{% endif %}</td>
       <td class="mono">{{ ln.part }}</td>
       <td class="mono">{{ ln.vendor_part or '—' }}</td>
-      <td>{{ ln.description|lower|capitalize }}{% if ln.release %}<div class="muted small" title="This part is on a 12-month blanket plan (Committed). The qty here is what booked orders need; the blanket release covers the same need, so it isn't added on top.">on a blanket plan — next release {{ ln.release.qty|qty }} by {{ ln.release.order_by|nice_date }}</div>{% endif %}</td>
+      <td class="dcol">{{ ln.description|lower|capitalize }}{% if ln.release %}<div class="muted small" title="This part is on a 12-month blanket plan (Committed). The qty here is what booked orders need; the blanket release covers the same need, so it isn't added on top.">on a blanket plan — next release {{ ln.release.qty|qty }} by {{ ln.release.order_by|nice_date }}</div>{% endif %}</td>
       <td class="r">{{ ln.qty|qty }}{% if ln.packs %}<div class="muted small">{{ ln.packs }} {{ ln.pack_uom or 'pk' }} of {{ ln.pack_qty|qty }}</div>{% endif %}</td>
       <td class="r">{{ ln.unit_cost|money if ln.unit_cost else '—' }}</td>
       <td class="r">{{ ln.spend|money if ln.spend else '—' }}</td>

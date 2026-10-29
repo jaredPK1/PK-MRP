@@ -51,12 +51,16 @@ def _qty(v):
     return f"{v:,.0f}" if v == int(v) else f"{v:,.2f}"
 
 
-def _nice_date(v):
-    """'2026-12-09' -> 'Wed 9 Dec' (with the year when it isn't this year)."""
+def _nice_date(v, weekday=True):
+    """'2026-12-09' -> 'Wed 9 Dec' (with the year when it isn't this year);
+    weekday=False -> '9 Dec', for tight tables."""
     if not v:
         return ""
     d = date.fromisoformat(v) if isinstance(v, str) else v
-    return f"{d:%a} {d.day} {d:%b}" + (f" {d.year}" if d.year != date.today().year else "")
+    # non-breaking spaces: a date never splits across lines in a table
+    out = (f"{d:%a} " if weekday else "") + f"{d.day} {d:%b}"
+    out += f" {d.year}" if d.year != date.today().year else ""
+    return out.replace(" ", "\u00a0")
 
 
 def _month_name(v):
@@ -425,7 +429,7 @@ def create_app():
                 today = date.fromisoformat(data["today"])
                 parts = {
                     p: Part(p, t, description=desc, mfg_lt=mfg, purchase_lt=pur)
-                    for p, (t, desc, mfg, pur) in data["parts"].items()
+                    for p, (t, desc, mfg, pur, *_) in data["parts"].items()
                 }
                 lines = {
                     p: (start, [(date.fromisoformat(d) if d else None, q) for d, q in ev])

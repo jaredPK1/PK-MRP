@@ -360,3 +360,20 @@ def test_overbuys_clearing_needs_sign_in(client, tmp_path, monkeypatch):
     assert "overbuys/clear" not in c.get("/overbuys").get_data(as_text=True)
     r = c.post("/overbuys/clear", data={"key": "STOCK|LENS", "action": "clear", "reason": "spares"})
     assert r.status_code == 403
+
+
+def test_promise_page_reads_the_atp_file_as_written(client):
+    from pkmrp import snapshot
+
+    # parts rows carry unit cost as a fifth field (Analytics); the page must not care
+    snapshot.write_atp(
+        {
+            "today": "2026-10-28",
+            "parts": {"LENS": ["B", "LENS 50MM", 0.0, 20.0, 900.0]},
+            "timelines": {"LENS": [2.0, []]},
+            "children": {},
+            "lead": {"LENS": 20.0},
+        }
+    )
+    r = client.get("/promise?part=LENS&qty=1")
+    assert r.status_code == 200 and "LENS" in r.get_data(as_text=True)

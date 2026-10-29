@@ -6,7 +6,7 @@
   <form method="post" action="{{ script_root }}/overbuys/clear" class="cand">
     <input type="hidden" name="key" value="{{ key_of(r) }}"><input type="hidden" name="new" value="{{ '1' if only_new else '' }}">
     <select name="reason" required aria-label="Why this isn't an overbuy"><option value="">Why?</option>{% for code, words in reasons[kind] %}<option value="{{ code }}">{{ words }}</option>{% endfor %}</select>
-    <input name="note" maxlength="300" placeholder="Note (needed for Other)" aria-label="Note">
+    <input name="note" maxlength="300" placeholder="Note (for Other)" aria-label="Note">
     <button class="btn" name="action" value="clear">Clear</button>
   </form>
 </details>{% endif %}{% if r.was_cleared %}<div class="muted small" title="{{ r.was_cleared.note }}">cleared {{ r.was_cleared.at[:10]|nice_date }} at {{ r.was_cleared.qty|qty }} — it's grown since</div>{% endif %}{% endmacro %}
@@ -40,21 +40,21 @@
 <div class="table-tools"><input type="search" class="table-filter" placeholder="Filter: part, description, buyer or vendor" aria-label="Filter the table"><span class="muted small filter-count"></span></div>
 <div class="table-wrap">
 <table class="dense">
-  <thead><tr><th>Part</th><th>Description</th><th>PO line</th><th>Problem</th><th class="r">Qty</th><th class="r">Value</th><th>Buyer</th><th>Vendor</th><th>Placed</th><th>Due</th><th></th></tr></thead>
+  <thead><tr><th>Part</th><th>Description</th><th>PO line</th><th>Problem</th><th class="r">Qty</th><th class="r">Value</th><th>Buyer</th><th>Vendor</th><th>Placed</th><th>Due</th><th class="act"></th></tr></thead>
   <tbody>
   {% for r in rows %}
     <tr>
       <td class="mono">{{ r.part }}</td>
-      <td>{{ r.description|lower|capitalize }}</td>
+      <td class="dcol">{{ r.description|lower|capitalize }}</td>
       <td class="mono">{{ r.ref[3:] }}</td>
       <td><span class="chip {{ 'late' if r.kind == 'cancel_candidate' else ('today' if r.kind == 'excess_on_po' else 'quiet') }}">{{ r.what }}{% if r.days_early %} · {{ r.days_early }}d{% endif %}</span>{% if r.new %} <span class="chip late">new</span>{% endif %}</td>
       <td class="r">{{ r.qty|qty }}</td>
       <td class="r"><b>{{ r.value|money }}</b></td>
       <td>{{ r.buyer }}</td>
       <td class="small">{{ r.vendor|title }}</td>
-      <td>{{ r.placed|nice_date if r.placed else '' }}</td>
-      <td>{{ r.due|nice_date if r.due else '' }}</td>
-      <td>{{ clear_form(r, 'po') }}</td>
+      <td title="{{ r.placed|nice_date if r.placed else '' }}">{{ r.placed|nice_date(False) if r.placed else '' }}</td>
+      <td title="{{ r.due|nice_date if r.due else '' }}">{{ r.due|nice_date(False) if r.due else '' }}</td>
+      <td class="act">{{ clear_form(r, 'po') }}</td>
     </tr>
   {% else %}<tr><td colspan="11" class="muted">Nothing here — every open PO line is needed. Lovely.</td></tr>{% endfor %}
   </tbody>
@@ -64,11 +64,11 @@
 <h3 class="steps-h">Stock no booked order needs <span class="muted">· {{ t.stock_extra|money }}, of which {{ t.stock_idle|money }} has no order at all</span></h3>
 <div class="table-wrap">
 <table class="dense">
-  <thead><tr><th>Part</th><th>Description</th><th>Buyer</th><th class="r">On hand</th><th class="r">Orders need</th><th class="r">Extra</th><th class="r">Value</th><th></th></tr></thead>
+  <thead><tr><th>Part</th><th>Description</th><th>Buyer</th><th class="r">On hand</th><th class="r">Orders need</th><th class="r">Extra</th><th class="r">Value</th><th class="act"></th></tr></thead>
   <tbody>
   {% for r in ob.stock[:150] %}
-    <tr><td class="mono">{{ r.part }}</td><td>{{ r.description|lower|capitalize }}</td><td>{{ r.buyer }}</td>
-        <td class="r">{{ r.on_hand|qty }}</td><td class="r">{{ r.needed|qty if r.needed else '—' }}</td><td class="r">{{ r.extra|qty }}</td><td class="r"><b>{{ r.value|money }}</b></td><td>{{ clear_form(r, 'stock') }}</td></tr>
+    <tr><td class="mono">{{ r.part }}</td><td class="dcol">{{ r.description|lower|capitalize }}</td><td>{{ r.buyer }}</td>
+        <td class="r">{{ r.on_hand|qty }}</td><td class="r">{{ r.needed|qty if r.needed else '—' }}</td><td class="r">{{ r.extra|qty }}</td><td class="r"><b>{{ r.value|money }}</b></td><td class="act">{{ clear_form(r, 'stock') }}</td></tr>
   {% endfor %}
   </tbody>
 </table>
@@ -82,7 +82,7 @@
   <thead><tr><th>Part</th><th>Description</th><th>Where</th><th class="r">Value</th><th>Why</th><th>Who</th><th>When</th><th></th></tr></thead>
   <tbody>
   {% for r in gone %}{% set kind = 'po' if r.ref else 'stock' %}
-    <tr><td class="mono">{{ r.part }}</td><td>{{ r.description|lower|capitalize }}</td>
+    <tr><td class="mono">{{ r.part }}</td><td class="dcol">{{ r.description|lower|capitalize }}</td>
         <td class="mono small">{{ r.ref[3:] if r.ref else 'stock' }}</td><td class="r">{{ r.value|money }}</td>
         <td>{{ reason_words[kind].get(r.cleared.reason, r.cleared.reason) }}{% if r.cleared.note %}<div class="muted small">{{ r.cleared.note }}</div>{% endif %}</td>
         <td class="small">{{ r.cleared.by.split('@')[0] }}</td><td>{{ r.cleared.at[:10]|nice_date }}</td>
