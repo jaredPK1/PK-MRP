@@ -377,3 +377,69 @@ def test_promise_page_reads_the_atp_file_as_written(client):
     )
     r = client.get("/promise?part=LENS&qty=1")
     assert r.status_code == 200 and "LENS" in r.get_data(as_text=True)
+
+
+def test_pages_show_ecn_chips_and_the_obsolete_alert(client, tmp_path):
+    from pkmrp import snapshot
+
+    snap = json.loads((tmp_path / "latest.json").read_text())
+    part = snap["buys"][0]["part"]
+    snap["ecn"] = {
+        "status": "ok",
+        "parts": {part: {"open": [{"ecn": "126168", "status": "In Process", "originator": "Abhi",
+                                   "opened": "2026-10-26", "closed": None, "old_rev": "A",
+                                   "new_rev": "ZZ", "change": "Obsolete", "summary": "", "blocker": ""}],
+                         "obsolete": {"ecn": "126056", "status": "Closed", "originator": "Abhi",
+                                      "opened": "2026-03-31", "closed": "2026-09-03", "old_rev": "A",
+                                      "new_rev": "ZZ", "change": "Obsolete", "summary": "", "blocker": ""}}},
+        "obsolete_buys": [{"part": part, "description": "x", "qty": 2, "order_value": 412000,
+                           "orders": 1, "ecn": {"ecn": "126056", "originator": "Abhi",
+                                                "closed": "2026-09-03", "change": "Obsolete"},
+                           "open_ecns": [], "via": [{"part": "00-2930-00G", "obsolete": True,
+                                                     "open_ecns": []}]}],
+        "open_parts": 1,
+        "obsolete_parts": 1,
+    }
+    snapshot.write(snap)
+    home = client.get("/").get_data(as_text=True)
+    assert "Obsoleted by an ECN, but still being bought" in home
+    assert "obsolete · ECN 126056" in home and "ECN 126168 · In Process" in home
+    assert f"/ecn/?pn={part}" in home and "itself obsolete" in home
+    why = client.get(f"/why/{part}").get_data(as_text=True)
+    assert "ECN 126056" in why and "Open " + part + " in the ECN app" in why
+
+
+def test_no_ecn_access_says_so_and_pages_still_work(client, tmp_path):
+    from pkmrp import snapshot
+
+    snap = json.loads((tmp_path / "latest.json").read_text())
+    snap["ecn"] = {"status": "no_access", "error": "4060"}
+    snapshot.write(snap)
+    assert "Obsoleted by an ECN" not in client.get("/").get_data(as_text=True)
+    assert "waiting on read access" in client.get("/notes").get_data(as_text=True)
+
+
+def test_a_hold_takes_the_part_off_every_buy_list_until_released(client, tmp_path, monkeypatch):
+    from pkmrp import snapshot
+    from pkmrp.db import store
+
+    c, engine = _overbuy_client(tmp_path, monkeypatch, "viewer")
+    snap = snapshot.load_latest()
+    part = snap["buys"][0]["part"]
+    snap["vendor_plan"] = {"IDEX": [{"part": part, "description": "LENS", "vendor_part": "",
+                                     "pack_qty": 0, "pack_uom": "", "unit_cost": 900.0,
+                                     "order_values": {}, "customers": {},
+                                     "orders": [["2026-10-01", "2026-12-01", 25, []]]}]}
+    snapshot.write(snap)
+    assert 'id="buy-1"' in c.get("/").get_data(as_text=True)
+    c.post("/notes", data={"part": part, "tag": "hold", "text": "obsolete per ECN 126041",
+                           "action": "add", "next": "/"})
+    home = c.get("/").get_data(as_text=True)
+    assert "On hold — don't buy" in home and "obsolete per ECN 126041" in home
+    assert 'id="buy-1"' not in home  # off the top 10
+    assert "On hold, not shown" in c.get("/buys").get_data(as_text=True)
+    assert "IDEX" not in c.get("/vendors").get_data(as_text=True)
+    nid = store.get_setting(engine, "part_notes")[part][0]["id"]
+    c.post("/notes", data={"part": part, "id": nid, "action": "remove", "next": "/"})
+    home = c.get("/").get_data(as_text=True)
+    assert 'id="buy-1"' in home and "On hold — don't buy" not in home

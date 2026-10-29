@@ -339,3 +339,11 @@ footer { max-width: 1600px; margin: 0 auto; padding: 18px 20px 30px; color: var(
                                       border-radius: 6px; background: var(--surface); color: var(--ink); }
 .note-new { margin: 4px 0 14px; } .note-new .note-text { flex: 1; min-width: 240px; }
 .why-notes { margin: 0 0 10px; line-height: 1.9; }
+.why-ecn { border-left: 3px solid var(--late); padding: 2px 0 2px 12px; margin: 0 0 12px; }
+.why-ecn p { margin: 4px 0; line-height: 1.7; }
+.ecn-alert { background: var(--late-soft); border: 1px solid var(--late); border-radius: 12px; padding: 14px 18px; margin: 18px 0; }
+.ecn-alert h2 { margin: 0 0 4px; font-size: 18px; color: var(--late); }
+.ecn-alert ul { margin: 8px 0 0; padding-left: 18px; } .ecn-alert li { margin: 6px 0; line-height: 1.6; }
+.on-hold { border: 1px solid var(--line); border-left: 4px solid var(--late); background: var(--surface); border-radius: 12px; padding: 12px 18px; margin: 18px 0; }
+.on-hold h2 { margin: 0 0 4px; font-size: 17px; }
+.on-hold ul { margin: 6px 0; padding-left: 18px; } .on-hold li { margin: 4px 0; line-height: 1.6; }

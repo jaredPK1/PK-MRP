@@ -39,6 +39,34 @@
   {% endif %}
 </section>
 
+{% set ob = (snap.ecn or {}).get('obsolete_buys') or [] %}
+{% if ob %}
+<section class="ecn-alert" aria-labelledby="ecn-h">
+  <h2 id="ecn-h">Obsoleted by an ECN, but still being bought <span class="muted">· {{ ob|length }}</span></h2>
+  <p class="muted small">Ron's ECN app says these parts are obsolete (latest closed ECN set rev ZZ), yet orders still pull them. Don't place these until Engineering says what replaces them — usually the fix is the parent or the order, not the buy.</p>
+  <ul>
+  {% for r in ob %}
+    <li><b class="mono">{{ r.part }}</b> {{ r.description|lower|capitalize }} — {{ r.qty|qty }} to buy{% if r.orders %} for {{ r.orders }} order{{ 's' if r.orders != 1 }}{% if r.order_value %} worth {{ r.order_value|money }}{% endif %}{% endif %}.
+      <a href="{{ ecn_link(r.part) }}" target="_blank" rel="noopener">ECN {{ r.ecn.ecn }}</a> <span class="muted small">({{ r.ecn.originator }}, closed {{ r.ecn.closed|nice_date if r.ecn.closed else '?' }}{% if r.ecn.change %}: {{ r.ecn.change|truncate(90) }}{% endif %})</span>
+      {% if r.via %}<div class="small">Pulled by {% for v in r.via %}<span class="mono">{{ v.part }}</span>{% if v.obsolete %} <span class="chip note-chip tag-obsolete">itself obsolete</span>{% endif %}{% if v.open_ecns %} <span class="chip note-chip tag-ecn">ECN {{ v.open_ecns|join(', ') }} open</span>{% endif %}{{ ', ' if not loop.last }}{% endfor %}</div>{% endif %}
+    </li>
+  {% endfor %}
+  </ul>
+</section>
+{% endif %}
+{% if on_hold %}
+<section class="on-hold" aria-labelledby="hold-h">
+  <h2 id="hold-h">On hold — don't buy <span class="muted">· {{ on_hold|length }}</span></h2>
+  <ul>
+  {% for b in on_hold %}
+    <li><b class="mono">{{ b.part }}</b> {{ b.description|lower|capitalize }} — {{ b.qty|qty }} would be due{% if b.orders %} for {{ b.orders }} order{{ 's' if b.orders != 1 }}{% if b.order_value %} worth {{ b.order_value|money }}{% endif %}{% endif %}.
+      <span class="small">Held by {{ b.hold.by.split('@')[0] }} {{ b.hold.at[:10]|nice_date }}{% if b.hold.text %}: “{{ b.hold.text }}”{% endif %}.</span>
+      <a class="small" href="{{ script_root }}/notes#n-{{ b.hold.id }}">Release the hold</a></li>
+  {% endfor %}
+  </ul>
+  <p class="muted small">A held part is off Today, All buys, By vendor and the shelf carts until its hold note is removed. The orders behind it still wait — the hold is a decision, not a fix.</p>
+</section>
+{% endif %}
 {% if top %}
 <section class="top" aria-labelledby="top-h">
   <div class="sec-head">

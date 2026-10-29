@@ -2,8 +2,9 @@
 
 "Engineering is working on a replacement", "obsolete", "ECN being created" --
 said once, kept on the part, and shown wherever the part appears, so nobody
-has to flag it again next plan. A note changes no plan; it stays until
-someone removes it.
+has to flag it again next plan. A note stays until someone removes it. Only
+"hold" changes what buyers see: a held part comes off every buy list (the
+plan itself is untouched).
 
 Stored as one PK_Ops setting, {part: [note, ...]}, newest last. Pure.
 """

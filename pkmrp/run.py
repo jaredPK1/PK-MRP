@@ -214,6 +214,16 @@ def build_plan(erp, settings=None, today=None, history_months=24, sku_map=None):
                 k in text for k in ("permission", "not able to access", "denied", "4060", "916")
             )
             pipeline = {"status": "no_access" if no_access else "error", "error": text[:300]}
+    # ECNs from Ron's ECN app: shown beside parts and as an alert; never
+    # changes the plan.
+    try:
+        ecn = {"status": "ok", "rows": timed("ecn_parts", extract.ecn_parts, erp)}
+    except Exception as exc:  # noqa: BLE001 -- the plan stands without ECNs
+        text = str(exc)
+        no_access = any(
+            k in text for k in ("permission", "not able to access", "denied", "4060", "916")
+        )
+        ecn = {"status": "no_access" if no_access else "error", "error": text[:300]}
     for p, by_month in pipe_months.items():
         merged = months.setdefault(p, {})
         for m, q in by_month.items():
@@ -268,6 +278,7 @@ def build_plan(erp, settings=None, today=None, history_months=24, sku_map=None):
         "shelf_orders": shelf_orders,
         "committed_plans": committed_plans,
         "pipeline": pipeline,
+        "ecn": ecn,
         "consigned": consigned,
         "consign_evidence": consign_evidence,
         "bom_codes_skipped": skipped_codes,

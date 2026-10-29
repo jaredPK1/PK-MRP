@@ -269,6 +269,31 @@ SELECT RTRIM(PRTNUM_07) AS part, RTRIM(VENID_07) AS vendor_id,
 FROM Part_Vendor
 """
 
+# ECNs from Ron's ECN app (pk_ecn on PK-SQL01) -- the source of truth for
+# engineering changes. Every part row on an open ECN, plus each part's latest
+# closed row when that row set the revision to ZZ (obsolete); a later closed
+# ECN that changes the part again means it isn't obsolete any more.
+# Access is a GRANT on pk_ecn (deploy/pk_ecn_read_grant.sql).
+ECN_PARTS_SQL = """
+SELECT part, ecn, status, originator, opened, closed, old_rev, new_rev, change, summary, blocker
+FROM (
+    SELECT RTRIM(p.part_number) AS part, RTRIM(e.ecn_no) AS ecn, e.status,
+           ISNULL(e.originator, '') AS originator,
+           e.date_opened AS opened, e.date_closed AS closed,
+           RTRIM(ISNULL(p.old_rev, '')) AS old_rev, RTRIM(ISNULL(p.new_rev, '')) AS new_rev,
+           LEFT(ISNULL(p.change_desc, ''), 400) AS change,
+           LEFT(ISNULL(e.summary, ''), 400) AS summary,
+           LEFT(ISNULL(e.action_blocker, ''), 200) AS blocker,
+           CASE WHEN e.status = 'Closed' THEN ROW_NUMBER() OVER (
+               PARTITION BY p.part_number, CASE WHEN e.status = 'Closed' THEN 1 ELSE 0 END
+               ORDER BY COALESCE(e.date_closed, e.date_opened) DESC, e.ecn_no DESC) END AS closed_rank
+    FROM pk_ecn.dbo.ecn_part p
+    JOIN pk_ecn.dbo.ecn e ON e.ecn_no = p.ecn_no
+    WHERE p.part_number IS NOT NULL AND e.status <> 'Cancelled'
+) x
+WHERE status <> 'Closed' OR (closed_rank = 1 AND new_rev = 'ZZ')
+"""
+
 ALL_SQL = {
     "parts": PARTS_SQL,
     "bom": BOM_SQL,
@@ -287,6 +312,7 @@ ALL_SQL = {
     "subcontract_reqs": SUBCONTRACT_REQ_SQL,
     "vendors": VENDORS_SQL,
     "part_vendors": PART_VENDORS_SQL,
+    "ecn_parts": ECN_PARTS_SQL,
 }
 
 _DATES = {
@@ -301,6 +327,8 @@ _DATES = {
     "first_receipt",
     "last_receipt",
     "last_sold",
+    "opened",
+    "closed",
 }
 _TEXT = {
     "part",
@@ -335,6 +363,13 @@ _TEXT = {
     "order_type",
     "booking",
     "sku",
+    "ecn",
+    "originator",
+    "old_rev",
+    "new_rev",
+    "change",
+    "summary",
+    "blocker",
 }
 
 
@@ -432,6 +467,12 @@ def booked_skus(erp):
 def booked_so_lines(erp):
     """MAX customer-order lines on the SOs Book/Bill 2.0 bookings name."""
     return _run(erp, "booked_so_lines")
+
+
+def ecn_parts(erp):
+    """Open-ECN part rows and ECN-obsoleted parts from Ron's ECN app.
+    Raises if the login has no access to pk_ecn -- the caller decides."""
+    return _run(erp, "ecn_parts")
 
 
 def last_sold(erp):

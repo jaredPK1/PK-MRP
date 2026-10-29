@@ -4,7 +4,12 @@
 {% block content %}
 <section class="page-intro">
   <h1 class="h1-small">Part notes</h1>
-  <p class="lede"><b>The question this page answers: what do we know about a part that MAX doesn't say?</b> Engineering working on a replacement, the part going obsolete, an ECN on the way, a supplier problem. A note is said once and stays on the part — it shows as a chip next to the part number on every page, every plan — until someone removes it. Notes don't change the plan.</p>
+  <p class="lede"><b>The question this page answers: what do we know about a part that MAX doesn't say?</b> Engineering working on a replacement, the part going obsolete, an ECN on the way, a supplier problem. A note is said once and stays on the part — it shows as a chip next to the part number on every page, every plan — until someone removes it. Notes don't change the plan, except <b>Hold — don't buy yet</b>: a held part comes off every buy list until the hold is removed.</p>
+  {% set es = ((snap or {}).get('ecn') or {}).get('status') %}
+  <p class="lede small-gap">ECNs come in by themselves from <a href="{{ ecn_app }}" target="_blank" rel="noopener">Ron's ECN app</a>, the source of truth for engineering changes —
+  {% if es == 'ok' %}{{ snap.ecn.open_parts }} parts in this plan have an open ECN and {{ snap.ecn.obsolete_parts }} are obsolete per their latest ECN. They show as <span class="chip note-chip tag-ecn">ECN … · In Process</span> and <span class="chip note-chip tag-obsolete">obsolete · ECN …</span> chips; no need to note them here.
+  {% elif es == 'no_access' %}<span class="late-text">waiting on read access to the ECN database (pk_ecn)</span>; until then, note ECNs by hand.
+  {% else %}<span class="late-text">couldn't be read on the last plan</span>; note ECNs by hand for now.{% endif %}</p>
   {% if error %}<p class="lede small-gap promise-error">Can't read notes from PK_Ops right now ({{ error }}).</p>{% endif %}
   {% if request.args.get('noted') %}<p class="lede small-gap" id="saved"><span class="chip soon">Saved</span> {{ request.args.get('noted') }}</p>{% endif %}
 </section>

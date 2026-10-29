@@ -6,6 +6,7 @@ with a reason and notes on parts (anyone signed in)."""
 import json
 import os
 import re
+from urllib.parse import quote
 from datetime import date, datetime
 
 from flask import Flask, abort, g, redirect, render_template, request, url_for
@@ -93,6 +94,9 @@ def _lead_words(source):
 SKU_MAP_KEY = "pipeline_sku_map"
 CLEARED_KEY = "overbuy_cleared"
 NOTES_KEY = "part_notes"
+# Ron's ECN app, the source of truth for ECNs; /ecn/?pn=<part> opens the
+# part's ECN history there.
+ECN_APP_URL = os.environ.get("ECN_APP_URL", "/ecn/")
 CELEBRATE_AT = 10  # overbuys one person clears in a day earns a celebration
 
 
@@ -126,6 +130,44 @@ def create_app():
                 g.part_notes, g.notes_error = {}, str(exc)[:200]
         return g.part_notes
 
+    def held():
+        """{part: hold note} -- parts someone put on hold; they come off every
+        buy list until the note is removed."""
+        return {
+            p: next(n for n in ns if n["tag"] == "hold")
+            for p, ns in part_notes().items()
+            if any(n["tag"] == "hold" for n in ns)
+        }
+
+    def without_held(snap):
+        """The snapshot as buyers should see it: held parts off the buy lists,
+        the needs-source list and the shelf carts."""
+        hold = held()
+        if not hold:
+            return snap, []
+        carts = []
+        for c in snap.get("shelf_orders") or []:
+            items = [it for it in c["items"] if it["part"] not in hold]
+            if items:
+                carts.append({**c, "items": items, "lines": len(items),
+                              "spend": round(sum(it.get("spend", 0) for it in items), 2)})
+        out = {
+            **snap,
+            "buys": [b for b in snap["buys"] if b["part"] not in hold],
+            "needs_source": [b for b in snap.get("needs_source", []) if b["part"] not in hold],
+            "shelf_orders": carts,
+            "vendor_plan": {
+                v: [ln for ln in lines if ln["part"] not in hold]
+                for v, lines in (snap.get("vendor_plan") or {}).items()
+            },
+        }
+        on_hold = [
+            {**b, "hold": hold[b["part"]]}
+            for b in snap["buys"] + snap.get("needs_source", [])
+            if b["part"] in hold
+        ]
+        return out, on_hold
+
     @app.context_processor
     def _ctx():
         from ..core.notes import TAG_SHORT, TAG_WORDS, TAGS
@@ -139,7 +181,15 @@ def create_app():
             "note_short": TAG_SHORT,
             "can_note": lambda: signed_in() and not g.get("notes_error"),
             "here": request.script_root + request.full_path.rstrip("?"),
+            "ecn_for": ecn_for,
+            "ecn_link": lambda part: f"{ECN_APP_URL}?pn={quote(part)}",
+            "ecn_app": ECN_APP_URL,
         }
+
+    def ecn_for(part):
+        """{"open": [...], "obsolete": ecn|None} from the latest plan, or None."""
+        snap = snapshot.load_latest() or {}
+        return ((snap.get("ecn") or {}).get("parts") or {}).get(part)
 
     @app.get("/health")
     def health():
@@ -153,6 +203,7 @@ def create_app():
         if snap is None:
             return render_template("empty.html", now=now), 200
         prev = snapshot.load_previous(snap["today"])
+        snap, on_hold = without_held(snap)
         buys = snap["buys"]
         for b in buys:
             b["when"], b["tone"] = _when(b["place_by"], today)
@@ -180,11 +231,12 @@ def create_app():
             voice=voice.speak(now, name, facts),
             now=now,
             vendor_n=vendor_n(snap),
+            on_hold=on_hold,
         )
 
     @app.get("/buys")
     def buys_page():
-        snap = snapshot.load_latest() or abort(404)
+        snap, on_hold = without_held(snapshot.load_latest() or abort(404))
         today = date.today()
         buyer = request.args.get("buyer", "")
         rows = [b for b in snap["buys"] if not buyer or b["buyer"] == buyer]
@@ -192,7 +244,13 @@ def create_app():
             b["when"], b["tone"] = _when(b["place_by"], today)
         buyers = sorted({b["buyer"] for b in snap["buys"] if b["buyer"]})
         return render_template(
-            "buys.html", snap=snap, rows=rows, buyers=buyers, buyer=buyer, vendor_n=vendor_n(snap)
+            "buys.html",
+            snap=snap,
+            rows=rows,
+            buyers=buyers,
+            buyer=buyer,
+            vendor_n=vendor_n(snap),
+            on_hold=on_hold,
         )
 
     @app.get("/overbuys")
@@ -582,7 +640,7 @@ def create_app():
     def vendors_page():
         from ..core.calendar import plus_workdays
 
-        snap = snapshot.load_latest() or abort(404)
+        snap, _ = without_held(snapshot.load_latest() or abort(404))
         today = date.fromisoformat(snap["today"])
         rows = vendor_counts(snap, today, plus_workdays(today, 5))
         rows = [r for r in rows if r[2]]
@@ -594,7 +652,7 @@ def create_app():
         from ..core.calendar import plus_workdays
         from ..core.vendor_order import window
 
-        snap = snapshot.load_latest() or abort(404)
+        snap, _ = without_held(snapshot.load_latest() or abort(404))
         name = request.args.get("v", "")
         plan = snap.get("vendor_plan") or {}
         if name not in plan:

@@ -13,6 +13,7 @@
     </label>
   </form>
 </section>
+{% if on_hold %}<p class="muted small">On hold, not shown: {% for b in on_hold %}<span class="mono">{{ b.part }}</span>{{ ', ' if not loop.last }}{% endfor %} — see <a href="{{ script_root }}/#hold-h">On hold</a> on Today.</p>{% endif %}
 {% if snap.needs_source %}<p class="muted small">Not here: {{ snap.needs_source|length }} parts with no vendor yet — they're under <a href="{{ script_root }}/#src-h">Needs a source</a> on Today. Shelf parts are in the Shelf order.</p>{% endif %}
 <div class="table-tools"><input type="search" class="table-filter" placeholder="Filter: part number or description words — e.g. 2300 lens" aria-label="Filter the table"><span class="muted small filter-count"></span></div>
 <div class="table-wrap">

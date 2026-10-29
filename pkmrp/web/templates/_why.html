@@ -1,6 +1,11 @@
 {% from "_notes.html" import part_note with context %}
 {% set s = b.story %}
 <div class="why-inner">
+  {% set ec = ecn_for(b.part) %}{% if ec %}<div class="why-ecn">
+    {% if ec.obsolete %}{% set e = ec.obsolete %}<p><span class="chip note-chip tag-obsolete">Obsolete</span> <b>ECN {{ e.ecn }}</b> ({{ e.originator }}, closed {{ e.closed|nice_date if e.closed else '?' }}) set this part to rev ZZ{% if e.change %}: “{{ e.change|truncate(220) }}”{% endif %}. Check with Engineering before buying — the demand may be coming from an old parent or an order that still calls it out.</p>{% endif %}
+    {% for e in ec.open %}<p><span class="chip note-chip tag-ecn">ECN {{ e.ecn }} · {{ e.status }}</span> {{ e.originator }}, opened {{ e.opened|nice_date if e.opened else '?' }}{% if e.new_rev %} · rev {{ e.old_rev or '—' }} → {{ e.new_rev }}{% endif %}{% if e.change %}. <i>This part:</i> {{ e.change|truncate(200) }}{% endif %}{% if e.summary %} <span class="muted small">— {{ e.summary|truncate(200) }}</span>{% endif %}{% if e.blocker %} <span class="late-text small">Blocked: {{ e.blocker }}</span>{% endif %}</p>{% endfor %}
+    <p class="small"><a href="{{ ecn_link(b.part) }}" target="_blank" rel="noopener">Open {{ b.part }} in the ECN app →</a></p>
+  </div>{% endif %}
   {% if notes_for(b.part) %}<p class="why-notes">{% for n in notes_for(b.part) %}<span class="chip note-chip tag-{{ n.tag }}">{{ note_words[n.tag] }}</span> {{ n.text }} <span class="muted small">— {{ n.by.split('@')[0] }}, {{ n.at[:10]|nice_date }}</span><br>{% endfor %}</p>{% endif %}
   <div class="story-head">
     {% if s.runs_out %}

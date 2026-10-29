@@ -7,6 +7,16 @@ Every feature people can see gets a line here in the same change
 WHATS_NEW = (
     (
         "2026-10-29",
+        "Hold a part so nobody buys it",
+        "A \"Hold — don't buy yet\" note now takes the part off Today's top 10, All buys, By vendor, Needs a source and the shelf carts, straight away. Held parts are listed under On hold on Today with who held them and why; remove the note to release it. First one: 45-3036-00G (obsolete per ECN 126041, none on hand).",
+    ),
+    (
+        "2026-10-29",
+        "ECNs from Ron's ECN app",
+        "PK-MRP now reads Ron's ECN app every plan. A part on an open ECN shows a blue chip (\"ECN 126168 · In Process\"), and a part whose latest closed ECN set it to rev ZZ shows a red \"obsolete · ECN …\" chip — everywhere the part appears, with the ECN's details in Why this buy?. Click a chip to open the part's ECN history in the ECN app. Today now opens with any buys of an obsoleted part and what's still pulling them, so nobody buys a dead part. ECNs never change the plan by themselves.",
+    ),
+    (
+        "2026-10-29",
         "Notes on a part",
         "Know something MAX doesn't say? Click + note next to any part number — Engineering working on a replacement, obsolete, ECN being created, on hold, supplier problem, or your own words. The note stays on the part, plan after plan, and shows as a chip wherever the part appears (Today, All buys, Overbuys, Committed, By vendor, Promise and the Why panel), so nobody has to flag it again. The Notes page lists them all, with filters; Remove when it's no longer true. Notes don't change the plan. Anyone signed in can add one.",
     ),

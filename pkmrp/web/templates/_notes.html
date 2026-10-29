@@ -1,5 +1,7 @@
 {# A part's notes as chips, and "+ note" to add one. Import with context. #}
-{% macro part_note(part, add=True) %}{% set ns = notes_for(part) %}
+{% macro part_note(part, add=True) %}{% set ns = notes_for(part) %}{% set ec = ecn_for(part) %}
+{% if ec %}{% if ec.obsolete %}<a class="chip note-chip tag-obsolete" href="{{ ecn_link(part) }}" target="_blank" rel="noopener" title="Obsoleted by ECN {{ ec.obsolete.ecn }} ({{ ec.obsolete.originator }}, closed {{ ec.obsolete.closed or '?' }}){% if ec.obsolete.change %}: {{ ec.obsolete.change|truncate(200) }}{% endif %} — open in the ECN app">obsolete · ECN {{ ec.obsolete.ecn }}</a>{% endif %}
+{% for e in ec.open %}<a class="chip note-chip tag-ecn" href="{{ ecn_link(part) }}" target="_blank" rel="noopener" title="ECN {{ e.ecn }} — {{ e.status }}, {{ e.originator }}, opened {{ e.opened or '?' }}{% if e.change %}. This part: {{ e.change|truncate(160) }}{% endif %}{% if e.summary %}. {{ e.summary|truncate(160) }}{% endif %} — open in the ECN app">ECN {{ e.ecn }} · {{ e.status }}</a>{% endfor %}{% endif %}
 {% for n in ns %}<a class="chip note-chip tag-{{ n.tag }}" href="{{ script_root }}/notes#n-{{ n.id }}" title="{{ note_words[n.tag] }}{% if n.text %}: {{ n.text }}{% endif %} — {{ n.by.split('@')[0] }}, {{ n.at[:10]|nice_date }}">{{ note_short[n.tag] }}</a>{% endfor %}
 {% if add and can_note() %}<details class="note-add"><summary class="small" title="Note something about {{ part }} that MAX doesn't say — it stays on the part">+ note</summary>
   <form method="post" action="{{ script_root }}/notes" class="note-form">

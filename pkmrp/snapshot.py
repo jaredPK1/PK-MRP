@@ -199,6 +199,7 @@ def build(run, so_df):
         "vendor_pos": _iso_deep(
             recent_open_pos(run["open_pos"], run.get("vendor_names_by_id") or {}, today)
         ),
+        "ecn": _ecn(run, buys, needs_source),
         "overbuys": _iso_deep(
             overbuys(
                 [e for e in res.exceptions if e.part not in (run.get("shelf") or {})],
@@ -211,6 +212,27 @@ def build(run, so_df):
                 today,
             )
         ),
+    }
+
+
+def _ecn(run, buys, needs_source):
+    """ECN facts for the parts this plan touches, and buys of obsoleted parts."""
+    from .core.ecn import by_part, obsolete_buys
+
+    src = run.get("ecn") or {"status": "off"}
+    if src.get("status") != "ok":
+        return {k: v for k, v in src.items() if k != "rows"}
+    res = run["result"]
+    keep = set(res.demands) | {p for p, q in run["stock"].items() if q} | set(run["open_pos"]["part"])
+    keep |= {cp["part"] for cp in run.get("committed_plans", [])}
+    parts = by_part(src["rows"], keep)
+    flat = [{k: _iso(v) for k, v in b.items()} for b in buys + needs_source]
+    return {
+        "status": "ok",
+        "parts": parts,
+        "obsolete_buys": obsolete_buys(flat, parts),
+        "open_parts": sum(1 for v in parts.values() if v["open"]),
+        "obsolete_parts": sum(1 for v in parts.values() if v["obsolete"]),
     }
 
 
