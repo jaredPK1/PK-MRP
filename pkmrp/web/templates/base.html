@@ -38,6 +38,7 @@
     {% if snap %}Planned from MAX at {{ snap.generated_at[11:16] }} on {{ snap.today }} · {% endif %}
     {% if snap and snap.ledger %}{% if snap.ledger.status == 'ok' %}Decision ledger recording ({{ snap.ledger.open }} open recommendations) · {% elif snap.ledger.status == 'waiting_on_dba' %}Decision ledger waiting on its PK_Ops tables · {% elif snap.ledger.status == 'off' %}Test copy — the ledger records on production · {% else %}Decision ledger hiccup — the plan is fine · {% endif %}{% endif %}
     Read-only: PK-MRP never writes to MAX. Recommendations are recorded and compared, not acted on, until a part class goes live.
+    · <a href="{{ script_root }}/weekly">Weekly email</a>
   </footer>
   <script src="{{ script_root }}/static/app.js?v={{ version }}" defer></script>
   <script src="/pk-feedback/static/js/feedback-widget.js" defer></script>

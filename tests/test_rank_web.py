@@ -610,3 +610,9 @@ def test_weekly_email_leaves_held_parts_out(client, tmp_path, monkeypatch):
     assert part in c.get("/weekly/email").get_data(as_text=True)
     c.post("/notes", data={"part": part, "tag": "hold", "text": "x", "action": "add", "next": "/"})
     assert part not in c.get("/weekly/email").get_data(as_text=True)
+
+
+
+def test_weekly_email_is_linked_from_analytics_and_every_footer(client):
+    assert 'href="/weekly"' in client.get("/").get_data(as_text=True)
+    assert "Weekly email →" in client.get("/analytics").get_data(as_text=True)

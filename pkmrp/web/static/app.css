@@ -364,3 +364,5 @@ footer { max-width: 1600px; margin: 0 auto; padding: 18px 20px 30px; color: var(
 .back-connect:hover { color: var(--leaf); }
 .weekly-controls { margin: 8px 0 14px; } .weekly-controls textarea { font: inherit; font-size: 13px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); color: var(--ink); max-width: 100%; }
 .weekly-frame { width: 100%; max-width: 720px; height: 1200px; border: 1px solid var(--line); border-radius: 12px; background: #f5f6f4; }
+.head-btn { font-size: 13px; vertical-align: middle; margin-left: 10px; text-decoration: none; }
+footer a { color: var(--leaf); }
