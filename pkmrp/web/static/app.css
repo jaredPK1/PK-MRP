@@ -268,3 +268,41 @@ footer { max-width: 1080px; margin: 0 auto; padding: 18px 20px 30px; color: var(
 .pct { display: inline-flex; align-items: center; gap: 8px; min-width: 150px; font-variant-numeric: tabular-nums; }
 .pct .hb-track { width: 90px; }
 @media (max-width: 760px) { .multiples { grid-template-columns: 1fr; } }
+
+/* Ten-cleared celebration (Overbuys) */
+.cheer { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; padding: 16px;
+         background: rgba(10, 14, 18, .55); animation: cheer-in .25s ease-out; }
+.cheer-card { background: var(--surface); color: var(--ink); border-radius: 16px; padding: 24px 28px;
+              max-width: 560px; width: 100%; text-align: center; box-shadow: 0 20px 60px rgba(0,0,0,.35); }
+.cheer-card h2 { margin: 0 0 6px; color: var(--leaf); }
+.cheer-close { margin-top: 14px; }
+@keyframes cheer-in { from { opacity: 0; } }
+.gift { position: relative; width: 120px; height: 120px; margin: 14px auto 4px; display: block;
+        background: none; border: 0; cursor: pointer; animation: gift-wobble 1.4s ease-in-out infinite; }
+.gift-box { position: absolute; left: 10px; right: 10px; bottom: 0; height: 78px; border-radius: 6px;
+            background: linear-gradient(90deg, transparent 44%, #facc15 44% 56%, transparent 56%), var(--leaf); }
+.gift-lid { position: absolute; left: 0; right: 0; top: 24px; height: 22px; border-radius: 5px; z-index: 1;
+            background: linear-gradient(90deg, transparent 44%, #facc15 44% 56%, transparent 56%), var(--leaf-dark);
+            transition: transform .6s cubic-bezier(.3,1.6,.5,1), opacity .6s; }
+.gift-lid::before, .gift-lid::after { content: ""; position: absolute; top: -18px; width: 26px; height: 20px;
+            border: 5px solid #facc15; border-radius: 50% 50% 0 50%; }
+.gift-lid::before { left: 30px; transform: rotate(-20deg); }
+.gift-lid::after { right: 30px; transform: scaleX(-1) rotate(-20deg); }
+.gift.open { animation: none; }
+.gift.open .gift-lid { transform: translateY(-90px) rotate(-35deg); opacity: 0; }
+@keyframes gift-wobble { 0%, 70%, 100% { transform: rotate(0); } 76% { transform: rotate(-7deg); }
+                         84% { transform: rotate(6deg); } 92% { transform: rotate(-3deg); } }
+.gift-video iframe { width: 100%; aspect-ratio: 16 / 9; border: 0; border-radius: 10px; margin-top: 10px; }
+.rocket { position: fixed; left: 50vw; bottom: -80px; z-index: 60; pointer-events: none;
+          transform: translateX(-50%); animation: rocket-up 3.2s cubic-bezier(.5,0,.8,.4) forwards; }
+.rocket-ship { display: block; }
+@keyframes rocket-up { 15% { transform: translate(-50%, 6px); } 100% { transform: translate(-50%, -125vh); } }
+.puff { position: fixed; bottom: -20px; z-index: 55; width: 26px; height: 26px; border-radius: 50%;
+        background: var(--line); opacity: 0; pointer-events: none; animation: puff 2.4s ease-out forwards; }
+@keyframes puff { 0% { opacity: .9; transform: translateY(0) scale(.4); }
+                  100% { opacity: 0; transform: translateY(-38vh) scale(2.6); } }
+@media (prefers-reduced-motion: reduce) { .gift { animation: none; } .gift-lid { transition: none; } }
+.clear-ob summary { cursor: pointer; color: var(--leaf); white-space: nowrap; }
+.clear-ob .cand { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 6px 0 0; min-width: 260px; }
+.clear-ob select, .clear-ob input { font: inherit; font-size: 13px; padding: 3px 6px; border: 1px solid var(--line);
+                                    border-radius: 6px; background: var(--surface); color: var(--ink); }

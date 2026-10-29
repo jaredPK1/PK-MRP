@@ -7,6 +7,11 @@ Every feature people can see gets a line here in the same change
 WHATS_NEW = (
     (
         "2026-10-29",
+        "Clear an overbuy with a reason",
+        "Some overbuys are legitimate — service spares, stock at a contract manufacturer, a minimum buy, a PO already changed with the vendor. Click Clear… on the line, pick why (Other needs a note), and it moves to Cleared at the bottom with your name and reason; the totals leave it out. It comes back by itself if it grows, and Put back undoes it. Anyone signed in can clear. Clear ten in a day and something fun happens.",
+    ),
+    (
+        "2026-10-29",
         "Analytics",
         "A new tab answers four questions: is PK-MRP saving money and orders (where what buyers did matched the advice, and the orders and dollars behind it — counted honestly, since shadow mode can't prove cause), is the plan getting healthier day by day, where today's lateness comes from (how late, product, vendor, buyer), and which vendors deliver — on-time % against the date first asked on the PO and real lead time vs MAX's, from 24 months of PK's own POs, with a quarterly trend.",
     ),

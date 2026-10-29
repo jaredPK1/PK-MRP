@@ -1,10 +1,23 @@
 {% extends "base.html" %}
 {% block title %}Overbuys · PK-MRP{% endblock %}
 {% block content %}
+{% macro clear_form(r, kind) %}{% if clearable %}
+<details class="clear-ob"><summary class="small">Clear…</summary>
+  <form method="post" action="{{ script_root }}/overbuys/clear" class="cand">
+    <input type="hidden" name="key" value="{{ key_of(r) }}"><input type="hidden" name="new" value="{{ '1' if only_new else '' }}">
+    <select name="reason" required aria-label="Why this isn't an overbuy"><option value="">Why?</option>{% for code, words in reasons[kind] %}<option value="{{ code }}">{{ words }}</option>{% endfor %}</select>
+    <input name="note" maxlength="300" placeholder="Note (needed for Other)" aria-label="Note">
+    <button class="btn" name="action" value="clear">Clear</button>
+  </form>
+</details>{% endif %}{% if r.was_cleared %}<div class="muted small" title="{{ r.was_cleared.note }}">cleared {{ r.was_cleared.at[:10]|nice_date }} at {{ r.was_cleared.qty|qty }} — it's grown since</div>{% endif %}{% endmacro %}
 {% set t = ob.totals or {} %}
 <section class="page-intro">
   <h1 class="h1-small">Overbuys</h1>
   <p class="lede">Money committed beyond what booked orders need — open POs nobody needs (or not yet), and stock sitting with no order behind it. Everyday parts only: the long-lead committed parts buy ahead on purpose and aren't here. Valued at MAX standard cost.</p>
+  {% if error %}<p class="lede small-gap promise-error">Can't read cleared overbuys from PK_Ops right now ({{ error }}). Everything is shown; clearing is off until it's back.</p>{% endif %}
+  {% if saved == 'clear' and mine_today >= celebrate_at %}<div id="celebrate" hidden data-n="{{ mine_today }}" data-day="{{ snap.today }}"></div>{% endif %}
+  {% if mine_today %}<p class="muted small">You've cleared {{ mine_today }} today{% if mine_today < celebrate_at %} — {{ celebrate_at - mine_today }} more for a surprise{% endif %}.</p>{% endif %}
+  {% if saved %}<p class="lede small-gap" id="saved"><span class="chip soon">{{ 'Cleared' if saved == 'clear' else 'Put back' }}</span> {{ 'It moves to Cleared at the bottom, with your reason.' if saved == 'clear' else "It's back on the list." }}</p>{% endif %}
 </section>
 <section class="tiles">
   <div class="tile"><span class="num">{{ t.not_needed|money }}</span><span class="lbl">on open POs no order needs</span><span class="sub">candidates to cancel</span></div>
@@ -12,6 +25,7 @@
   <div class="tile"><span class="num">{{ t.early|money }}</span><span class="lbl">arriving well before it's needed</span><span class="sub">candidates to push out</span></div>
   <div class="tile {% if t.new %}warn{% endif %}"><span class="num">{{ t.new|money }}</span><span class="lbl">placed in the last {{ ob.new_days }} days, not needed</span><span class="sub">{{ t.new_lines }} PO line{{ '' if t.new_lines == 1 else 's' }} — the new overbuys</span></div>
 </section>
+{% if t.cleared %}<p class="muted small">Totals leave out {{ t.cleared|money }} that people cleared with a reason — <a href="#cleared">see Cleared</a>.</p>{% endif %}
 
 {% if ob.by_buyer %}
 <h3 class="steps-h">By buyer</h3>
@@ -26,7 +40,7 @@
 <div class="table-tools"><input type="search" class="table-filter" placeholder="Filter: part, description, buyer or vendor" aria-label="Filter the table"><span class="muted small filter-count"></span></div>
 <div class="table-wrap">
 <table class="dense">
-  <thead><tr><th>Part</th><th>Description</th><th>PO line</th><th>Problem</th><th class="r">Qty</th><th class="r">Value</th><th>Buyer</th><th>Vendor</th><th>Placed</th><th>Due</th></tr></thead>
+  <thead><tr><th>Part</th><th>Description</th><th>PO line</th><th>Problem</th><th class="r">Qty</th><th class="r">Value</th><th>Buyer</th><th>Vendor</th><th>Placed</th><th>Due</th><th></th></tr></thead>
   <tbody>
   {% for r in rows %}
     <tr>
@@ -40,8 +54,9 @@
       <td class="small">{{ r.vendor|title }}</td>
       <td>{{ r.placed|nice_date if r.placed else '' }}</td>
       <td>{{ r.due|nice_date if r.due else '' }}</td>
+      <td>{{ clear_form(r, 'po') }}</td>
     </tr>
-  {% else %}<tr><td colspan="10" class="muted">Nothing here — every open PO line is needed. Lovely.</td></tr>{% endfor %}
+  {% else %}<tr><td colspan="11" class="muted">Nothing here — every open PO line is needed. Lovely.</td></tr>{% endfor %}
   </tbody>
 </table>
 </div>
@@ -49,14 +64,33 @@
 <h3 class="steps-h">Stock no booked order needs <span class="muted">· {{ t.stock_extra|money }}, of which {{ t.stock_idle|money }} has no order at all</span></h3>
 <div class="table-wrap">
 <table class="dense">
-  <thead><tr><th>Part</th><th>Description</th><th>Buyer</th><th class="r">On hand</th><th class="r">Orders need</th><th class="r">Extra</th><th class="r">Value</th></tr></thead>
+  <thead><tr><th>Part</th><th>Description</th><th>Buyer</th><th class="r">On hand</th><th class="r">Orders need</th><th class="r">Extra</th><th class="r">Value</th><th></th></tr></thead>
   <tbody>
   {% for r in ob.stock[:150] %}
     <tr><td class="mono">{{ r.part }}</td><td>{{ r.description|lower|capitalize }}</td><td>{{ r.buyer }}</td>
-        <td class="r">{{ r.on_hand|qty }}</td><td class="r">{{ r.needed|qty if r.needed else '—' }}</td><td class="r">{{ r.extra|qty }}</td><td class="r"><b>{{ r.value|money }}</b></td></tr>
+        <td class="r">{{ r.on_hand|qty }}</td><td class="r">{{ r.needed|qty if r.needed else '—' }}</td><td class="r">{{ r.extra|qty }}</td><td class="r"><b>{{ r.value|money }}</b></td><td>{{ clear_form(r, 'stock') }}</td></tr>
   {% endfor %}
   </tbody>
 </table>
 </div>
-<p class="foot-note">Some of this is legitimate — service spares, stock already at a contract manufacturer, minimum buys. The point is to see it, not to cancel blindly. "New" means the PO line was created in the last {{ ob.new_days }} days.</p>
+{% set gone = ob.cleared_po + ob.cleared_stock %}
+{% if gone %}
+<h3 class="steps-h" id="cleared">Cleared <span class="muted">· {{ gone|length }} · {{ t.cleared|money }} — someone said why it isn't an overbuy</span></h3>
+<p class="muted small">A cleared line stays off the list until it grows — more on the PO, or more extra stock — then it comes back.</p>
+<div class="table-wrap">
+<table class="dense">
+  <thead><tr><th>Part</th><th>Description</th><th>Where</th><th class="r">Value</th><th>Why</th><th>Who</th><th>When</th><th></th></tr></thead>
+  <tbody>
+  {% for r in gone %}{% set kind = 'po' if r.ref else 'stock' %}
+    <tr><td class="mono">{{ r.part }}</td><td>{{ r.description|lower|capitalize }}</td>
+        <td class="mono small">{{ r.ref[3:] if r.ref else 'stock' }}</td><td class="r">{{ r.value|money }}</td>
+        <td>{{ reason_words[kind].get(r.cleared.reason, r.cleared.reason) }}{% if r.cleared.note %}<div class="muted small">{{ r.cleared.note }}</div>{% endif %}</td>
+        <td class="small">{{ r.cleared.by.split('@')[0] }}</td><td>{{ r.cleared.at[:10]|nice_date }}</td>
+        <td>{% if clearable %}<form method="post" action="{{ script_root }}/overbuys/clear"><input type="hidden" name="key" value="{{ key_of(r) }}"><button class="btn" name="action" value="undo">Put back</button></form>{% endif %}</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% endif %}
+<p class="foot-note">Some of this is legitimate — service spares, stock already at a contract manufacturer, minimum buys. The point is to see it, not to cancel blindly — when one is legitimate, <b>Clear…</b> it with the reason so the list stays the real work. "New" means the PO line was created in the last {{ ob.new_days }} days.</p>
 {% endblock %}

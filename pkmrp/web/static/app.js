@@ -232,3 +232,100 @@ document.querySelectorAll('table.vendor-order').forEach(function (table) {
   const focus = table.querySelector('tr.focus');
   if (focus) focus.scrollIntoView({ block: 'center' });
 });
+
+
+// Ten overbuys cleared in a day: a celebration, once a day per browser. Three
+// take turns -- a confetti storm, a rocket, and a present to open (which
+// rickrolls). Reduced motion gets the words without the movement.
+(function () {
+  const mark = document.getElementById('celebrate');
+  if (!mark) return;
+  const day = mark.dataset.day, n = mark.dataset.n;
+  let turn = 0;
+  try {
+    if (localStorage.getItem('pkmrp-ten-' + day)) return;
+    localStorage.setItem('pkmrp-ten-' + day, '1');
+    turn = Number(localStorage.getItem('pkmrp-ten-turn') || 0);
+    localStorage.setItem('pkmrp-ten-turn', String((turn + 1) % 3));
+  } catch (e) { turn = Math.floor(Math.random() * 3); }
+  const still = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  function overlay(html) {
+    const o = document.createElement('div');
+    o.className = 'cheer';
+    o.setAttribute('role', 'dialog');
+    o.setAttribute('aria-modal', 'true');
+    o.innerHTML = '<div class="cheer-card">' + html +
+      '<button class="btn cheer-close" type="button">Back to work</button></div>';
+    const close = () => o.remove();
+    o.addEventListener('click', e => { if (e.target === o) close(); });
+    o.querySelector('.cheer-close').addEventListener('click', close);
+    document.addEventListener('keydown', function esc(e) {
+      if (e.key === 'Escape') { close(); document.removeEventListener('keydown', esc); }
+    });
+    document.body.appendChild(o);
+    return o;
+  }
+  function confetti(count) {
+    if (still) return;
+    const colours = ['#009576', '#70ffcd', '#facc15', '#53ffff', '#007a61', '#fb923c'];
+    for (let i = 0; i < count; i++) {
+      const c = document.createElement('i');
+      c.className = 'confetti';
+      c.style.left = Math.random() * 100 + 'vw';
+      c.style.background = colours[i % colours.length];
+      c.style.animationDelay = Math.random() * 1.2 + 's';
+      c.style.transform = 'rotate(' + Math.random() * 360 + 'deg)';
+      document.body.appendChild(c);
+      setTimeout(() => c.remove(), 4400);
+    }
+  }
+  const title = '<h2>' + n + ' overbuys cleared today!</h2>';
+
+  if (turn === 0) {
+    overlay(title + '<p>The list is the real work again. That\'s a tidy desk.</p>');
+    confetti(160);
+  } else if (turn === 1) {
+    overlay(title + '<p>Overbuys down, morale to the moon.</p>');
+    if (!still) {
+      const r = document.createElement('div');
+      r.className = 'rocket';
+      r.innerHTML = '<svg class="rocket-ship" viewBox="0 0 40 80" width="48" height="96" aria-hidden="true">' +
+        '<path d="M20 2 C31 14 33 30 31 52 H9 C7 30 9 14 20 2 Z" fill="#eef1f3" stroke="#14181d" stroke-width="2"/>' +
+        '<circle cx="20" cy="26" r="6" fill="#53ffff" stroke="#14181d" stroke-width="2"/>' +
+        '<path d="M9 40 L1 58 L9 54 Z M31 40 L39 58 L31 54 Z" fill="#009576" stroke="#14181d" stroke-width="2"/>' +
+        '<path d="M13 52 Q20 80 27 52 Z" fill="#facc15"/><path d="M16 52 Q20 68 24 52 Z" fill="#fb923c"/></svg>';
+      document.body.appendChild(r);
+      for (let i = 0; i < 14; i++) {
+        const p = document.createElement('i');
+        p.className = 'puff';
+        p.style.animationDelay = (i * 0.12) + 's';
+        p.style.left = (48 + Math.random() * 4) + 'vw';
+        document.body.appendChild(p);
+        setTimeout(() => p.remove(), 3600);
+      }
+      setTimeout(() => r.remove(), 3400);
+      setTimeout(() => confetti(60), 1800);
+    }
+  } else {
+    const o = overlay(title + '<p>Something arrived for you. It was even on time.</p>' +
+      '<button class="gift" type="button" aria-label="Open your present">' +
+      '<span class="gift-lid"></span><span class="gift-box"></span></button>' +
+      '<p class="muted small gift-hint">Click to open</p>');
+    const gift = o.querySelector('.gift');
+    gift.addEventListener('click', function () {
+      gift.classList.add('open');
+      o.querySelector('.gift-hint').textContent = '';
+      setTimeout(function () {
+        const v = document.createElement('div');
+        v.className = 'gift-video';
+        v.innerHTML = '<iframe src="https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ?autoplay=1" ' +
+          'title="Your present" allow="autoplay; encrypted-media" allowfullscreen></iframe>' +
+          '<p class="small">Never gonna let your overbuys down. ' +
+          '<a href="https://www.youtube.com/watch?v=dQw4w9WgXcQ" target="_blank" rel="noopener">Won\'t play? Open it here.</a></p>';
+        gift.replaceWith(v);
+        confetti(80);
+      }, still ? 0 : 650);
+    }, { once: true });
+  }
+})();

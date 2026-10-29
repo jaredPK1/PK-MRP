@@ -42,3 +42,33 @@ def test_po_problems_valued_by_buyer_new_flagged_committed_left_out():
     assert out["totals"]["new"] == 50 and out["po"][1]["new"] and not out["po"][0]["new"]
     assert out["stock"][0]["part"] == "LENS" and out["stock"][0]["extra"] == 4
     assert {b["buyer"] for b in out["by_buyer"]} == {"AS", "LB"}
+
+
+def _ob():
+    po = [
+        {"part": "SCREW", "ref": "PO 1/01/01", "kind": "cancel_candidate", "qty": 100, "value": 50.0,
+         "buyer": "AS", "new": True},
+        {"part": "LENS", "ref": "PO 2/01/01", "kind": "excess_on_po", "qty": 4, "value": 3600.0,
+         "buyer": "LB", "new": False},
+    ]
+    stock = [{"part": "LENS", "extra": 4, "value": 3600.0, "idle": False}]
+    totals = {"not_needed": 50.0, "more_than_needed": 3600.0, "early": 0, "new": 50.0,
+              "new_lines": 1, "stock_extra": 3600.0, "stock_idle": 0}
+    by_buyer = [{"buyer": "LB", "po_value": 3600.0, "po_lines": 1, "new_value": 0},
+                {"buyer": "AS", "po_value": 50.0, "po_lines": 1, "new_value": 50.0}]
+    return {"po": po, "stock": stock, "totals": totals, "by_buyer": by_buyer}
+
+
+def test_cleared_rows_leave_the_list_and_the_totals_until_they_grow():
+    from pkmrp.core.overbuy import apply_cleared
+
+    cleared = {"PO|SCREW|PO 1/01/01": {"reason": "spares", "qty": 100},
+               "STOCK|LENS": {"reason": "offsite", "qty": 3}}  # stock grew 3 -> 4
+    out = apply_cleared(_ob(), cleared)
+    assert [r["part"] for r in out["po"]] == ["LENS"]
+    assert out["totals"]["not_needed"] == 0 and out["totals"]["new"] == 0
+    assert out["totals"]["new_lines"] == 0 and out["totals"]["cleared"] == 50.0
+    assert [b["buyer"] for b in out["by_buyer"]] == ["LB"]
+    assert out["stock"][0]["was_cleared"]["reason"] == "offsite"  # back: it grew
+    assert out["totals"]["stock_extra"] == 3600.0
+    assert out["cleared_po"][0]["cleared"]["reason"] == "spares" and not out["cleared_stock"]

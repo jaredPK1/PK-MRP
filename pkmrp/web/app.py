@@ -1,6 +1,7 @@
 """PK-MRP web app. Reads the snapshot `pkmrp run` writes; never queries MAX.
-The one thing it writes is PK-MRP's own settings in PK_Ops (the Pipeline
-page's confirmed SKU -> part map), for planners with an editing role."""
+The one thing it writes is PK-MRP's own settings in PK_Ops: the Pipeline
+page's confirmed SKU -> part map (editing role) and overbuys people cleared
+with a reason (anyone signed in)."""
 
 import json
 import os
@@ -86,6 +87,8 @@ def _lead_words(source):
 
 
 SKU_MAP_KEY = "pipeline_sku_map"
+CLEARED_KEY = "overbuy_cleared"
+CELEBRATE_AT = 10  # overbuys one person clears in a day earns a celebration
 
 
 def _pick(item, key, label=None):
@@ -175,9 +178,82 @@ def create_app():
             "totals": {},
             "new_days": 30,
         }
+        from ..core.overbuy import REASONS, apply_cleared, clear_key
+        from ..db import store
+
+        try:
+            cleared, error = store.get_setting(ops_engine(), CLEARED_KEY, {}), None
+        except Exception as exc:  # noqa: BLE001 -- page still shows the overbuys
+            cleared, error = {}, str(exc)[:200]
+        ob = apply_cleared(ob, cleared)
+        who = request.headers.get("X-Auth-Request-Email", "") or "unknown"
+        today = date.today().isoformat()
+        mine_today = sum(
+            1 for c in cleared.values() if c.get("by") == who and c.get("at", "")[:10] == today
+        )
         only_new = request.args.get("new") == "1"
         rows = [r for r in ob.get("po", []) if r["new"] or not only_new]
-        return render_template("overbuys.html", snap=snap, ob=ob, rows=rows, only_new=only_new)
+        return render_template(
+            "overbuys.html",
+            snap=snap,
+            ob=ob,
+            rows=rows,
+            only_new=only_new,
+            reasons=REASONS,
+            reason_words={k: dict(v) for k, v in REASONS.items()},
+            key_of=clear_key,
+            clearable=can_clear() and error is None,
+            error=error,
+            saved=request.args.get("saved"),
+            mine_today=mine_today,
+            celebrate_at=CELEBRATE_AT,
+        )
+
+    @app.post("/overbuys/clear")
+    def overbuys_clear():
+        from ..core.overbuy import REASONS, clear_key
+        from ..db import store
+
+        if not can_clear():
+            abort(403)
+        key = request.form.get("key") or ""
+        action = request.form.get("action")
+        if action not in ("clear", "undo") or not key:
+            abort(400)
+        engine = ops_engine()
+        current = store.get_setting(engine, CLEARED_KEY, {})
+        who = request.headers.get("X-Auth-Request-Email", "") or "unknown"
+        if action == "undo":
+            current.pop(key, None)
+        else:
+            snap = snapshot.load_latest() or abort(404)
+            ob = snap.get("overbuys") or {}
+            row = next(
+                (r for r in (ob.get("po") or []) + (ob.get("stock") or []) if clear_key(r) == key),
+                None,
+            )
+            if row is None:
+                abort(400, "That overbuy isn't on the current plan.")
+            kind = "po" if "ref" in row else "stock"
+            reason = request.form.get("reason") or ""
+            note = (request.form.get("note") or "").strip()[:300]
+            if reason not in dict(REASONS[kind]):
+                abort(400, "Pick a reason.")
+            if reason == "other" and not note:
+                abort(400, "Say why in the note when the reason is Other.")
+            current[key] = {
+                "reason": reason,
+                "note": note,
+                "qty": row["qty"] if kind == "po" else row["extra"],
+                "value": row["value"],
+                "by": who,
+                "at": datetime.now().isoformat(timespec="minutes"),
+            }
+        store.put_setting(engine, CLEARED_KEY, current, who)
+        args = {"saved": action}
+        if request.form.get("new") == "1":
+            args["new"] = "1"
+        return redirect(url_for("overbuys_page", **args) + "#saved")
 
     @app.get("/training")
     def training_page():
@@ -530,6 +606,11 @@ def create_app():
         # pk_access sets pk_role; viewers read, admins and developers confirm.
         role = getattr(request, "pk_role", app.config.get("DEFAULT_ROLE"))
         return role in ("admin", "developer")
+
+    def can_clear():
+        # Anyone signed in to PK-MRP (buyers are viewers) may clear an overbuy
+        # with a reason; it changes no plan, and who did it is kept.
+        return bool(getattr(request, "pk_role", app.config.get("DEFAULT_ROLE")))
 
     def sku_map():
         """(confirmed map, error text or None)."""

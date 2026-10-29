@@ -128,3 +128,95 @@ def _totals(po_rows, stock_rows):
         "stock_extra": total(stock_rows),
         "stock_idle": total(r for r in stock_rows if r["idle"]),
     }
+
+
+# Why a person cleared an overbuy -- (code, words). Kept short so the reasons
+# can be counted later; "other" needs a note.
+REASONS = {
+    "po": (
+        ("spares", "Service or spares stock"),
+        ("minimum", "Minimum buy or price break"),
+        ("vendor", "Already changed or cancelled with the vendor"),
+        ("demand", "It is needed — MAX is missing the demand"),
+        ("expected", "For an order we expect"),
+        ("other", "Other"),
+    ),
+    "stock": (
+        ("spares", "Service or spares stock"),
+        ("offsite", "It's at a contract manufacturer or vendor"),
+        ("minimum", "Minimum buy or price break"),
+        ("expected", "For an order we expect"),
+        ("scrap", "Being scrapped or returned"),
+        ("other", "Other"),
+    ),
+}
+
+
+def clear_key(row):
+    """Stable key for an overbuy row: a PO line row, or a stock row."""
+    return f"PO|{row['part']}|{row['ref']}" if "ref" in row else f"STOCK|{row['part']}"
+
+
+def _amount(row):
+    return row["qty"] if "ref" in row else row["extra"]
+
+
+def apply_cleared(ob, cleared):
+    """The Overbuys view with cleared rows taken out (into cleared_po /
+    cleared_stock) and totals and by-buyer reduced by them. A row comes back
+    if it has grown since it was cleared -- more on the PO, or more extra
+    stock -- with `was_cleared` saying what was said then."""
+    totals = dict(ob.get("totals") or {})
+    by_buyer = {b["buyer"]: dict(b) for b in ob.get("by_buyer") or []}
+    tot_kind = {
+        "cancel_candidate": "not_needed",
+        "excess_on_po": "more_than_needed",
+        "push_out_open_po": "early",
+    }
+
+    def take(t, v):
+        if t in totals:
+            totals[t] = round(totals[t] - v, 2)
+
+    def split(rows):
+        keep, gone = [], []
+        for r in rows:
+            c = cleared.get(clear_key(r))
+            if not c:
+                keep.append(r)
+            elif _amount(r) > float(c.get("qty") or 0) + 1e-9:
+                keep.append({**r, "was_cleared": c})
+            else:
+                gone.append({**r, "cleared": c})
+        return keep, gone
+
+    po, po_gone = split(ob.get("po") or [])
+    stock, stock_gone = split(ob.get("stock") or [])
+    for r in po_gone:
+        take(tot_kind.get(r["kind"]), r["value"])
+        if r["new"] and r["kind"] != "push_out_open_po":
+            take("new", r["value"])
+            if "new_lines" in totals:
+                totals["new_lines"] -= 1
+        b = by_buyer.get(r["buyer"] or "(none)")
+        if b:
+            b["po_value"] = round(b["po_value"] - r["value"], 2)
+            b["po_lines"] -= 1
+            if r["new"]:
+                b["new_value"] = round(b["new_value"] - r["value"], 2)
+    for r in stock_gone:
+        take("stock_extra", r["value"])
+        if r["idle"]:
+            take("stock_idle", r["value"])
+    totals["cleared"] = round(sum(r["value"] for r in po_gone + stock_gone), 2)
+    return {
+        **ob,
+        "po": po,
+        "stock": stock,
+        "cleared_po": po_gone,
+        "cleared_stock": stock_gone,
+        "totals": totals,
+        "by_buyer": sorted(
+            (b for b in by_buyer.values() if b["po_lines"] > 0), key=lambda x: -x["po_value"]
+        ),
+    }

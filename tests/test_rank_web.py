@@ -294,3 +294,69 @@ def test_pipeline_viewers_read_but_cannot_confirm(client, tmp_path, monkeypatch)
     assert "01-0351-00G" in page and "Use this" not in page
     r = c.post("/pipeline/map", data={"sku": "FK11-SAE-U", "part": "01-0351-00G", "action": "use"})
     assert r.status_code == 403
+
+
+def _overbuy_client(tmp_path, monkeypatch, role):
+    from sqlalchemy import create_engine
+    from sqlalchemy.pool import StaticPool
+
+    from pkmrp import snapshot
+    from pkmrp.db import store
+    from pkmrp.web.app import create_app
+
+    monkeypatch.setattr(snapshot, "DATA_DIR", str(tmp_path))
+    snap = json.loads((tmp_path / "latest.json").read_text())
+    snap["overbuys"] = {
+        "po": [
+            {"part": f"P{i}", "description": "SCREW", "ref": f"PO 7011{i:04d}/01/01",
+             "what": "not needed", "kind": "cancel_candidate", "qty": 10, "value": 5.0,
+             "buyer": "AS", "vendor": "MCMASTER", "placed": None, "due": None, "new": False,
+             "days_early": None}
+            for i in range(12)
+        ],
+        "stock": [{"part": "LENS", "description": "LENS", "buyer": "LB", "on_hand": 9,
+                   "needed": 1, "extra": 8, "value": 800.0, "idle": False}],
+        "by_buyer": [{"buyer": "AS", "po_value": 60.0, "po_lines": 12, "new_value": 0}],
+        "totals": {"not_needed": 60.0, "stock_extra": 800.0, "new_lines": 0},
+        "new_days": 30,
+    }
+    snapshot.write(snap)
+    engine = create_engine("sqlite://", poolclass=StaticPool)
+    store.metadata.create_all(engine)
+    app = create_app()
+    app.config.update(OPS_ENGINE=engine, DEFAULT_ROLE=role)
+    return app.test_client(), engine
+
+
+def test_overbuys_clear_with_a_reason_undo_and_celebrate_at_ten(client, tmp_path, monkeypatch):
+    from pkmrp.db import store
+
+    c, engine = _overbuy_client(tmp_path, monkeypatch, "viewer")  # buyers are viewers
+    page = c.get("/overbuys").get_data(as_text=True)
+    assert "Clear…" in page and "PO|P0|PO 70110000/01/01" in page
+    assert c.post("/overbuys/clear", data={"key": "PO|P0|PO 70110000/01/01", "action": "clear"}).status_code == 400
+    other = {"key": "STOCK|LENS", "action": "clear", "reason": "other"}
+    assert c.post("/overbuys/clear", data=other).status_code == 400  # Other needs a note
+    r = c.post("/overbuys/clear", data={**other, "note": "Kit stock at KJS"})
+    assert r.status_code == 302
+    saved = store.get_setting(engine, "overbuy_cleared")
+    assert saved["STOCK|LENS"]["note"] == "Kit stock at KJS" and saved["STOCK|LENS"]["qty"] == 8
+    page = c.get("/overbuys?saved=clear").get_data(as_text=True)
+    assert 'id="cleared"' in page and "Kit stock at KJS" in page and 'id="celebrate"' not in page
+    for i in range(9):
+        c.post("/overbuys/clear", data={"key": f"PO|P{i}|PO 7011{i:04d}/01/01",
+                                         "action": "clear", "reason": "spares"})
+    page = c.get("/overbuys?saved=clear").get_data(as_text=True)
+    assert 'id="celebrate"' in page and "cleared 10 today" in page
+    c.post("/overbuys/clear", data={"key": "STOCK|LENS", "action": "undo"})
+    assert "STOCK|LENS" not in store.get_setting(engine, "overbuy_cleared")
+    bad = c.post("/overbuys/clear", data={"key": "PO|NOPE|PO 1/01/01", "action": "clear",
+                                          "reason": "spares"})
+    assert bad.status_code == 400
+
+
+def test_overbuys_clearing_needs_sign_in(client, tmp_path, monkeypatch):
+    c, _ = _overbuy_client(tmp_path, monkeypatch, None)
+    assert "overbuys/clear" not in c.get("/overbuys").get_data(as_text=True)
+    r = c.post("/overbuys/clear", data={"key": "STOCK|LENS", "action": "clear", "reason": "spares"})
+    assert r.status_code == 403
