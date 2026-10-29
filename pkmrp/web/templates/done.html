@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Done · PK-MRP{% endblock %}
+{% block content %}
+<section class="page-intro">
+  <h1 class="h1-small">Done — every buy marked done, and whether MAX agrees</h1>
+  <p class="lede"><b>The question this page answers: what did we place, and did it really go in?</b> A buy is marked done on Today or All buys. On the next plan PK-MRP checks MAX: <span class="chip soon">confirmed</span> means the buy is gone (a PO went in, or the need did); <span class="chip late">no PO in MAX</span> means MAX still needs it placed; <span class="chip quiet">waiting</span> means the next plan hasn't run yet. Kept for good — nothing resets.</p>
+  {% if error %}<p class="lede small-gap promise-error">Can't read the Done log from PK_Ops right now ({{ error }}).</p>{% endif %}
+</section>
+<p class="filters">
+  {% for code, words in (('1', 'Today'), ('7', 'Last 7 days'), ('30', 'Last 30 days'), ('all', 'Everything')) %}<a class="chip {{ 'soon' if period == code else 'quiet' }}" href="?period={{ code }}{% if who %}&who={{ who }}{% endif %}">{{ words }}</a> {% endfor %}
+  · {% for n in buyer_names() %}<a class="chip {{ 'soon' if who == n else 'quiet' }}" href="?period={{ period }}&who={{ n }}">{{ n }}</a> {% endfor %}{% if who %}<a class="chip quiet" href="?period={{ period }}">Anyone</a>{% endif %}
+</p>
+<p class="muted small">{{ rows|length }} marked done · {{ counts.confirmed }} confirmed · {{ counts.no_po }} no PO in MAX · {{ counts.waiting }} waiting · {{ counts.undone }} undone</p>
+<div class="table-tools"><input type="search" class="table-filter" placeholder="Filter: part, PO, vendor or who" aria-label="Filter the table"><span class="muted small filter-count"></span></div>
+<div class="table-wrap"><table class="dense">
+  <thead><tr><th>When</th><th>Part</th><th>Description</th><th class="r">Qty</th><th>Vendor</th><th>PO</th><th>On it</th><th>Marked by</th><th>MAX says</th></tr></thead>
+  <tbody>{% for e in rows %}
+    <tr><td class="small">{{ e.at[:10]|nice_date(False) }} {{ e.at[11:16] }}</td><td class="mono">{{ e.part }}</td><td class="dcol">{{ (e.description or '')|lower|capitalize }}</td>
+        <td class="r">{{ e.qty|qty if e.qty is not none else '' }}</td><td class="small">{{ (e.vendor or '')|title }}</td><td class="mono">{{ e.po }}</td>
+        <td>{{ e.owner }}</td><td class="small">{{ e.by|person }}</td>
+        <td>{% if e.check == 'confirmed' %}<span class="chip soon">confirmed</span>{% elif e.check == 'no_po' %}<span class="chip late">no PO in MAX</span>{% elif e.check == 'undone' %}<span class="chip quiet">undone{% if e.undone_by %} by {{ e.undone_by|person }}{% endif %}</span>{% else %}<span class="chip quiet">waiting</span>{% endif %}{% if e.checked_at %}<div class="muted small">{{ e.checked_at[:10]|nice_date(False) }} {{ e.checked_at[11:16] }}</div>{% endif %}</td></tr>
+  {% else %}<tr><td colspan="9" class="muted">Nothing marked done in this period.</td></tr>{% endfor %}</tbody>
+</table></div>
+{% endblock %}

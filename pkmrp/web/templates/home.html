@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% from "_notes.html" import part_note with context %}
+{% from "_buy_status.html" import owner_pick, done_controls, done_note with context %}
 {% block title %}Today · PK-MRP{% endblock %}
 {% block content %}
 <section class="hero">
@@ -75,13 +76,14 @@
 <section class="top" aria-labelledby="top-h">
   <div class="sec-head">
     <h2 id="top-h">Today's top {{ top|length }}</h2>
-    <p>Ranked by the booked orders each one is holding up. <kbd>j</kbd>/<kbd>k</kbd> to move, <kbd>Enter</kbd> for why, <kbd>d</kbd> when you're done with one.</p>
-    <span class="grow"></span><span class="done-count" aria-live="polite"></span>
+    <p>Ranked by the booked orders each one is holding up. <kbd>j</kbd>/<kbd>k</kbd> to move, <kbd>Enter</kbd> for why. Pick who's on it; mark it done when the PO is in — PK-MRP checks MAX on the next plan.</p>
+    <span class="grow"></span>{% set ns = namespace(n=0) %}{% for b in top %}{% set d = buy_view(b.part).done %}{% if d and d.state == 'waiting' %}{% set ns.n = ns.n + 1 %}{% endif %}{% endfor %}{% if ns.n %}<span class="done-count">{{ ns.n }} of {{ top|length }} done</span>{% endif %}
   </div>
   <ol class="cards" data-plan="{{ snap.today }}">
     {% for b in top %}
-    <li class="card" tabindex="0" id="buy-{{ loop.index }}" data-part="{{ b.part }}">
-      <div class="done-line" hidden><span class="tick">✓</span> <b class="mono">{{ b.part }}</b> · {{ b.qty|qty }} to buy · done <button type="button" class="undo-btn">Undo</button></div>
+    {% set bv = buy_view(b.part) %}{% set waiting = bv.done and bv.done.state == 'waiting' %}
+    <li class="card{% if waiting %} done{% endif %}{% if bv.done and bv.done.state == 'no_po' %} flagged{% endif %}" tabindex="0" id="buy-{{ loop.index }}" data-part="{{ b.part }}">
+      <div class="done-line"{% if not waiting %} hidden{% endif %}><span class="tick">✓</span> <b class="mono">{{ b.part }}</b> · {{ b.qty|qty }} to buy · done by {{ bv.done.by|person if waiting else '' }}{% if waiting and bv.done.po %} · PO {{ bv.done.po }}{% endif %} <span class="muted small">· checking MAX on the next plan</span> {% if waiting %}{{ done_controls(b.part, '#buy-' ~ loop.index) }}{% endif %}</div>
       <div class="rank" aria-hidden="true">{{ b.rank }}</div>
       <div class="body">
         <div class="row1">
@@ -104,9 +106,11 @@
           {% if b.customers %}<span class="cust">· {{ b.customers[:3]|join(', ') }}{% if b.customers|length > 3 %} +{{ b.customers|length - 3 }}{% endif %}</span>{% endif %}
         </div>
         {% endif %}
+        {{ done_note(b.part) }}
         <div class="card-actions">
           <button class="why-btn" data-why="{{ script_root }}/why/{{ b.part }}" data-target="#why-{{ loop.index }}" aria-expanded="false">Why this buy?</button>
-          <button type="button" class="done-btn" title="Fold this card away (d)">Done</button>
+          {{ owner_pick(b.part, '#buy-' ~ loop.index) }}
+          {{ done_controls(b.part, '#buy-' ~ loop.index) }}
         </div>
         <div class="why" id="why-{{ loop.index }}"></div>
       </div>

@@ -14,6 +14,8 @@ import tempfile
 from collections import Counter
 from datetime import date, datetime
 
+import pandas as pd
+
 from .core.analytics import breakdown, trend_point
 from .core.calendar import plus_workdays
 from .core.overbuy import overbuys
@@ -202,6 +204,9 @@ def build(run, so_df):
         "ecn": _ecn(run, buys, needs_source),
         "replaced": _iso_deep(run.get("replaced") or {}),
         "fix_max": _iso_deep(run.get("fix_max") or {"status": "off"}),
+        # open POs placed in the last 60 days, by part: lets a Done's PO
+        # number be matched to MAX
+        "recent_po_parts": _recent_po_parts(run["open_pos"], today),
         "overbuys": _iso_deep(
             overbuys(
                 [e for e in res.exceptions if e.part not in (run.get("shelf") or {})],
@@ -236,6 +241,15 @@ def _ecn(run, buys, needs_source):
         "open_parts": sum(1 for v in parts.values() if v["open"]),
         "obsolete_parts": sum(1 for v in parts.values() if v["obsolete"]),
     }
+
+
+def _recent_po_parts(open_pos, today, days=60):
+    out = {}
+    cutoff = pd.Timestamp(today) - pd.Timedelta(days=days)
+    for r in open_pos.itertuples(index=False):
+        if r.created == r.created and r.created >= cutoff:
+            out.setdefault(r.part, []).append([r.po, r.created.date().isoformat(), float(r.qty_due)])
+    return out
 
 
 def write(snap):

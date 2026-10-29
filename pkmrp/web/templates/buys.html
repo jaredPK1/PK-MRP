@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% from "_notes.html" import part_note with context %}
+{% from "_buy_status.html" import owner_pick, done_controls, done_note with context %}
 {% block title %}All buys · PK-MRP{% endblock %}
 {% block content %}
 <section class="sec-head wide">
@@ -18,7 +19,7 @@
 <div class="table-tools"><input type="search" class="table-filter" placeholder="Filter: part number or description words — e.g. 2300 lens" aria-label="Filter the table"><span class="muted small filter-count"></span></div>
 <div class="table-wrap">
 <table class="dense">
-  <thead><tr><th class="r">#</th><th>Part</th><th>Description</th><th class="r">Qty</th><th class="r">Spend</th><th>Order by</th><th class="r">Lead</th><th>Vendor</th><th>Buyer</th><th class="r">Orders</th><th class="r">Order value</th><th></th></tr></thead>
+  <thead><tr><th class="r">#</th><th>Part</th><th>Description</th><th class="r">Qty</th><th class="r">Spend</th><th>Order by</th><th class="r">Lead</th><th>Vendor</th><th>Buyer</th><th>On it</th><th class="r">Orders</th><th class="r">Order value</th><th></th></tr></thead>
   <tbody>
   {% for b in rows %}
     <tr>
@@ -31,13 +32,14 @@
       <td class="r">{{ b.lead_days|round|int }}d</td>
       <td><a href="{{ script_root }}/vendor?v={{ b.vendor|urlencode }}&part={{ b.part|urlencode }}" title="Everything PK needs from {{ b.vendor|title }}, on one PO">{{ b.vendor }}</a>{% set n = vendor_n.get(b.vendor, 1) %}{% if n > 1 %} <span class="muted small">+{{ n - 1 }}</span>{% endif %}</td>
       <td>{{ b.buyer }}</td>
+      <td id="row-{{ loop.index }}">{{ owner_pick(b.part, '#row-' ~ loop.index) }}{{ done_note(b.part) }}{{ done_controls(b.part, '#row-' ~ loop.index) }}</td>
       <td class="r">{{ b.orders or '' }}</td>
       <td class="r">{{ b.order_value|money if b.order_value else '' }}</td>
       <td><button class="why-btn" data-why="{{ script_root }}/why/{{ b.part }}" data-target="#why-row-{{ loop.index }}" aria-expanded="false">Why?</button></td>
     </tr>
-    <tr class="cp-row"><td colspan="12" id="why-row-{{ loop.index }}" class="cp-cell why-cell"></td></tr>
+    <tr class="cp-row"><td colspan="13" id="why-row-{{ loop.index }}" class="cp-cell why-cell"></td></tr>
   {% else %}
-    <tr><td colspan="12" class="muted">Nothing for this buyer this week.</td></tr>
+    <tr><td colspan="13" class="muted">Nothing for this buyer this week.</td></tr>
   {% endfor %}
   </tbody>
 </table>

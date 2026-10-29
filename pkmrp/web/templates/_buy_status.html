@@ -1,0 +1,22 @@
+{# Who's on a buy, and Done -- shared through PK_Ops, checked against MAX. Import with context. #}
+{% macro owner_pick(part, anchor='') %}{% set bv = buy_view(part) %}
+<form method="post" action="{{ script_root }}/buy-status" class="owner-form">
+  <input type="hidden" name="part" value="{{ part }}"><input type="hidden" name="action" value="owner"><input type="hidden" name="next" value="{{ here }}{{ anchor }}">
+  <label class="small">On it <select name="owner" class="owner-pick" aria-label="Who is working {{ part }}"><option value="">—</option>{% for n in buyer_names() %}<option{% if bv.owner == n %} selected{% endif %}>{{ n }}</option>{% endfor %}</select></label>
+  <noscript><button class="btn">Save</button></noscript>
+</form>{% endmacro %}
+
+{% macro done_controls(part, anchor='') %}{% set bv = buy_view(part) %}
+{% if bv.done %}
+<form method="post" action="{{ script_root }}/buy-status" class="inline-form"><input type="hidden" name="part" value="{{ part }}"><input type="hidden" name="next" value="{{ here }}{{ anchor }}"><button class="btn" name="action" value="undo">Undo done</button></form>
+{% else %}
+<details class="done-add"><summary class="btn">Done…</summary>
+  <form method="post" action="{{ script_root }}/buy-status" class="note-form">
+    <input type="hidden" name="part" value="{{ part }}"><input type="hidden" name="next" value="{{ here }}{{ anchor }}">
+    <input name="po" maxlength="20" placeholder="PO # (optional)" aria-label="PO number" inputmode="numeric">
+    <button class="btn" name="action" value="done">Mark done</button>
+  </form>
+</details>
+{% endif %}{% endmacro %}
+
+{% macro done_note(part) %}{% set d = buy_view(part).done %}{% if d %}{% if d.state == 'no_po' %}<p class="no-po"><b>Marked done</b> by {{ d.by|person }} {{ d.at[:16]|replace('T', ' ') }}{% if d.po %} (PO {{ d.po }}){% endif %} — <b>but MAX still shows this buy.</b> Check the PO went in for this part and quantity, then the next plan clears it.</p>{% else %}<p class="done-wait">✓ Done by {{ d.by|person }} {{ d.at[11:16] }}{% if d.po %} · PO {{ d.po }}{% if d.po_found %} <span class="muted">(found in MAX)</span>{% endif %}{% endif %} · <span class="muted">confirmed against MAX on the next plan</span></p>{% endif %}{% endif %}{% endmacro %}

@@ -138,7 +138,29 @@ def _plan_once(erp):
     snap["ledger"] = _ledger(run, snap)
     snapshot.write(snap)
     snapshot.write_atp(snapshot.build_atp(run))
+    _reconcile_done(snap)
     return snap
+
+
+def _reconcile_done(snap):
+    """Check every Done against this plan: confirmed if MAX covers the buy
+    now, flagged if it still needs placing. Skips quietly without PK_Ops."""
+    from .core import buy_status
+    from .db import store
+
+    try:
+        engine = store.ops_engine(DbConfig.from_env())
+        if store.missing_tables(engine):
+            return
+        status = store.get_setting(engine, "buy_status", {})
+        log = store.get_setting(engine, "buy_log", [])
+        parts = {b["part"] for b in snap["buys"] + snap.get("needs_source", [])}
+        status, log, changed = buy_status.reconcile(status, log, parts, snap["generated_at"])
+        if changed:
+            store.put_setting(engine, "buy_status", status, "pk-mrp plan")
+            store.put_setting(engine, "buy_log", log, "pk-mrp plan")
+    except Exception as exc:  # noqa: BLE001 -- the plan is written; this can wait an hour
+        click.echo(f"done check: {exc}", err=True)
 
 
 @main.command("run")

@@ -493,3 +493,44 @@ def test_fix_max_page_csv_and_today_line(client, tmp_path):
     csv_text = client.get("/fix-max.csv").get_data(as_text=True)
     assert csv_text.splitlines()[1].startswith("SO line,20047755,20,01,00-2930-00G,00-2930-01G")
     assert "Fix in MAX:</b> 1 order line" in client.get("/").get_data(as_text=True)
+
+
+def test_on_it_and_done_are_shared_and_checked_against_max(client, tmp_path, monkeypatch):
+    from pkmrp import snapshot
+    from pkmrp.cli import _reconcile_done  # noqa: F401 -- the loop's hook exists
+    from pkmrp.core import buy_status as bs
+    from pkmrp.db import store
+
+    c, engine = _overbuy_client(tmp_path, monkeypatch, "viewer")
+    snap = snapshot.load_latest()
+    part = snap["buys"][0]["part"]
+    home = c.get("/").get_data(as_text=True)
+    assert 'class="owner-pick"' in home and "Done…" in home and "<kbd>d</kbd>" not in home
+    c.post("/buy-status", data={"part": part, "action": "owner", "owner": "Aaron", "next": "/"})
+    assert store.get_setting(engine, "buy_status")[part]["owner"] == "Aaron"
+    assert c.post("/buy-status", data={"part": part, "action": "owner", "owner": "Mallory"}).status_code == 400
+    c.post("/buy-status", data={"part": part, "action": "done", "po": "70111309", "next": "/"})
+    home = c.get("/").get_data(as_text=True)
+    assert "checking MAX on the next plan" in home and "1 of 1 done" in home
+    # next plan still has the buy -> flagged
+    st, log, _ = bs.reconcile(store.get_setting(engine, "buy_status"), store.get_setting(engine, "buy_log"),
+                              {part}, "9999-01-01T00:00:00")
+    store.put_setting(engine, "buy_status", st, "t"); store.put_setting(engine, "buy_log", log, "t")
+    assert "but MAX still shows this buy" in c.get("/").get_data(as_text=True)
+    page = c.get("/done?period=all").get_data(as_text=True)
+    assert "70111309" in page and "no PO in MAX" in page and "Aaron" in page
+
+
+def test_top_ten_is_renumbered_when_a_part_is_held(client, tmp_path, monkeypatch):
+    from pkmrp import snapshot
+
+    c, _ = _overbuy_client(tmp_path, monkeypatch, "viewer")
+    snap = snapshot.load_latest()
+    first = dict(snap["buys"][0])
+    snap["buys"] = [first, {**first, "part": "SECOND-PART", "rank": 2}, {**first, "part": "THIRD-PART", "rank": 3}]
+    snapshot.write(snap)
+    c.post("/notes", data={"part": first["part"], "tag": "hold", "text": "x", "action": "add", "next": "/"})
+    home = c.get("/").get_data(as_text=True)
+    import re
+    ranks = re.findall(r'<div class="rank" aria-hidden="true">(\d+)</div>', home)
+    assert ranks == ["1", "2"]

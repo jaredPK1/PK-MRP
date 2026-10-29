@@ -14,6 +14,7 @@ pkmrp/core/__init__.py
 pkmrp/core/analytics.py
 pkmrp/core/atp.py
 pkmrp/core/bom.py
+pkmrp/core/buy_status.py
 pkmrp/core/calendar.py
 pkmrp/core/committed.py
 pkmrp/core/consign.py
@@ -50,6 +51,7 @@ pkmrp/web/whats_new.py
 pkmrp/web/wsgi.py
 tests/test_analytics.py
 tests/test_atp.py
+tests/test_buy_status.py
 tests/test_committed.py
 tests/test_consign.py
 tests/test_core.py

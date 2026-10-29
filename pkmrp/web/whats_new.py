@@ -7,6 +7,11 @@ Every feature people can see gets a line here in the same change
 WHATS_NEW = (
     (
         "2026-10-29",
+        "Who's on it, and Done that MAX checks",
+        "Each buy on Today and All buys has an \"On it\" dropdown (Chad / Rob / Aaron) so everyone can see who is working what. Done is now shared and recorded — who, when and the PO number — instead of a fold in your own browser, and it's checked: on the next plan, a buy MAX no longer needs is confirmed, and one MAX still needs comes back flagged \"no PO in MAX\". The new Done page lists every one, by period and person. The d shortcut is gone (it folded cards by accident), and Today's top ten is numbered 1-10 again when a part is on hold.",
+    ),
+    (
+        "2026-10-29",
         "Fix in MAX",
         "A new page lists everything in MAX that still names a part Engineering obsoleted — open order lines, forecast (master-schedule) entries, released work orders, and live BOMs — each with the part the same ECN released in its place. These are what make MRP buy dead parts (46 orders on the old station interface had MRP buying the obsolete support bracket). It's rebuilt every plan from Ron's ECN app, rows drop off once MAX is fixed, and a CSV gives the bulk-change list. Today shows a one-line count when there's something to fix. Also lists order lines on parts an open ECN is about to obsolete.",
     ),

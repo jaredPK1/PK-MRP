@@ -95,6 +95,9 @@ SKU_MAP_KEY = "pipeline_sku_map"
 CLEARED_KEY = "overbuy_cleared"
 NOTES_KEY = "part_notes"
 REPLACE_KEY = "part_replacements"
+STATUS_KEY = "buy_status"
+LOG_KEY = "buy_log"
+BUYERS_KEY = "buyer_names"
 # Ron's ECN app, the source of truth for ECNs; /ecn/?pn=<part> opens the
 # part's ECN history there.
 ECN_APP_URL = os.environ.get("ECN_APP_URL", "/ecn/")
@@ -119,6 +122,7 @@ def create_app():
     app.jinja_env.filters["lead_words"] = _lead_words
     app.jinja_env.filters["wdays"] = _wdays
     app.jinja_env.filters["pick"] = _pick
+    app.jinja_env.filters["person"] = _first_name
 
     def part_notes():
         """{part: [note]} from PK_Ops, read once per request; {} if unreadable."""
@@ -130,6 +134,28 @@ def create_app():
             except Exception as exc:  # noqa: BLE001 -- pages work without notes
                 g.part_notes, g.notes_error = {}, str(exc)[:200]
         return g.part_notes
+
+    def buy_status():
+        """(status, buyer names) from PK_Ops, once per request."""
+        if "buy_status" not in g:
+            from ..core.buy_status import DEFAULT_BUYERS
+            from ..db import store
+
+            try:
+                engine = ops_engine()
+                g.buy_status = store.get_setting(engine, STATUS_KEY, {})
+                g.buyer_names = store.get_setting(engine, BUYERS_KEY, list(DEFAULT_BUYERS))
+            except Exception:  # noqa: BLE001 -- cards still render
+                g.buy_status, g.buyer_names = {}, list(DEFAULT_BUYERS)
+        return g.buy_status, g.buyer_names
+
+    def buy_view(part):
+        from ..core.buy_status import card_state
+
+        snap = snapshot.load_latest() or {}
+        status, _ = buy_status()
+        recent = (snap.get("recent_po_parts") or {}).get(part, [])
+        return card_state(status.get(part), snap.get("generated_at", ""), recent)
 
     def replacements():
         """{old: {part, use_up, why, by, at}} from PK_Ops, once per request."""
@@ -165,7 +191,11 @@ def create_app():
                               "spend": round(sum(it.get("spend", 0) for it in items), 2)})
         out = {
             **snap,
-            "buys": [b for b in snap["buys"] if b["part"] not in hold],
+            # renumbered, so Today's top ten reads 1-10 with no gaps
+            "buys": [
+                {**b, "rank": i}
+                for i, b in enumerate((b for b in snap["buys"] if b["part"] not in hold), 1)
+            ],
             "needs_source": [b for b in snap.get("needs_source", []) if b["part"] not in hold],
             "shelf_orders": carts,
             "vendor_plan": {
@@ -195,6 +225,8 @@ def create_app():
             "here": request.script_root + request.full_path.rstrip("?"),
             "ecn_for": ecn_for,
             "replacement_for": lambda part: replacements().get(part),
+            "buy_view": buy_view,
+            "buyer_names": lambda: buy_status()[1],
             "can_replace": lambda: can_edit() and not g.get("notes_error"),
             "ecn_link": lambda part: f"{ECN_APP_URL}?pn={quote(part)}",
             "ecn_app": ECN_APP_URL,
@@ -867,6 +899,70 @@ def create_app():
             "Content-Type": "text/csv; charset=utf-8",
             "Content-Disposition": f'attachment; filename="{name}"',
         }
+
+    @app.post("/buy-status")
+    def buy_status_save():
+        from ..core import buy_status as bs
+        from ..db import store
+
+        if not signed_in():
+            abort(403)
+        part = (request.form.get("part") or "").strip().upper()
+        action = request.form.get("action")
+        back = request.form.get("next") or ""
+        if not back.startswith("/") or back.startswith("//"):
+            back = url_for("home")
+        if not part or action not in ("owner", "done", "undo"):
+            abort(400)
+        engine = ops_engine()
+        status = store.get_setting(engine, STATUS_KEY, {})
+        who = request.headers.get("X-Auth-Request-Email", "") or "unknown"
+        at = datetime.now().isoformat(timespec="seconds")
+        if action == "owner":
+            _, names = buy_status()
+            owner = request.form.get("owner") or ""
+            if owner and owner not in names:
+                abort(400, "Pick a name from the list.")
+            store.put_setting(engine, STATUS_KEY, bs.set_owner(status, part, owner, who, at), who)
+        else:
+            log = store.get_setting(engine, LOG_KEY, [])
+            if action == "done":
+                snap = snapshot.load_latest() or {}
+                buy = next((b for b in snap.get("buys", []) + snap.get("needs_source", [])
+                            if b["part"] == part), None)
+                status, log = bs.mark_done(status, log, part, request.form.get("po"), who, at, buy)
+            else:
+                status, log = bs.undo_done(status, log, part, who, at)
+            store.put_setting(engine, STATUS_KEY, status, who)
+            store.put_setting(engine, LOG_KEY, log, who)
+        return redirect(back)
+
+    @app.get("/done")
+    def done_page():
+        from datetime import timedelta
+
+        from ..db import store
+
+        snap = snapshot.load_latest()
+        try:
+            log = store.get_setting(ops_engine(), LOG_KEY, [])
+            error = None
+        except Exception as exc:  # noqa: BLE001
+            log, error = [], str(exc)[:200]
+        period = request.args.get("period", "7")
+        who = request.args.get("who", "")
+        cutoff = None
+        if period in ("1", "7", "30"):
+            cutoff = (datetime.now() - timedelta(days=int(period) - 1)).date().isoformat()
+        rows = [
+            e for e in reversed(log)
+            if (not cutoff or e["at"][:10] >= cutoff)
+            and (not who or e.get("owner") == who or e["by"].split("@")[0].split(".")[0].lower() == who.lower())
+        ]
+        counts = {k: sum(1 for e in rows if e.get("check") == k)
+                  for k in ("confirmed", "waiting", "no_po", "undone")}
+        return render_template("done.html", snap=snap, rows=rows, counts=counts,
+                               period=period, who=who, error=error)
 
     @app.post("/replacements")
     def replacements_save():

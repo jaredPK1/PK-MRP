@@ -16,10 +16,6 @@
     else if (e.key === 'Enter' && document.activeElement.classList.contains('card')) {
       const btn = document.activeElement.querySelector('.why-btn');
       if (btn) btn.click();
-    } else if (e.key === 'd' && document.activeElement.classList.contains('card')) {
-      const card = document.activeElement;
-      setDone(card, !card.classList.contains('done'));
-      if (card.classList.contains('done')) focus(at + 1);
     }
   });
 
@@ -48,33 +44,11 @@
     }
   });
 
-  // Done: fold a card to one line, remembered in this browser for this plan.
-  const list = document.querySelector('.cards[data-plan]');
-  const key = list ? 'pkmrp-done-' + list.dataset.plan : null;
-  let doneSet = new Set();
-  try { if (key) doneSet = new Set(JSON.parse(localStorage.getItem(key) || '[]')); } catch (e) {}
-  function save() { try { if (key) localStorage.setItem(key, JSON.stringify([...doneSet])); } catch (e) {} }
-  function count() {
-    const el = document.querySelector('.done-count');
-    if (!el || !cards.length) return;
-    const n = cards.filter(c => c.classList.contains('done')).length;
-    el.textContent = n ? n + ' of ' + cards.length + ' done' + (n === cards.length ? ' — all clear 🎉' : '') : '';
-    return n;
-  }
-  function setDone(card, done, quiet) {
-    card.classList.toggle('done', done);
-    card.querySelector('.done-line').hidden = !done;
-    if (done) doneSet.add(card.dataset.part); else doneSet.delete(card.dataset.part);
-    save();
-    const n = count();
-    if (!quiet && done && n === cards.length) confetti(90);
-  }
-  cards.forEach(function (card) {
-    if (doneSet.has(card.dataset.part)) setDone(card, true, true);
-    card.querySelector('.done-btn').addEventListener('click', e => { e.stopPropagation(); setDone(card, true); });
-    card.querySelector('.undo-btn').addEventListener('click', e => { e.stopPropagation(); setDone(card, false); });
+  // Who's on it: picking a name saves straight away (Done lives in PK_Ops
+  // and is checked against MAX on the next plan -- see buy_status.py).
+  document.querySelectorAll('select.owner-pick').forEach(function (sel) {
+    sel.addEventListener('change', function () { sel.form.submit(); });
   });
-  count();
 
   function confetti(n) {
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
