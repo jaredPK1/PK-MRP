@@ -467,3 +467,29 @@ def test_replacements_are_set_by_editors_only_and_show_on_the_old_part(client, t
     assert "ECN 126056" in page and "next plan" in page
     c.post("/replacements", data={"old": "P0", "action": "remove"})
     assert store.get_setting(engine, "part_replacements") == {}
+
+
+def test_fix_max_page_csv_and_today_line(client, tmp_path):
+    from pkmrp import snapshot
+
+    assert "Waiting on read access" not in client.get("/fix-max").get_data(as_text=True)
+    snap = json.loads((tmp_path / "latest.json").read_text())
+    snap["fix_max"] = {"status": "no_access"}
+    snapshot.write(snap)
+    assert "Waiting on read access" in client.get("/fix-max").get_data(as_text=True)
+    ecn = {"ecn": "126056", "originator": "Abhi", "closed": "2026-09-03", "status": "Closed", "change": ""}
+    snap["fix_max"] = {
+        "status": "ok",
+        "so_lines": [{"so": "20047755", "line": "20", "delivery": "01", "part": "00-2930-00G",
+                      "customer": "FiberHome", "qty": 1.0, "due": "2026-10-29", "unscheduled": False,
+                      "ecn": ecn, "suggest": ["00-2930-01G"], "planned_as": None, "description": "SI"}],
+        "ms_entries": [], "work_orders": [], "boms": [], "coming": [],
+        "counts": {"so_lines": 1, "so_orders": 1, "so_scheduled": 1, "so_parts": 1, "ms_entries": 0,
+                   "work_orders": 0, "boms": 0, "coming": 0},
+    }
+    snapshot.write(snap)
+    page = client.get("/fix-max").get_data(as_text=True)
+    assert "20047755/20" in page and "00-2930-01G" in page and "released on the same ECN" in page
+    csv_text = client.get("/fix-max.csv").get_data(as_text=True)
+    assert csv_text.splitlines()[1].startswith("SO line,20047755,20,01,00-2930-00G,00-2930-01G")
+    assert "Fix in MAX:</b> 1 order line" in client.get("/").get_data(as_text=True)

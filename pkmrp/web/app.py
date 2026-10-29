@@ -842,6 +842,32 @@ def create_app():
         sep = "&" if "?" in back else "?"
         return redirect(f"{back.split('#')[0]}{sep}noted={part}")
 
+    @app.get("/fix-max")
+    def fix_max_page():
+        snap = snapshot.load_latest() or abort(404)
+        fx = snap.get("fix_max") or {"status": "off"}
+        return render_template("fix_max.html", snap=snap, fx=fx)
+
+    @app.get("/fix-max.csv")
+    def fix_max_csv():
+        import csv
+        import io
+
+        from ..core.fix_max import bulk_rows
+
+        snap = snapshot.load_latest() or abort(404)
+        fx = snap.get("fix_max") or {}
+        buf = io.StringIO()
+        w = csv.writer(buf)
+        w.writerow(["record", "order", "line", "delivery", "current_part", "change_to",
+                    "qty", "due", "customer_or_bill", "ecn"])
+        w.writerows(bulk_rows(fx))
+        name = f"fix-in-max-{snap['today']}.csv"
+        return buf.getvalue(), 200, {
+            "Content-Type": "text/csv; charset=utf-8",
+            "Content-Disposition": f'attachment; filename="{name}"',
+        }
+
     @app.post("/replacements")
     def replacements_save():
         from ..db import store

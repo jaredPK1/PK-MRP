@@ -54,6 +54,10 @@
   </ul>
 </section>
 {% endif %}
+{% set fc = ((snap.fix_max or {}).get('counts')) %}
+{% if fc and (fc.so_scheduled or fc.ms_entries or fc.work_orders) %}
+<p class="fix-max-line"><a href="{{ script_root }}/fix-max"><b>Fix in MAX:</b> {{ fc.so_scheduled }} order line{{ 's' if fc.so_scheduled != 1 }}{% if fc.ms_entries %}, {{ fc.ms_entries }} forecast entr{{ 'ies' if fc.ms_entries != 1 else 'y' }}{% endif %}{% if fc.work_orders %}, {{ fc.work_orders }} work order{{ 's' if fc.work_orders != 1 }}{% endif %} still name a part an ECN obsoleted — they make MRP buy the dead part →</a></p>
+{% endif %}
 {% if on_hold %}
 <section class="on-hold" aria-labelledby="hold-h">
   <h2 id="hold-h">On hold — don't buy <span class="muted">· {{ on_hold|length }}</span></h2>

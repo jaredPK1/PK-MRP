@@ -19,6 +19,7 @@ pkmrp/core/committed.py
 pkmrp/core/consign.py
 pkmrp/core/demand.py
 pkmrp/core/ecn.py
+pkmrp/core/fix_max.py
 pkmrp/core/leadtime.py
 pkmrp/core/netting.py
 pkmrp/core/notes.py
@@ -55,6 +56,7 @@ tests/test_core.py
 tests/test_ecn.py
 tests/test_erp_guard.py
 tests/test_extract.py
+tests/test_fix_max.py
 tests/test_ledger.py
 tests/test_notes.py
 tests/test_outcomes.py

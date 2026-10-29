@@ -7,6 +7,11 @@ Every feature people can see gets a line here in the same change
 WHATS_NEW = (
     (
         "2026-10-29",
+        "Fix in MAX",
+        "A new page lists everything in MAX that still names a part Engineering obsoleted — open order lines, forecast (master-schedule) entries, released work orders, and live BOMs — each with the part the same ECN released in its place. These are what make MRP buy dead parts (46 orders on the old station interface had MRP buying the obsolete support bracket). It's rebuilt every plan from Ron's ECN app, rows drop off once MAX is fixed, and a CSV gives the bulk-change list. Today shows a one-line count when there's something to fix. Also lists order lines on parts an open ECN is about to obsolete.",
+    ),
+    (
+        "2026-10-29",
         "Replacements: stop buying the part Engineering replaced",
         "When orders or work orders in MAX still name an obsolete part, PK-MRP kept planning it (46 orders on the old station interface 00-2930-00G made it say \"buy 64-2694-02G\" and never ask for -03G). A planner can now set a replacement on the Notes page — old part → new part, optionally using up the old stock — and from the next plan the demand, work-order requirements and BOMs move to the new part. The old part shows a \"→ new part\" chip. Also: the quantity on each Today card now says it's the minimum to place this week, with a link to the vendor's 4-week order.",
     ),

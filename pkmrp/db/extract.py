@@ -294,6 +294,35 @@ FROM (
 WHERE status <> 'Closed' OR (closed_rank = 1 AND new_rev = 'ZZ')
 """
 
+# Open master-schedule (forecast) entries' requirement rows -- for Fix in MAX:
+# MS entries copy the planning bill when exploded, so they keep naming a part
+# the bill has since replaced.
+MS_REQ_SQL = """
+SELECT RTRIM(o.ORDNUM_10) AS ms, RTRIM(o.PRTNUM_10) AS parent,
+       RTRIM(ISNULL(o.ORDREF_10, '')) AS reference,
+       RTRIM(rd.PRTNUM_11) AS part, RTRIM(rd.ORDNUM_11) AS req_order,
+       RTRIM(rd.LINNUM_11) AS line, RTRIM(rd.DELNUM_11) AS delivery,
+       rd.CURQTY_11 - rd.ISSQTY_11 AS qty_open, rd.CURDUE_11 AS due
+FROM Requirement_Detail rd
+JOIN Order_Master o ON o.ORDER_10 = rd.ORDER_11
+WHERE o.TYPE_10 = 'MS' AND o.STATUS_10 = '3' AND rd.TYPE_11 = 'RQ' AND rd.STATUS_11 = '3'
+  AND rd.CURQTY_11 > rd.ISSQTY_11
+"""
+
+# Parts a closed ECN released alongside one it obsoleted, with the same base
+# part number (00-2930-00G -> 00-2930-01G on ECN 126056): the likely
+# replacement, offered on Fix in MAX -- a suggestion, never applied.
+ECN_RELEASES_SQL = """
+SELECT DISTINCT RTRIM(z.part_number) AS obsolete, RTRIM(r.part_number) AS released,
+       RTRIM(z.ecn_no) AS ecn
+FROM pk_ecn.dbo.ecn_part z
+JOIN pk_ecn.dbo.ecn_part r ON r.ecn_no = z.ecn_no AND r.part_number <> z.part_number
+     AND LEFT(r.part_number, 8) = LEFT(z.part_number, 8)
+     AND RTRIM(ISNULL(r.new_rev, '')) NOT IN ('ZZ', 'NC', '', '-')
+JOIN pk_ecn.dbo.ecn e ON e.ecn_no = z.ecn_no
+WHERE RTRIM(ISNULL(z.new_rev, '')) = 'ZZ' AND e.status = 'Closed' AND z.part_number IS NOT NULL
+"""
+
 ALL_SQL = {
     "parts": PARTS_SQL,
     "bom": BOM_SQL,
@@ -313,6 +342,8 @@ ALL_SQL = {
     "vendors": VENDORS_SQL,
     "part_vendors": PART_VENDORS_SQL,
     "ecn_parts": ECN_PARTS_SQL,
+    "ecn_releases": ECN_RELEASES_SQL,
+    "ms_requirements": MS_REQ_SQL,
 }
 
 _DATES = {
@@ -370,6 +401,10 @@ _TEXT = {
     "change",
     "summary",
     "blocker",
+    "ms",
+    "req_order",
+    "obsolete",
+    "released",
 }
 
 
@@ -473,6 +508,17 @@ def ecn_parts(erp):
     """Open-ECN part rows and ECN-obsoleted parts from Ron's ECN app.
     Raises if the login has no access to pk_ecn -- the caller decides."""
     return _run(erp, "ecn_parts")
+
+
+def ecn_releases(erp):
+    """(obsolete, released, ecn): parts a closed ECN released beside one it
+    obsoleted, same base number. Raises without pk_ecn access."""
+    return _run(erp, "ecn_releases")
+
+
+def ms_requirements(erp):
+    """Open requirement rows of open master-schedule (forecast) entries."""
+    return _run(erp, "ms_requirements")
 
 
 def last_sold(erp):

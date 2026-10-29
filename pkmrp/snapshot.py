@@ -201,6 +201,7 @@ def build(run, so_df):
         ),
         "ecn": _ecn(run, buys, needs_source),
         "replaced": _iso_deep(run.get("replaced") or {}),
+        "fix_max": _iso_deep(run.get("fix_max") or {"status": "off"}),
         "overbuys": _iso_deep(
             overbuys(
                 [e for e in res.exceptions if e.part not in (run.get("shelf") or {})],

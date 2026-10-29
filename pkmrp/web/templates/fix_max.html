@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% from "_notes.html" import part_note with context %}
+{% block title %}Fix in MAX · PK-MRP{% endblock %}
+{% macro fix_cell(r) %}{% if r.planned_as %}<span class="mono">{{ r.planned_as }}</span> <span class="chip note-chip tag-replacement" title="A replacement rule in PK-MRP already plans this part instead">planned</span>{% elif r.suggest %}<span class="mono">{{ r.suggest|join(' or ') }}</span> <span class="muted small">released on the same ECN</span>{% else %}<span class="muted small">ask Engineering — no replacement released</span>{% endif %}{% endmacro %}
+{% macro ecn_cell(r) %}<a href="{{ ecn_link(r.part) }}" target="_blank" rel="noopener">ECN {{ r.ecn.ecn }}</a> <span class="muted small">{{ r.ecn.originator }}{% if r.ecn.closed %}, {{ r.ecn.closed|nice_date(False) }}{% endif %}</span>{% endmacro %}
+{% block content %}
+<section class="page-intro">
+  <h1 class="h1-small">Fix in MAX</h1>
+  <p class="lede"><b>The question this page answers: what in MAX still names a part Engineering obsoleted?</b> When an ECN obsoletes a part, the planning bills get switched, but orders, forecast entries and BOMs entered earlier keep the old part — and MRP keeps buying it. This list is rebuilt every plan from Ron's ECN app and MAX; a row disappears by itself once MAX is corrected.</p>
+  {% if fx.status == 'no_access' %}<p class="lede small-gap late-text">Waiting on read access to the ECN database (pk_ecn) — this list fills in on the first plan after it's granted.</p>
+  {% elif fx.status != 'ok' %}<p class="lede small-gap late-text">The ECN app couldn't be read on the last plan, so this list is empty for now.</p>
+  {% else %}{% set c = fx.counts %}
+  <p class="lede small-gap"><b>{{ c.so_lines }}</b> order line{{ 's' if c.so_lines != 1 }} on {{ c.so_orders }} order{{ 's' if c.so_orders != 1 }} ({{ c.so_scheduled }} scheduled) · <b>{{ c.ms_entries }}</b> forecast entr{{ 'ies' if c.ms_entries != 1 else 'y' }} · <b>{{ c.work_orders }}</b> work order{{ 's' if c.work_orders != 1 }} · <b>{{ c.boms }}</b> BOM{{ 's' if c.boms != 1 }} for Engineering · <b>{{ c.coming }}</b> coming soon. <a href="{{ script_root }}/fix-max.csv">Download the bulk-change list (CSV)</a> — orders, forecast entries and work orders, one row each, with the part to change to.</p>
+  {% endif %}
+</section>
+{% if fx.status == 'ok' %}
+
+<h3 class="steps-h">Order lines — Order Admin</h3>
+<div class="table-tools"><input type="search" class="table-filter" placeholder="Filter: part, SO, customer" aria-label="Filter the table"><span class="muted small filter-count"></span></div>
+<div class="table-wrap"><table class="dense">
+  <thead><tr><th>SO / line</th><th>Customer</th><th>Obsolete part</th><th>Change to</th><th class="r">Qty</th><th>Due</th><th>Why</th></tr></thead>
+  <tbody>{% for r in fx.so_lines %}
+    <tr><td class="mono">{{ r.so }}/{{ r.line }}</td><td class="small">{{ r.customer }}</td>
+        <td class="mono">{{ r.part }} {{ part_note(r.part, False) }}<div class="muted small">{{ r.description|lower|capitalize }}</div></td>
+        <td>{{ fix_cell(r) }}</td><td class="r">{{ r.qty|qty }}</td>
+        <td>{% if r.unscheduled %}<span class="muted">unscheduled</span>{% else %}{{ r.due|nice_date(False) }}{% endif %}</td><td class="small">{{ ecn_cell(r) }}</td></tr>
+  {% else %}<tr><td colspan="7" class="muted">No open order names an obsolete part. Lovely.</td></tr>{% endfor %}</tbody>
+</table></div>
+
+<h3 class="steps-h">Forecast (master-schedule) entries — planning</h3>
+<p class="muted small">These copied the planning bill when they were entered. Re-exploding them picks up the current bill.</p>
+<div class="table-wrap"><table class="dense">
+  <thead><tr><th>MS entry</th><th>Planning bill</th><th>Reference</th><th>Obsolete part</th><th>Change to</th><th class="r">Qty</th><th>Due</th><th>Why</th></tr></thead>
+  <tbody>{% for r in fx.ms_entries %}
+    <tr><td class="mono">{{ r.ms }}</td><td class="mono small">{{ r.planning_bill }}</td><td class="small">{{ r.reference }}</td>
+        <td class="mono">{{ r.part }}</td><td>{{ fix_cell(r) }}</td><td class="r">{{ r.qty|qty }}</td><td>{{ r.due|nice_date(False) }}</td><td class="small">{{ ecn_cell(r) }}</td></tr>
+  {% else %}<tr><td colspan="8" class="muted">None.</td></tr>{% endfor %}</tbody>
+</table></div>
+
+<h3 class="steps-h">Released work orders with an obsolete component — production / Engineering</h3>
+<div class="table-wrap"><table class="dense">
+  <thead><tr><th>WO</th><th>Builds</th><th>Obsolete component</th><th>Change to</th><th class="r">Qty open</th><th>Due</th><th>Why</th></tr></thead>
+  <tbody>{% for r in fx.work_orders %}
+    <tr><td class="mono">{{ r.wo }}</td><td class="mono small">{{ r.builds }}</td><td class="mono">{{ r.part }}</td><td>{{ fix_cell(r) }}</td>
+        <td class="r">{{ r.qty|qty }}</td><td>{{ r.due|nice_date(False) }}</td><td class="small">{{ ecn_cell(r) }}</td></tr>
+  {% else %}<tr><td colspan="7" class="muted">None.</td></tr>{% endfor %}</tbody>
+</table></div>
+
+<h3 class="steps-h">BOMs still using an obsolete part — needs an ECN</h3>
+<p class="muted small">Only parents with demand in this plan. A BOM change goes through Ron's ECN process, not a bulk edit.</p>
+<div class="table-wrap"><table class="dense">
+  <thead><tr><th>Parent</th><th>Obsolete component</th><th class="r">Qty per</th><th>Change to</th><th>Why</th></tr></thead>
+  <tbody>{% for r in fx.boms %}
+    <tr><td class="mono">{{ r.parent }}<div class="muted small">{{ r.parent_description|lower|capitalize }}</div></td><td class="mono">{{ r.part }}</td>
+        <td class="r">{{ r.qty_per|qty }}</td><td>{{ fix_cell(r) }}</td><td class="small">{{ ecn_cell(r) }}</td></tr>
+  {% else %}<tr><td colspan="5" class="muted">None.</td></tr>{% endfor %}</tbody>
+</table></div>
+
+<h3 class="steps-h">Coming soon — order lines on parts an open ECN will obsolete</h3>
+<div class="table-wrap"><table class="dense">
+  <thead><tr><th>SO / line</th><th>Customer</th><th>Part</th><th class="r">Qty</th><th>Due</th><th>Open ECN</th></tr></thead>
+  <tbody>{% for r in fx.coming %}
+    <tr><td class="mono">{{ r.so }}/{{ r.line }}</td><td class="small">{{ r.customer }}</td><td class="mono">{{ r.part }}<div class="muted small">{{ r.description|lower|capitalize }}</div></td>
+        <td class="r">{{ r.qty|qty }}</td><td>{% if r.unscheduled %}<span class="muted">unscheduled</span>{% else %}{{ r.due|nice_date(False) }}{% endif %}</td>
+        <td class="small">{% for e in r.coming %}<a href="{{ ecn_link(r.part) }}" target="_blank" rel="noopener">ECN {{ e.ecn }}</a> · {{ e.status }} · {{ e.originator }}{{ '; ' if not loop.last }}{% endfor %}</td></tr>
+  {% else %}<tr><td colspan="6" class="muted">None.</td></tr>{% endfor %}</tbody>
+</table></div>
+{% endif %}
+{% endblock %}

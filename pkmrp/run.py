@@ -8,6 +8,7 @@ import pandas as pd
 
 from .core import analytics, consign, leadtime, segment, skumap, supersede, supply
 from .core import committed as committed_mod
+from .core import fix_max as fix_max_mod
 from .core import demand as demand_mod
 from .core import pipeline as pipeline_mod
 from .core import shelf as shelf_mod
@@ -228,13 +229,33 @@ def build_plan(
     # ECNs from Ron's ECN app: shown beside parts and as an alert; never
     # changes the plan.
     try:
-        ecn = {"status": "ok", "rows": timed("ecn_parts", extract.ecn_parts, erp)}
+        ecn = {
+            "status": "ok",
+            "rows": timed("ecn_parts", extract.ecn_parts, erp),
+            "releases": timed("ecn_releases", extract.ecn_releases, erp),
+        }
     except Exception as exc:  # noqa: BLE001 -- the plan stands without ECNs
         text = str(exc)
         no_access = any(
             k in text for k in ("permission", "not able to access", "denied", "4060", "916")
         )
         ecn = {"status": "no_access" if no_access else "error", "error": text[:300]}
+    # Fix in MAX: records still naming an ECN-obsoleted part (needs pk_ecn).
+    if ecn["status"] == "ok":
+        fix_max = fix_max_mod.worklist(
+            ecn["rows"],
+            ecn["releases"],
+            so_df,
+            req_df,
+            timed("ms_requirements", extract.ms_requirements, erp),
+            children,
+            set(result.demands),
+            parts,
+            replacements or {},
+            today,
+        )
+    else:
+        fix_max = {"status": ecn["status"]}
     for p, by_month in pipe_months.items():
         merged = months.setdefault(p, {})
         for m, q in by_month.items():
@@ -291,6 +312,7 @@ def build_plan(
         "pipeline": pipeline,
         "ecn": ecn,
         "replaced": replaced,
+        "fix_max": fix_max,
         "consigned": consigned,
         "consign_evidence": consign_evidence,
         "bom_codes_skipped": skipped_codes,
