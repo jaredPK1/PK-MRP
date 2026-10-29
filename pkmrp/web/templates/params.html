@@ -18,13 +18,12 @@
 <div class="table-tools"><input type="search" class="table-filter" placeholder="Filter: part number or description words — e.g. 2300 lens" aria-label="Filter the table"><span class="muted small filter-count"></span></div>
 <div class="table-wrap">
 <table class="dense">
-  <thead><tr><th>Part</th><th>Description</th><th>Buyer</th><th>Vendor</th><th class="r">MAX has</th><th class="r">Propose</th><th class="r">Change</th><th class="r">Median</th><th class="r">P80</th><th class="r">Receipts</th><th></th></tr></thead>
+  <thead><tr><th>Part</th><th>Description</th><th>Vendor</th><th class="r">MAX has</th><th class="r">Propose</th><th class="r">Change</th><th class="r">Median</th><th class="r">P80</th><th class="r">Receipts</th><th></th></tr></thead>
   <tbody>
   {% for r in rows %}
     <tr>
       <td class="mono">{{ r.part }} {{ part_note(r.part, False) }}</td>
       <td class="dcol">{{ r.description|lower|capitalize }}</td>
-      <td>{{ r.buyer }}</td>
       <td>{{ r.vendor }}</td>
       <td class="r">{{ r.current_bdays|int }}</td>
       <td class="r"><b>{{ r.proposed_bdays }}</b>{% if r.basis == 'median' %} <small class="muted" title="Fewer than 5 receipts: proposed from the median">m</small>{% endif %}</td>
@@ -34,7 +33,7 @@
       <td class="r">{{ r.lines }}</td>
       <td>{% if r.segment == 'committed' %}<span class="chip quiet" title="Also planned a year ahead on Committed">committed</span>{% endif %}</td>
     </tr>
-  {% else %}<tr><td colspan="11" class="muted">Every lead time with enough history is within 25%. Lovely.</td></tr>{% endfor %}
+  {% else %}<tr><td colspan="10" class="muted">Every lead time with enough history is within 25%. Lovely.</td></tr>{% endfor %}
   </tbody>
 </table>
 </div>

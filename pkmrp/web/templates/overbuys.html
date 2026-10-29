@@ -28,20 +28,16 @@
 </section>
 {% if t.cleared %}<p class="muted small">Totals leave out {{ t.cleared|money }} that people cleared with a reason — <a href="#cleared">see Cleared</a>.</p>{% endif %}
 
-{% if ob.by_buyer %}
-<h3 class="steps-h">By buyer</h3>
-<p class="buyers">{% for b in ob.by_buyer %}<span class="chip quiet" title="{{ b.po_lines }} PO lines">{{ b.buyer }} · {{ b.po_value|money }}{% if b.new_value %} <b class="late-text">· {{ b.new_value|money }} new</b>{% endif %}</span> {% endfor %}</p>
-{% endif %}
 
 <h3 class="steps-h">Open POs to cut, cancel or push</h3>
 <p class="filters">
   <a class="chip {{ 'soon' if not only_new else 'quiet' }}" href="?">All {{ ob.po|length }}</a>
   <a class="chip {{ 'late' if only_new else 'quiet' }}" href="?new=1">Placed in the last {{ ob.new_days }} days</a>
 </p>
-<div class="table-tools"><input type="search" class="table-filter" placeholder="Filter: part, description, buyer or vendor" aria-label="Filter the table"><span class="muted small filter-count"></span></div>
+<div class="table-tools"><input type="search" class="table-filter" placeholder="Filter: part, description or vendor" aria-label="Filter the table"><span class="muted small filter-count"></span></div>
 <div class="table-wrap">
 <table class="dense">
-  <thead><tr><th>Part</th><th>Description</th><th>PO line</th><th>Problem</th><th class="r">Qty</th><th class="r">Value</th><th>Buyer</th><th>Vendor</th><th>Placed</th><th>Due</th><th class="act"></th></tr></thead>
+  <thead><tr><th>Part</th><th>Description</th><th>PO line</th><th>Problem</th><th class="r">Qty</th><th class="r">Value</th><th>Vendor</th><th>Placed</th><th>Due</th><th class="act"></th></tr></thead>
   <tbody>
   {% for r in rows %}
     <tr>
@@ -51,13 +47,12 @@
       <td><span class="chip {{ 'late' if r.kind == 'cancel_candidate' else ('today' if r.kind == 'excess_on_po' else 'quiet') }}">{{ r.what }}{% if r.days_early %} · {{ r.days_early }}d{% endif %}</span>{% if r.new %} <span class="chip late">new</span>{% endif %}</td>
       <td class="r">{{ r.qty|qty }}</td>
       <td class="r"><b>{{ r.value|money }}</b></td>
-      <td>{{ r.buyer }}</td>
       <td class="small">{{ r.vendor|title }}</td>
       <td title="{{ r.placed|nice_date if r.placed else '' }}">{{ r.placed|nice_date(False) if r.placed else '' }}</td>
       <td title="{{ r.due|nice_date if r.due else '' }}">{{ r.due|nice_date(False) if r.due else '' }}</td>
       <td class="act">{{ clear_form(r, 'po') }}</td>
     </tr>
-  {% else %}<tr><td colspan="11" class="muted">Nothing here — every open PO line is needed. Lovely.</td></tr>{% endfor %}
+  {% else %}<tr><td colspan="10" class="muted">Nothing here — every open PO line is needed. Lovely.</td></tr>{% endfor %}
   </tbody>
 </table>
 </div>
@@ -65,10 +60,10 @@
 <h3 class="steps-h">Stock no booked order needs <span class="muted">· {{ t.stock_extra|money }}, of which {{ t.stock_idle|money }} has no order at all</span></h3>
 <div class="table-wrap">
 <table class="dense">
-  <thead><tr><th>Part</th><th>Description</th><th>Buyer</th><th class="r">On hand</th><th class="r">Orders need</th><th class="r">Extra</th><th class="r">Value</th><th class="act"></th></tr></thead>
+  <thead><tr><th>Part</th><th>Description</th><th class="r">On hand</th><th class="r">Orders need</th><th class="r">Extra</th><th class="r">Value</th><th class="act"></th></tr></thead>
   <tbody>
   {% for r in ob.stock[:150] %}
-    <tr><td class="mono">{{ r.part }} {{ part_note(r.part) }}</td><td class="dcol">{{ r.description|lower|capitalize }}</td><td>{{ r.buyer }}</td>
+    <tr><td class="mono">{{ r.part }} {{ part_note(r.part) }}</td><td class="dcol">{{ r.description|lower|capitalize }}</td>
         <td class="r">{{ r.on_hand|qty }}</td><td class="r">{{ r.needed|qty if r.needed else '—' }}</td><td class="r">{{ r.extra|qty }}</td><td class="r"><b>{{ r.value|money }}</b></td><td class="act">{{ clear_form(r, 'stock') }}</td></tr>
   {% endfor %}
   </tbody>

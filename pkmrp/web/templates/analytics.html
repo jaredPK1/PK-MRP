@@ -83,15 +83,11 @@
 
 <section class="lesson" id="today">
   <h2>Where is today's lateness?</h2>
-  <p class="lede">The {{ h.buy_now }} buys due now, cut four ways.</p>
+  <p class="lede">The {{ h.buy_now }} buys due now, cut three ways.</p>
   <div class="multiples two">
     <figure><figcaption>How late (days past order-by)</figcaption>{{ bars(bd.lateness or [], 'buys', 'name') }}</figure>
     <figure><figcaption>Products held up, by $ of their orders</figcaption>{{ bars(bd.products or [], 'value', 'name', '$') }}</figure>
     <figure><figcaption>Late buys by vendor (top {{ (bd.by_vendor or [])|length }})</figcaption>{{ bars(bd.by_vendor or [], 'late', 'name') }}</figure>
-    <figure><figcaption>By buyer</figcaption>
-      <table class="dense"><thead><tr><th>Buyer</th><th class="r">Buys</th><th class="r">Late</th><th class="r">Orders</th><th class="r">Spend</th></tr></thead><tbody>
-      {% for r in bd.by_buyer or [] %}<tr><td>{{ r.name }}</td><td class="r">{{ r.buys }}</td><td class="r">{{ r.late }}</td><td class="r">{{ r.orders }}</td><td class="r">{{ r.spend|money }}</td></tr>{% endfor %}
-      </tbody></table></figure>
   </div>
 </section>
 
