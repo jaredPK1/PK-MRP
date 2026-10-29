@@ -153,7 +153,10 @@ def missing_tables(engine):
     """Names of PK-MRP tables not present yet (the DBA script not run)."""
     from sqlalchemy import inspect
 
-    have = set(inspect(engine).get_table_names())
+    # The DBA creates them in dbo, but app_control_tower's default schema in
+    # pk_ops is db_datareader, and the inspector looks only in the default one.
+    schema = "dbo" if engine.dialect.name == "mssql" else None
+    have = set(inspect(engine).get_table_names(schema=schema))
     return [t for t in metadata.tables if t not in have]
 
 
