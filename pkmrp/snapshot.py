@@ -200,6 +200,7 @@ def build(run, so_df):
             recent_open_pos(run["open_pos"], run.get("vendor_names_by_id") or {}, today)
         ),
         "ecn": _ecn(run, buys, needs_source),
+        "replaced": _iso_deep(run.get("replaced") or {}),
         "overbuys": _iso_deep(
             overbuys(
                 [e for e in res.exceptions if e.part not in (run.get("shelf") or {})],

@@ -6,7 +6,7 @@ from datetime import date, timedelta
 
 import pandas as pd
 
-from .core import analytics, consign, leadtime, segment, skumap, supply
+from .core import analytics, consign, leadtime, segment, skumap, supersede, supply
 from .core import committed as committed_mod
 from .core import demand as demand_mod
 from .core import pipeline as pipeline_mod
@@ -38,8 +38,11 @@ def _sku_proposals(erp, pipeline, parts, today, timed):
     return skumap.propose(skus, booked, lines, catalogue, last, today)
 
 
-def build_plan(erp, settings=None, today=None, history_months=24, sku_map=None):
-    """`sku_map` is the confirmed pipeline_sku_map (mrp_settings), or None."""
+def build_plan(
+    erp, settings=None, today=None, history_months=24, sku_map=None, replacements=None
+):
+    """`sku_map` is the confirmed pipeline_sku_map (mrp_settings), or None;
+    `replacements` the part_replacements rules (old -> new), or None."""
     settings = settings or PlanSettings()
     today = today or date.today()
     timings = {}
@@ -172,12 +175,20 @@ def build_plan(erp, settings=None, today=None, history_months=24, sku_map=None):
     committed = {r["part"] for r in segments if r["segment"] in ("committed", "unproven_long")}
     timings["segment"] = round(time.time() - t, 2)
     t = time.time()
-    result = plan(
-        parts,
-        children,
+    # Replacements: plan the new part where orders/BOMs still name the old.
+    plan_demands, plan_children, plan_stock, plan_receipts, replaced = supersede.apply(
+        replacements or {},
         so_demand + wo_demand + sub_demand + kit_demand,
+        children,
         stock,
         receipts,
+    )
+    result = plan(
+        parts,
+        plan_children,
+        plan_demands,
+        plan_stock,
+        plan_receipts,
         settings,
         today,
         lead,
@@ -258,9 +269,9 @@ def build_plan(erp, settings=None, today=None, history_months=24, sku_map=None):
         "today": today,
         "settings": settings,
         "parts": parts,
-        "children": children,
-        "stock": stock,
-        "receipts": receipts,
+        "children": plan_children,
+        "stock": plan_stock,
+        "receipts": plan_receipts,
         "lead_times": lt_stats,
         "result": result,
         "worklists": worklists,
@@ -279,6 +290,7 @@ def build_plan(erp, settings=None, today=None, history_months=24, sku_map=None):
         "committed_plans": committed_plans,
         "pipeline": pipeline,
         "ecn": ecn,
+        "replaced": replaced,
         "consigned": consigned,
         "consign_evidence": consign_evidence,
         "bom_codes_skipped": skipped_codes,

@@ -443,3 +443,27 @@ def test_a_hold_takes_the_part_off_every_buy_list_until_released(client, tmp_pat
     c.post("/notes", data={"part": part, "id": nid, "action": "remove", "next": "/"})
     home = c.get("/").get_data(as_text=True)
     assert 'id="buy-1"' in home and "On hold — don't buy" not in home
+
+
+def test_replacements_are_set_by_editors_only_and_show_on_the_old_part(client, tmp_path, monkeypatch):
+    from pkmrp import snapshot
+    from pkmrp.db import store
+
+    c, engine = _overbuy_client(tmp_path, monkeypatch, "viewer")
+    assert "Plan the replacement" not in c.get("/notes").get_data(as_text=True)
+    assert c.post("/replacements", data={"old": "P0", "new": "P1", "action": "set"}).status_code == 403
+
+    c, engine = _overbuy_client(tmp_path, monkeypatch, "admin")
+    snapshot.write_atp({"parts": {"P0": ["B", "OLD", 0, 0], "P1": ["B", "NEW", 0, 0]}, "timelines": {}})
+    assert c.post("/replacements", data={"old": "P1", "new": "P1", "action": "set"}).status_code == 400
+    assert c.post("/replacements", data={"old": "P0", "new": "NOPE", "action": "set"}).status_code == 400
+    r = c.post("/replacements", data={"old": "p0", "new": "p1", "use_up": "1", "why": "ECN 126056",
+                                      "action": "set"})
+    assert r.status_code == 302
+    saved = store.get_setting(engine, "part_replacements")
+    assert saved["P0"]["part"] == "P1" and saved["P0"]["use_up"] is True
+    assert "→ P1" in c.get("/overbuys").get_data(as_text=True)  # chip on the old part
+    page = c.get("/notes").get_data(as_text=True)
+    assert "ECN 126056" in page and "next plan" in page
+    c.post("/replacements", data={"old": "P0", "action": "remove"})
+    assert store.get_setting(engine, "part_replacements") == {}

@@ -94,6 +94,7 @@ def _lead_words(source):
 SKU_MAP_KEY = "pipeline_sku_map"
 CLEARED_KEY = "overbuy_cleared"
 NOTES_KEY = "part_notes"
+REPLACE_KEY = "part_replacements"
 # Ron's ECN app, the source of truth for ECNs; /ecn/?pn=<part> opens the
 # part's ECN history there.
 ECN_APP_URL = os.environ.get("ECN_APP_URL", "/ecn/")
@@ -129,6 +130,17 @@ def create_app():
             except Exception as exc:  # noqa: BLE001 -- pages work without notes
                 g.part_notes, g.notes_error = {}, str(exc)[:200]
         return g.part_notes
+
+    def replacements():
+        """{old: {part, use_up, why, by, at}} from PK_Ops, once per request."""
+        if "replacements" not in g:
+            from ..db import store
+
+            try:
+                g.replacements = store.get_setting(ops_engine(), REPLACE_KEY, {})
+            except Exception:  # noqa: BLE001 -- pages work without them
+                g.replacements = {}
+        return g.replacements
 
     def held():
         """{part: hold note} -- parts someone put on hold; they come off every
@@ -182,6 +194,8 @@ def create_app():
             "can_note": lambda: signed_in() and not g.get("notes_error"),
             "here": request.script_root + request.full_path.rstrip("?"),
             "ecn_for": ecn_for,
+            "replacement_for": lambda part: replacements().get(part),
+            "can_replace": lambda: can_edit() and not g.get("notes_error"),
             "ecn_link": lambda part: f"{ECN_APP_URL}?pn={quote(part)}",
             "ecn_app": ECN_APP_URL,
         }
@@ -771,9 +785,17 @@ def create_app():
         descriptions = {p: v[1] for p, v in (atp.get("parts") or {}).items()}
         tag = request.args.get("tag") or None
         notes = part_notes()
+        moved = (snap or {}).get("replaced") or {}
+        rules = sorted(
+            ({"old": o, **r, "moved": moved.get(o)} for o, r in replacements().items()),
+            key=lambda r: r["old"],
+        )
         return render_template(
             "notes.html",
             snap=snap,
+            rules=rules,
+            descriptions=descriptions,
+            replace=(request.args.get("replace") or "").strip().upper(),
             rows=listing(notes, descriptions, tag),
             counts={t: sum(1 for ns in notes.values() for n in ns if n["tag"] == t) for t, _ in TAGS},
             total=sum(len(ns) for ns in notes.values()),
@@ -819,6 +841,39 @@ def create_app():
         store.put_setting(engine, NOTES_KEY, current, who)
         sep = "&" if "?" in back else "?"
         return redirect(f"{back.split('#')[0]}{sep}noted={part}")
+
+    @app.post("/replacements")
+    def replacements_save():
+        from ..db import store
+
+        if not can_edit():
+            abort(403)
+        old = (request.form.get("old") or "").strip().upper()
+        action = request.form.get("action")
+        if not old or action not in ("set", "remove"):
+            abort(400)
+        engine = ops_engine()
+        current = store.get_setting(engine, REPLACE_KEY, {})
+        who = request.headers.get("X-Auth-Request-Email", "") or "unknown"
+        if action == "remove":
+            current.pop(old, None)
+        else:
+            new = (request.form.get("new") or "").strip().upper()
+            atp = snapshot.load_atp()
+            for p in (old, new):
+                if not p or (atp and p not in atp["parts"]):
+                    abort(400, f"{p or 'No part'} isn't a make or buy part in MAX.")
+            if new == old:
+                abort(400, "A part can't replace itself.")
+            current[old] = {
+                "part": new,
+                "use_up": request.form.get("use_up") == "1",
+                "why": (request.form.get("why") or "").strip()[:300],
+                "by": who,
+                "at": datetime.now().isoformat(timespec="minutes"),
+            }
+        store.put_setting(engine, REPLACE_KEY, current, who)
+        return redirect(url_for("notes_page", replaced=old) + "#replace")
 
     app.config["DATA_DIR"] = os.environ.get("DATA_DIR", snapshot.DATA_DIR)
     return app

@@ -26,6 +26,41 @@
 </form>
 {% endif %}
 
+<h3 class="steps-h" id="replace">Replacements — plan the new part where the old one is still called for</h3>
+<p class="muted small">When Engineering replaces a part but open orders, work orders or BOMs in MAX still name the old one, PK-MRP would keep buying the old part. A replacement makes the plan use the new part instead — order demand, WO requirements and BOMs all move. Tick <b>use up</b> if the old part's stock and open POs can be used for the same thing (backward compatible); otherwise they show on Overbuys. Takes effect on the next hourly plan. The orders in MAX still need fixing — this keeps buying right until they are.</p>
+{% if request.args.get('replaced') %}<p class="lede small-gap"><span class="chip soon">Saved</span> {{ request.args.get('replaced') }} — used from the next plan.</p>{% endif %}
+{% if rules %}
+<div class="table-wrap">
+<table class="dense">
+  <thead><tr><th>Old part</th><th>Planned as</th><th>Use up old stock</th><th>Why</th><th>Last plan moved</th><th>Who</th><th></th></tr></thead>
+  <tbody>
+  {% for r in rules %}
+    <tr><td class="mono">{{ r.old }} <span class="muted small">{{ (descriptions.get(r.old) or '')|lower|capitalize }}</span></td>
+        <td class="mono">{{ r.part }} <span class="muted small">{{ (descriptions.get(r.part) or '')|lower|capitalize }}</span></td>
+        <td>{{ 'yes' if r.use_up else 'no' }}</td><td>{{ r.why }}</td>
+        <td class="small">{% if r.moved %}{{ r.moved.demand|qty }} demand{% if r.moved.parents %}, {{ r.moved.parents }} BOM{{ 's' if r.moved.parents != 1 }}{% endif %}{% if r.moved.stock %}, {{ r.moved.stock|qty }} stock{% endif %}{% if r.moved.receipts %}, {{ r.moved.receipts }} open order{{ 's' if r.moved.receipts != 1 }}{% endif %}{% else %}<span class="muted">next plan</span>{% endif %}</td>
+        <td class="small">{{ r.by.split('@')[0] }} {{ r.at[:10]|nice_date }}</td>
+        <td>{% if can_replace() %}<form method="post" action="{{ script_root }}/replacements"><input type="hidden" name="old" value="{{ r.old }}"><button class="btn" name="action" value="remove">Remove</button></form>{% endif %}</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% endif %}
+{% if can_replace() %}
+<form method="post" action="{{ script_root }}/replacements" class="note-form note-new">
+  <label class="picker small">Old part
+    <input name="old" required value="{{ replace }}" placeholder="the obsolete part" autocomplete="off" data-suggest="{{ script_root }}/api/parts" role="combobox" aria-expanded="false" aria-autocomplete="list">
+    <ul class="suggest" role="listbox" hidden></ul></label>
+  <label class="picker small">Plan as
+    <input name="new" required placeholder="its replacement" autocomplete="off" data-suggest="{{ script_root }}/api/parts" role="combobox" aria-expanded="false" aria-autocomplete="list">
+    <ul class="suggest" role="listbox" hidden></ul></label>
+  <label class="small"><input type="checkbox" name="use_up" value="1"> use up old stock first</label>
+  <input name="why" maxlength="300" placeholder="Why (ECN #…)" class="note-text" aria-label="Why">
+  <button class="btn" name="action" value="set">Plan the replacement</button>
+</form>
+{% else %}<p class="muted small">Setting a replacement changes the plan, so it needs an admin or developer role in PK-MRP.</p>{% endif %}
+
+<h3 class="steps-h">Notes</h3>
 <p class="filters">
   <a class="chip {{ 'soon' if not tag else 'quiet' }}" href="?">All {{ total }}</a>
   {% for code, words in note_tags %}{% if counts[code] %}<a class="chip {{ 'soon' if tag == code else 'quiet' }}" href="?tag={{ code }}">{{ words }} · {{ counts[code] }}</a> {% endif %}{% endfor %}

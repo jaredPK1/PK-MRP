@@ -32,6 +32,7 @@ pkmrp/core/settings.py
 pkmrp/core/shelf.py
 pkmrp/core/skumap.py
 pkmrp/core/story.py
+pkmrp/core/supersede.py
 pkmrp/core/supply.py
 pkmrp/core/vendor_order.py
 pkmrp/db/__init__.py
@@ -65,4 +66,5 @@ tests/test_segment_params.py
 tests/test_shelf.py
 tests/test_skumap.py
 tests/test_story.py
+tests/test_supersede.py
 tests/test_vendor_order.py

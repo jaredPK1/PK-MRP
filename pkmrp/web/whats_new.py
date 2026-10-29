@@ -7,6 +7,11 @@ Every feature people can see gets a line here in the same change
 WHATS_NEW = (
     (
         "2026-10-29",
+        "Replacements: stop buying the part Engineering replaced",
+        "When orders or work orders in MAX still name an obsolete part, PK-MRP kept planning it (46 orders on the old station interface 00-2930-00G made it say \"buy 64-2694-02G\" and never ask for -03G). A planner can now set a replacement on the Notes page — old part → new part, optionally using up the old stock — and from the next plan the demand, work-order requirements and BOMs move to the new part. The old part shows a \"→ new part\" chip. Also: the quantity on each Today card now says it's the minimum to place this week, with a link to the vendor's 4-week order.",
+    ),
+    (
+        "2026-10-29",
         "Hold a part so nobody buys it",
         "A \"Hold — don't buy yet\" note now takes the part off Today's top 10, All buys, By vendor, Needs a source and the shelf carts, straight away. Held parts are listed under On hold on Today with who held them and why; remove the note to release it. First one: 45-3036-00G (obsolete per ECN 126041, none on hand).",
     ),

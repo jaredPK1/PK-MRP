@@ -48,7 +48,7 @@
   {% for r in ob %}
     <li><b class="mono">{{ r.part }}</b> {{ r.description|lower|capitalize }} — {{ r.qty|qty }} to buy{% if r.orders %} for {{ r.orders }} order{{ 's' if r.orders != 1 }}{% if r.order_value %} worth {{ r.order_value|money }}{% endif %}{% endif %}.
       <a href="{{ ecn_link(r.part) }}" target="_blank" rel="noopener">ECN {{ r.ecn.ecn }}</a> <span class="muted small">({{ r.ecn.originator }}, closed {{ r.ecn.closed|nice_date if r.ecn.closed else '?' }}{% if r.ecn.change %}: {{ r.ecn.change|truncate(90) }}{% endif %})</span>
-      {% if r.via %}<div class="small">Pulled by {% for v in r.via %}<span class="mono">{{ v.part }}</span>{% if v.obsolete %} <span class="chip note-chip tag-obsolete">itself obsolete</span>{% endif %}{% if v.open_ecns %} <span class="chip note-chip tag-ecn">ECN {{ v.open_ecns|join(', ') }} open</span>{% endif %}{{ ', ' if not loop.last }}{% endfor %}</div>{% endif %}
+      {% if r.via %}<div class="small">Pulled by {% for v in r.via %}<span class="mono">{{ v.part }}</span>{% if v.obsolete %} <span class="chip note-chip tag-obsolete">itself obsolete</span>{% if can_replace() %} <a class="small" href="{{ script_root }}/notes?replace={{ v.part|urlencode }}#replace">plan its replacement →</a>{% endif %}{% endif %}{% if v.open_ecns %} <span class="chip note-chip tag-ecn">ECN {{ v.open_ecns|join(', ') }} open</span>{% endif %}{{ ', ' if not loop.last }}{% endfor %}</div>{% endif %}
     </li>
   {% endfor %}
   </ul>
@@ -88,7 +88,7 @@
         </div>
         <div class="desc">{{ b.description|lower|capitalize }}</div>
         <div class="facts">
-          <span><b>{{ b.qty|qty }}</b> to buy{% if b.packs %} <span class="muted">({{ b.packs }} {{ b.pack_uom or 'pack' }} of {{ b.pack_qty|qty }})</span>{% endif %}{% if b.spend %} · {{ b.spend|money }}{% endif %}</span>
+          <span><b>{{ b.qty|qty }}</b> to buy{% if b.packs %} <span class="muted">({{ b.packs }} {{ b.pack_uom or 'pack' }} of {{ b.pack_qty|qty }})</span>{% endif %}{% if b.spend %} · {{ b.spend|money }}{% endif %} <small class="muted" title="Only the buys whose order-by date falls in the next 5 working days — the minimum to place now. Later needs come up as their dates get close.">· the minimum this week{% if b.vendor %} — <a href="{{ script_root }}/vendor?v={{ b.vendor|urlencode }}&weeks=4&part={{ b.part|urlencode }}">4-week order</a>{% endif %}</small></span>
           <span>{{ b.lead_days|round|int }}-day lead <small>· {{ b.lead_source|lead_words }}</small></span>
           {% if b.vendor %}{% set n = vendor_n.get(b.vendor, 1) %}<span>vendor <a class="vendor-link" href="{{ script_root }}/vendor?v={{ b.vendor|urlencode }}&part={{ b.part|urlencode }}" title="Everything PK needs from {{ b.vendor|title }}, on one PO">{{ b.vendor }}{% if n > 1 %} · +{{ n - 1 }} more to order with it{% endif %}</a></span>{% endif %}
           {% if b.buyer %}<span>buyer {{ b.buyer }}</span>{% endif %}

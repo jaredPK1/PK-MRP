@@ -115,11 +115,25 @@ def _sku_map():
         return {}
 
 
+def _replacements():
+    """The part_replacements rules from PK_Ops; {} when they can't be read."""
+    from .db import store
+
+    try:
+        engine = store.ops_engine(DbConfig.from_env())
+        if store.missing_tables(engine):
+            return {}
+        return store.get_setting(engine, "part_replacements", {})
+    except Exception as exc:  # noqa: BLE001 -- plan as MAX has it
+        click.echo(f"replacements: {exc}", err=True)
+        return {}
+
+
 def _plan_once(erp):
     from . import snapshot
     from .run import build_plan
 
-    run = build_plan(erp, sku_map=_sku_map())
+    run = build_plan(erp, sku_map=_sku_map(), replacements=_replacements())
     snap = snapshot.build(run, run["so_lines"])
     snap["ledger"] = _ledger(run, snap)
     snapshot.write(snap)
