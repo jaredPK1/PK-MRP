@@ -1,0 +1,12 @@
+pyodbc>=5
+pandas>=2.2
+numpy>=1.26
+sqlalchemy>=2.0
+flask>=3.0
+click>=8.1
+gunicorn>=22
+pymssql>=2.3
+
+[dev]
+pytest>=8
+ruff>=0.6

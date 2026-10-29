@@ -7,7 +7,7 @@
   <p class="lede small-gap"><b>{{ counts.committed or 0 }}</b> parts are planned this way. Another <b>{{ counts.unproven_long or 0 }}</b> are listed at the bottom: MAX says they're slow, but we've never received one to check, so they aren't planned a year out yet. Whether MAX's own lead-time number is right is a separate question — that's the <a href="{{ script_root }}/lead-times">Lead times</a> page.</p>
   <p class="filters">
     {% set pl = snap.pipeline or {} %}
-    {% if pl.status == 'ok' %}<span class="muted small">Requirement = booked orders + Book/Bill 2.0 pipeline ({{ pl.bookings }} open bookings, weighted by win probability){% if pl.unmapped %} · {{ pl.unmapped|length }} SKUs not yet matched to a MAX part{% endif %}.</span>
+    {% if pl.status == 'ok' %}<span class="muted small">Requirement = booked orders + Book/Bill 2.0 pipeline ({{ pl.bookings }} open bookings, weighted by win probability){% if pl.unmapped %} · <a href="{{ script_root }}/pipeline">{{ pl.unmapped|length }} SKUs not yet matched to a MAX part</a>{% endif %}.</span>
     {% elif pl.status == 'no_access' %}<span class="muted small">Requirement is booked orders only — PK-MRP can't read the Book/Bill 2.0 pipeline yet (needs a read grant on pk_sales).</span>
     {% else %}<span class="muted small">Requirement is booked orders only — the pipeline didn't load this run.</span>{% endif %}
     <span class="grow"></span>

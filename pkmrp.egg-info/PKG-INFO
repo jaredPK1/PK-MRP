@@ -1,0 +1,16 @@
+Metadata-Version: 2.4
+Name: pkmrp
+Version: 0.1.0
+Summary: Backlog-driven material planning for Photon Kinetics
+Requires-Python: >=3.11
+Requires-Dist: pyodbc>=5
+Requires-Dist: pandas>=2.2
+Requires-Dist: numpy>=1.26
+Requires-Dist: sqlalchemy>=2.0
+Requires-Dist: flask>=3.0
+Requires-Dist: click>=8.1
+Requires-Dist: gunicorn>=22
+Requires-Dist: pymssql>=2.3
+Provides-Extra: dev
+Requires-Dist: pytest>=8; extra == "dev"
+Requires-Dist: ruff>=0.6; extra == "dev"

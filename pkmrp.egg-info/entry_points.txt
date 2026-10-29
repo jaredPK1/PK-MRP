@@ -1,0 +1,2 @@
+[console_scripts]
+pkmrp = pkmrp.cli:main

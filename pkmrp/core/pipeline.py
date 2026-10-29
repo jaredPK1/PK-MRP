@@ -12,8 +12,10 @@ month, so a 12-month blanket covers deals likely to land.
   * what     = the line item's product SKU, and each option's SKU x the line
                quantity. A SKU that is a MAX part number is used as is; one
                that isn't is looked up in `sku_map` (mrp_settings
-               'pipeline_sku_map'), else it goes on the unmapped worklist --
-               never guessed.
+               'pipeline_sku_map', confirmed on the Pipeline page), else it
+               goes on the unmapped worklist -- never guessed. A map entry is
+               a part number, {"part", "qty_per"}, or {"skip": true} for a
+               SKU that is no material (a license, a service, a note).
 
 Output rows look like open_so_lines rows (so, line, part, qty_due, cus_due,
 cur_due, unit_price, customer), so committed.monthly_requirement can walk
@@ -26,11 +28,24 @@ from datetime import date
 import pandas as pd
 
 
+def resolve(entry):
+    """A pipeline_sku_map entry -> (part, qty_per), "skip", or None."""
+    if isinstance(entry, str):
+        return (entry, 1.0) if entry.strip() else None
+    if isinstance(entry, dict):
+        if entry.get("skip"):
+            return "skip"
+        if entry.get("part"):
+            return entry["part"], float(entry.get("qty_per") or 1.0)
+    return None
+
+
 def pipeline_demand(lines, known_parts, sku_map, settings):
     """(frame of demand rows, worklist dict)."""
     rows = []
     unmapped = defaultdict(lambda: {"qty": 0.0, "bookings": set(), "description": ""})
-    undated = set()
+    skipped = defaultdict(float)
+    undated = {}
     for r in lines.itertuples(index=False):
         sku = (r.sku or "").strip()
         qty = float(r.qty or 0)
@@ -42,9 +57,24 @@ def pipeline_demand(lines, known_parts, sku_map, settings):
         if w <= 0:
             continue
         if r.bill_year != r.bill_year or r.bill_month != r.bill_month or not r.bill_year:
-            undated.add(r.booking)
+            u = undated.setdefault(
+                r.booking,
+                {
+                    "booking": r.booking,
+                    "customer": r.customer,
+                    "status": r.status,
+                    "p_win": float(r.p_win or 0),
+                    "skus": [],
+                },
+            )
+            if sku not in u["skus"]:
+                u["skus"].append(sku)
             continue
-        part = sku if sku in known_parts else sku_map.get(sku)
+        found = (sku, 1.0) if sku in known_parts else resolve(sku_map.get(sku))
+        if found == "skip":
+            skipped[sku] += qty * w
+            continue
+        part, per = found or (None, 1.0)
         if not part:
             u = unmapped[sku]
             u["qty"] += qty * w
@@ -57,7 +87,7 @@ def pipeline_demand(lines, known_parts, sku_map, settings):
                 "so": f"BK {r.booking}",
                 "line": str(int(r.item_id)),
                 "part": part,
-                "qty_due": round(qty * w, 4),
+                "qty_due": round(qty * per * w, 4),
                 "cus_due": pd.Timestamp(when),
                 "cur_due": pd.Timestamp(when),
                 "unit_price": 0.0,
@@ -93,6 +123,8 @@ def pipeline_demand(lines, known_parts, sku_map, settings):
             key=lambda x: -x["weighted_qty"],
         ),
         "undated_bookings": len(undated),
+        "undated": sorted(undated.values(), key=lambda u: (-u["p_win"], u["booking"])),
+        "skipped": {k: round(v, 2) for k, v in skipped.items()},
         "bookings": len({r["so"] for r in rows}),
         "lines": len(rows),
     }

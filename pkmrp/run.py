@@ -6,8 +6,8 @@ from datetime import date, timedelta
 
 import pandas as pd
 
+from .core import analytics, consign, leadtime, segment, skumap, supply
 from .core import committed as committed_mod
-from .core import consign, leadtime, segment, supply
 from .core import demand as demand_mod
 from .core import pipeline as pipeline_mod
 from .core import shelf as shelf_mod
@@ -18,7 +18,28 @@ from .core.settings import PlanSettings
 from .db import extract
 
 
-def build_plan(erp, settings=None, today=None, history_months=24):
+def _sku_proposals(erp, pipeline, parts, today, timed):
+    """Proposed MAX parts for each unmapped pipeline SKU; {} if it can't."""
+    skus = [u["sku"] for u in pipeline["unmapped"]]
+    if not skus:
+        return {}
+    try:
+        booked = timed("booked_skus", extract.booked_skus, erp)
+        lines = timed("booked_so_lines", extract.booked_so_lines, erp)
+        sold = timed("last_sold", extract.last_sold, erp)
+    except Exception:  # noqa: BLE001 -- the page still lists them, unproposed
+        return {}
+    last = {
+        r.part: r.last_sold.date()
+        for r in sold.itertuples(index=False)
+        if r.last_sold == r.last_sold
+    }
+    catalogue = {p: (v.type, v.description) for p, v in parts.items()}
+    return skumap.propose(skus, booked, lines, catalogue, last, today)
+
+
+def build_plan(erp, settings=None, today=None, history_months=24, sku_map=None):
+    """`sku_map` is the confirmed pipeline_sku_map (mrp_settings), or None."""
     settings = settings or PlanSettings()
     today = today or date.today()
     timings = {}
@@ -178,8 +199,12 @@ def build_plan(erp, settings=None, today=None, history_months=24):
     if settings.include_pipeline:
         try:
             lines_df = timed("pipeline_lines", extract.pipeline_lines, erp)
-            pipe_df, pipeline = pipeline_mod.pipeline_demand(lines_df, set(parts), {}, settings)
+            pipe_df, pipeline = pipeline_mod.pipeline_demand(
+                lines_df, set(parts), sku_map or {}, settings
+            )
             pipeline["status"] = "ok"
+            pipeline["mapped"] = len(sku_map or {})
+            pipeline["proposals"] = _sku_proposals(erp, pipeline, parts, today, timed)
             pipe_months = committed_mod.monthly_requirement(
                 committed_parts, pipe_df, children, parts, settings, today
             )
@@ -233,6 +258,11 @@ def build_plan(erp, settings=None, today=None, history_months=24):
         "po_history": hist_df,
         "open_pos": po_df,
         "vendor_name": vendor_name,
+        "vendor_names_by_id": names,
+        "vendor_delivery": analytics.vendor_delivery(
+            deep_df, {p: v.purchase_lt for p, v in parts.items()}, names, today
+        ),
+        "vendor_part": vendor_part_all,
         "segments": segments,
         "shelf": shelf,
         "shelf_orders": shelf_orders,

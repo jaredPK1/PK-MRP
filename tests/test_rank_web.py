@@ -215,3 +215,82 @@ def test_parts_with_no_source_get_their_own_list(client):
     assert "Needs a source" in html and "88-0719-00G" in html and "1 with no cost in MAX" in html
     why = client.get("/why/88-0719-00G").get_data(as_text=True)
     assert "Nobody has bought this before" in why and "no cost for it" in why
+
+
+def _pipeline_client(tmp_path, monkeypatch, role):
+    from sqlalchemy import create_engine
+    from sqlalchemy.pool import StaticPool
+
+    from pkmrp import snapshot
+    from pkmrp.db import store
+    from pkmrp.web.app import create_app
+
+    monkeypatch.setattr(snapshot, "DATA_DIR", str(tmp_path))
+    snap = json.loads((tmp_path / "latest.json").read_text())
+    snap["pipeline"] = {
+        "status": "ok",
+        "unmapped": [
+            {"sku": "FK11-SAE-U", "weighted_qty": 4.0, "bookings": 2, "description": ""},
+            {"sku": "2304 Option", "weighted_qty": 9.0, "bookings": 5, "description": "MFD"},
+        ],
+        "proposals": {
+            "FK11-SAE-U": {
+                "confidence": "strong",
+                "orders": 9,
+                "catch_all": False,
+                "candidates": [
+                    {
+                        "part": "01-0351-00G",
+                        "description": "FK11-SAE-U CLEAVER",
+                        "qty_per": 1.0,
+                        "evidence": ["on 9 of 9 orders that had FK11-SAE-U"],
+                    }
+                ],
+            },
+            "2304 Option": {"confidence": "weak", "orders": 0, "catch_all": True, "candidates": []},
+        },
+        "undated": [
+            {"booking": "BK-9", "customer": "Acme", "status": "open", "p_win": 50, "skus": ["X"]}
+        ],
+        "undated_bookings": 1,
+    }
+    snapshot.write(snap)
+    snapshot.write_atp(
+        {"parts": {"01-0351-00G": ["A", "FK11-SAE-U CLEAVER", 0, 0]}, "timelines": {}}
+    )
+    engine = create_engine("sqlite://", poolclass=StaticPool)
+    store.metadata.create_all(engine)
+    app = create_app()
+    app.config.update(OPS_ENGINE=engine, DEFAULT_ROLE=role)
+    return app.test_client(), engine
+
+
+def test_pipeline_page_confirms_skips_and_undoes(client, tmp_path, monkeypatch):
+    from pkmrp.db import store
+
+    c, engine = _pipeline_client(tmp_path, monkeypatch, "admin")
+    page = c.get("/pipeline").get_data(as_text=True)
+    assert "01-0351-00G" in page and "catch-all" in page and "BK-9" in page
+    assert page.index("FK11-SAE-U") < page.index("2304 Option")  # surest first
+    r = c.post(
+        "/pipeline/map",
+        data={"sku": "FK11-SAE-U", "part": "01-0351-00G", "qty_per": "2", "action": "use"},
+    )
+    assert r.status_code == 302
+    c.post("/pipeline/map", data={"sku": "2304 Option", "action": "skip"})
+    saved = store.get_setting(engine, "pipeline_sku_map")
+    assert saved["FK11-SAE-U"]["part"] == "01-0351-00G" and saved["FK11-SAE-U"]["qty_per"] == 2.0
+    assert saved["2304 Option"]["skip"] is True
+    assert "To check" not in c.get("/pipeline").get_data(as_text=True)
+    c.post("/pipeline/map", data={"sku": "2304 Option", "action": "clear"})
+    assert "2304 Option" not in store.get_setting(engine, "pipeline_sku_map")
+    bad = c.post("/pipeline/map", data={"sku": "FK12", "part": "NOT-A-PART", "action": "use"})
+    assert bad.status_code == 400
+
+
+def test_pipeline_viewers_read_but_cannot_confirm(client, tmp_path, monkeypatch):
+    c, _ = _pipeline_client(tmp_path, monkeypatch, "viewer")
+    page = c.get("/pipeline").get_data(as_text=True)
+    assert "01-0351-00G" in page and "Use this" not in page
+    r = c.post("/pipeline/map", data={"sku": "FK11-SAE-U", "part": "01-0351-00G", "action": "use"})
+    assert r.status_code == 403

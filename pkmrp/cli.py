@@ -101,11 +101,25 @@ def _ledger(run, snap):
         return {"status": "error", "error": str(exc)[:300]}
 
 
+def _sku_map():
+    """The confirmed pipeline_sku_map from PK_Ops; {} when it can't be read."""
+    from .db import store
+
+    try:
+        engine = store.ops_engine(DbConfig.from_env())
+        if store.missing_tables(engine):
+            return {}
+        return store.get_setting(engine, "pipeline_sku_map", {})
+    except Exception as exc:  # noqa: BLE001 -- plan without the pipeline map
+        click.echo(f"sku map: {exc}", err=True)
+        return {}
+
+
 def _plan_once(erp):
     from . import snapshot
     from .run import build_plan
 
-    run = build_plan(erp)
+    run = build_plan(erp, sku_map=_sku_map())
     snap = snapshot.build(run, run["so_lines"])
     snap["ledger"] = _ledger(run, snap)
     snapshot.write(snap)

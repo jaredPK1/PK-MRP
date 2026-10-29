@@ -190,3 +190,45 @@ document.querySelectorAll('.copy-cart').forEach(function (btn) {
       () => { btn.textContent = 'Select and copy below'; });
   });
 });
+
+// Vendor order: ticks drive the totals, the copy and the CSV.
+document.querySelectorAll('table.vendor-order').forEach(function (table) {
+  const rows = Array.from(table.querySelectorAll('tbody tr'));
+  const all = table.querySelector('input.all');
+  const count = document.querySelector('.sel-count');
+  const total = document.querySelector('.sel-total');
+  const money = n => n.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
+  const picked = () => rows.filter(r => r.querySelector('.pick').checked);
+  function sum() {
+    const p = picked();
+    count.textContent = p.length + ' of ' + rows.length + ' parts';
+    total.textContent = '· about ' + money(p.reduce((s, r) => s + (+r.dataset.spend || 0), 0));
+    rows.forEach(r => r.classList.toggle('off', !r.querySelector('.pick').checked));
+    all.checked = p.length === rows.length;
+  }
+  rows.forEach(r => r.querySelector('.pick').addEventListener('change', sum));
+  all.addEventListener('change', () => { rows.forEach(r => r.querySelector('.pick').checked = all.checked); sum(); });
+  const cells = r => [r.dataset.part, r.dataset.vpart, r.dataset.qty, r.dataset.unit, r.dataset.need];
+  document.querySelector('.copy-po').addEventListener('click', function () {
+    const btn = this;
+    const text = picked().map(r => cells(r).join('\t')).join('\n');
+    navigator.clipboard.writeText(text).then(
+      () => { const t = btn.textContent; btn.textContent = 'Copied ✓'; setTimeout(() => btn.textContent = t, 1800); },
+      () => { btn.textContent = 'Copy blocked — use CSV'; });
+  });
+  document.querySelector('.csv-po').addEventListener('click', function () {
+    const q = s => '"' + String(s == null ? '' : s).replace(/"/g, '""') + '"';
+    const head = ['Our part', 'Their part', 'Description', 'Qty', 'Unit cost', 'Extended', 'Need by'];
+    const body = picked().map(r => [r.dataset.part, r.dataset.vpart, r.dataset.desc, r.dataset.qty,
+      r.dataset.unit, r.dataset.spend, r.dataset.need].map(q).join(','));
+    const blob = new Blob([[head.map(q).join(',')].concat(body).join('\r\n')], { type: 'text/csv' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'PO ' + table.dataset.vendor.replace(/[^\w .-]/g, '') + '.csv';
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  });
+  sum();
+  const focus = table.querySelector('tr.focus');
+  if (focus) focus.scrollIntoView({ block: 'center' });
+});

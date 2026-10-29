@@ -228,3 +228,43 @@ footer { max-width: 1080px; margin: 0 auto; padding: 18px 20px 30px; color: var(
 .cart summary { cursor: pointer; font-size: 15px; }
 .cart-tools { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 10px 0 6px; }
 .cart-items { max-width: none; margin-top: 6px; }
+
+/* Pipeline: sales SKU -> MAX part */
+.sku-map td { vertical-align: top; }
+.sku-map .cand { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; margin: 0 0 6px; }
+.sku-map .per { width: 4.5em; font: inherit; padding: 3px 6px; border: 1px solid var(--line); border-radius: 6px; }
+.sku-map .other summary { cursor: pointer; color: var(--leaf); font-weight: 600; margin-top: 4px; }
+.sku-map .other .picker input { font: inherit; padding: 3px 6px; border: 1px solid var(--line); border-radius: 6px; }
+
+/* Vendor order */
+.vendor-order tr.off td { opacity: .45; }
+.vendor-order tr.focus td { background: var(--today-soft); }
+.order-tools { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 12px; position: sticky; bottom: 0;
+               background: var(--bg); padding: 10px 0; border-top: 1px solid var(--line); }
+.vendor-link { font-weight: 600; }
+
+/* Analytics: one series per chart, one hue, values in ink */
+.multiples { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 22px; }
+.multiples figure, .wide-fig { margin: 0; min-width: 0; }
+.multiples figcaption, .wide-fig figcaption { font-weight: 600; font-size: 13.5px; color: var(--ink-2); margin-bottom: 6px; }
+.line-chart { width: 100%; height: auto; display: block; overflow: visible; }
+.wide-fig .line-chart { max-height: 180px; }
+.line-chart .grid { stroke: var(--line); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.line-chart .base { stroke: var(--muted); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.line-chart .ln { fill: none; stroke: var(--leaf); stroke-width: 2; vector-effect: non-scaling-stroke; stroke-linejoin: round; }
+.line-chart .dot { fill: var(--leaf); stroke: var(--surface); stroke-width: 2; vector-effect: non-scaling-stroke; }
+.line-chart .hit { fill: transparent; }
+.line-chart .pt:hover .dot { r: 6; }
+.line-chart .xl { font-size: 11px; fill: var(--muted); }
+.chart-now { margin: 4px 0 0; font-size: 13px; color: var(--ink-2); }
+.chart-empty { padding: 24px 0; }
+.hbars { display: grid; gap: 6px; }
+.hbar { display: grid; grid-template-columns: minmax(90px, 34%) 1fr auto; gap: 10px; align-items: center; font-size: 13px; }
+.hbar:hover .hb-fill { background: var(--leaf-dark); }
+.hb-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink-2); }
+.hb-track { display: inline-block; height: 10px; width: 100%; border-radius: 4px; background: var(--bg); overflow: hidden; vertical-align: middle; }
+.hb-fill { display: block; height: 100%; background: var(--leaf); border-radius: 0 4px 4px 0; }
+.hb-val { font-variant-numeric: tabular-nums; color: var(--ink); min-width: 4.5em; text-align: right; }
+.pct { display: inline-flex; align-items: center; gap: 8px; min-width: 150px; font-variant-numeric: tabular-nums; }
+.pct .hb-track { width: 90px; }
+@media (max-width: 760px) { .multiples { grid-template-columns: 1fr; } }

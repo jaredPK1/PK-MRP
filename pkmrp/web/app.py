@@ -1,10 +1,13 @@
-"""PK-MRP web app. Reads the snapshot `pkmrp run` writes; never queries MAX."""
+"""PK-MRP web app. Reads the snapshot `pkmrp run` writes; never queries MAX.
+The one thing it writes is PK-MRP's own settings in PK_Ops (the Pipeline
+page's confirmed SKU -> part map), for planners with an editing role."""
 
+import json
 import os
 import re
 from datetime import date, datetime
 
-from flask import Flask, abort, render_template, request
+from flask import Flask, abort, redirect, render_template, request, url_for
 
 from .. import snapshot
 from . import voice
@@ -82,6 +85,18 @@ def _lead_words(source):
     return s
 
 
+SKU_MAP_KEY = "pipeline_sku_map"
+
+
+def _pick(item, key, label=None):
+    """(label, value) for a chart point: a trend item is (day, numbers); a
+    row dict takes its label from `label`."""
+    if isinstance(item, dict):
+        return (item.get(label), item.get(key))
+    day, row = item
+    return (_nice_date(day), (row or {}).get(key))
+
+
 def create_app():
     app = Flask(__name__)
     app.jinja_env.filters["money"] = _money
@@ -90,6 +105,7 @@ def create_app():
     app.jinja_env.filters["month_name"] = _month_name
     app.jinja_env.filters["lead_words"] = _lead_words
     app.jinja_env.filters["wdays"] = _wdays
+    app.jinja_env.filters["pick"] = _pick
 
     @app.context_processor
     def _ctx():
@@ -133,6 +149,7 @@ def create_app():
             name=name,
             voice=voice.speak(now, name, facts),
             now=now,
+            vendor_n=vendor_n(snap),
         )
 
     @app.get("/buys")
@@ -144,7 +161,9 @@ def create_app():
         for b in rows:
             b["when"], b["tone"] = _when(b["place_by"], today)
         buyers = sorted({b["buyer"] for b in snap["buys"] if b["buyer"]})
-        return render_template("buys.html", snap=snap, rows=rows, buyers=buyers, buyer=buyer)
+        return render_template(
+            "buys.html", snap=snap, rows=rows, buyers=buyers, buyer=buyer, vendor_n=vendor_n(snap)
+        )
 
     @app.get("/overbuys")
     def overbuys_page():
@@ -366,6 +385,216 @@ def create_app():
         rows = snap["buys"] + snap.get("needs_source", [])
         b = next((b for b in rows if b["part"] == part), None) or abort(404)
         return render_template("_why.html", b=b, today_iso=date.today().isoformat())
+
+    def vendor_counts(snap, today, soon):
+        """[(vendor, lines due now or late, lines in 4 weeks, $ in 4 weeks)]."""
+        from ..core.calendar import plus_workdays
+        from ..core.vendor_order import window
+
+        four = plus_workdays(today, 20)
+        out = []
+        for v, lines in (snap.get("vendor_plan") or {}).items():
+            rows = window(lines, today, four, soon)
+            due = sum(1 for r in rows if r["status"] != "upcoming")
+            out.append((v, due, len(rows), round(sum(r["spend"] for r in rows), 2)))
+        return out
+
+    def vendor_n(snap):
+        """{vendor: parts to order from them in 4 weeks} for "+n more" links."""
+        from ..core.calendar import plus_workdays
+
+        today = date.fromisoformat(snap["today"])
+        return {v: n for v, _due, n, _s in vendor_counts(snap, today, plus_workdays(today, 5))}
+
+    def ledger_impact(today, so_values):
+        """(impact dict, error text) from the Decision Ledger in PK_Ops."""
+        from sqlalchemy import select
+
+        from ..core.analytics import impact
+        from ..db import store
+
+        try:
+            engine = ops_engine()
+            r, o = store.recommendation, store.outcome
+            with engine.connect() as conn:
+                recs = [
+                    dict(x._mapping)
+                    for x in conn.execute(
+                        select(
+                            r.c.rec_id,
+                            r.c.kind,
+                            r.c.part,
+                            r.c.ref,
+                            r.c.qty,
+                            r.c.place_by,
+                            r.c.created_at,
+                            r.c.closed_at,
+                            r.c.why_json,
+                        )
+                    )
+                ]
+                outs = [
+                    dict(x._mapping)
+                    for x in conn.execute(select(o.c.rec_id, o.c.what, o.c.event_date, o.c.qty))
+                ]
+        except Exception as exc:  # noqa: BLE001 -- the rest of the page stands
+            return None, str(exc)[:200]
+        for x in recs:
+            try:
+                why = json.loads(x.pop("why_json") or "{}")
+            except ValueError:
+                why = {}
+            x["sales_orders"] = why.get("sales_orders") or []
+            x["order_values"] = why.get("order_values") or {}
+        atp = snapshot.load_atp() or {}
+        cost = {p: v[4] for p, v in (atp.get("parts") or {}).items() if len(v) > 4 and v[4]}
+        return impact(recs, outs, cost, today, so_values), None
+
+    @app.get("/analytics")
+    def analytics_page():
+        snap = snapshot.load_latest() or abort(404)
+        today = date.fromisoformat(snap["today"])
+        an = snap.get("analytics") or {}
+        trend = sorted(snapshot.load_trend().items())
+        imp, imp_error = ledger_impact(today, snap.get("so_values") or {})
+        names = (snapshot.load_atp() or {}).get("parts") or {}
+        bd = an.get("breakdown") or {}
+        for r in bd.get("products") or []:
+            desc = (names.get(r["name"]) or [None, ""])[1]
+            if desc:
+                r["name"] = f"{r['name']} · {desc.title()[:26]}"
+        return render_template(
+            "analytics.html",
+            snap=snap,
+            vd=an.get("vendor_delivery") or {},
+            bd=bd,
+            trend=trend,
+            imp=imp,
+            imp_error=imp_error,
+            ob=(snap.get("overbuys") or {}).get("totals") or {},
+            h=snap["headline"],
+        )
+
+    @app.get("/vendors")
+    def vendors_page():
+        from ..core.calendar import plus_workdays
+
+        snap = snapshot.load_latest() or abort(404)
+        today = date.fromisoformat(snap["today"])
+        rows = vendor_counts(snap, today, plus_workdays(today, 5))
+        rows = [r for r in rows if r[2]]
+        rows.sort(key=lambda r: (-r[1], -r[3], r[0]))
+        return render_template("vendors.html", snap=snap, rows=rows)
+
+    @app.get("/vendor")
+    def vendor_page():
+        from ..core.calendar import plus_workdays
+        from ..core.vendor_order import window
+
+        snap = snapshot.load_latest() or abort(404)
+        name = request.args.get("v", "")
+        plan = snap.get("vendor_plan") or {}
+        if name not in plan:
+            abort(404)
+        weeks = request.args.get("weeks", "4")
+        weeks = int(weeks) if weeks in ("1", "2", "4", "8", "12") else 4
+        today = date.fromisoformat(snap["today"])
+        soon = plus_workdays(today, 5)
+        lines = window(plan[name], today, plus_workdays(today, weeks * 5), soon)
+        plans = {cp["part"]: cp for cp in snap.get("committed_plans", [])}
+        for ln in lines:
+            cp = plans.get(ln["part"])
+            ln["release"] = cp["releases"][0] if cp and cp.get("releases") else None
+        later = len(window(plan[name], today, plus_workdays(today, 60), soon)) - len(lines)
+        return render_template(
+            "vendor.html",
+            snap=snap,
+            vendor=name,
+            lines=lines,
+            weeks=weeks,
+            later=later,
+            pos=(snap.get("vendor_pos") or {}).get(name, []),
+            focus=request.args.get("part", ""),
+        )
+
+    def ops_engine():
+        """PK_Ops for settings; tests put a SQLite engine in OPS_ENGINE."""
+        if app.config.get("OPS_ENGINE") is None:
+            from ..config import DbConfig
+            from ..db import store
+
+            app.config["OPS_ENGINE"] = store.ops_engine(DbConfig.from_env())
+        return app.config["OPS_ENGINE"]
+
+    def can_edit():
+        # pk_access sets pk_role; viewers read, admins and developers confirm.
+        role = getattr(request, "pk_role", app.config.get("DEFAULT_ROLE"))
+        return role in ("admin", "developer")
+
+    def sku_map():
+        """(confirmed map, error text or None)."""
+        from ..db import store
+
+        try:
+            return store.get_setting(ops_engine(), SKU_MAP_KEY, {}), None
+        except Exception as exc:  # noqa: BLE001 -- page still shows proposals
+            return {}, str(exc)[:200]
+
+    @app.get("/pipeline")
+    def pipeline_page():
+        snap = snapshot.load_latest() or abort(404)
+        pl = snap.get("pipeline") or {}
+        confirmed, error = sku_map()
+        proposals = pl.get("proposals") or {}
+        todo = [u for u in pl.get("unmapped", []) if u["sku"] not in confirmed]
+        for u in todo:
+            u["proposal"] = proposals.get(u["sku"]) or {"confidence": "none", "candidates": []}
+        rank = {"strong": 0, "likely": 1, "weak": 2, "none": 3}
+        todo.sort(key=lambda u: (rank[u["proposal"]["confidence"]], -u["weighted_qty"]))
+        done = sorted(confirmed.items(), key=lambda kv: kv[0].lower())
+        return render_template(
+            "pipeline.html",
+            snap=snap,
+            pl=pl,
+            todo=todo,
+            done=done,
+            error=error,
+            editable=can_edit() and error is None,
+            saved=request.args.get("saved"),
+        )
+
+    @app.post("/pipeline/map")
+    def pipeline_map():
+        from ..db import store
+
+        if not can_edit():
+            abort(403)
+        sku = (request.form.get("sku") or "").strip()
+        action = request.form.get("action")
+        if not sku or action not in ("use", "skip", "clear"):
+            abort(400)
+        engine = ops_engine()
+        current = store.get_setting(engine, SKU_MAP_KEY, {})
+        who = request.headers.get("X-Auth-Request-Email", "") or "unknown"
+        stamp = {"by": who, "at": datetime.now().isoformat(timespec="minutes")}
+        if action == "clear":
+            current.pop(sku, None)
+        elif action == "skip":
+            current[sku] = {"skip": True, **stamp}
+        else:
+            part = (request.form.get("part") or "").strip().upper()
+            atp = snapshot.load_atp()
+            if not part or (atp and part not in atp["parts"]):
+                abort(400, f"{part or 'No part'} isn't a make or buy part in MAX.")
+            try:
+                per = float(request.form.get("qty_per") or 1)
+            except ValueError:
+                abort(400)
+            if per <= 0:
+                abort(400)
+            current[sku] = {"part": part, "qty_per": per, **stamp}
+        store.put_setting(engine, SKU_MAP_KEY, current, who)
+        return redirect(url_for("pipeline_page", saved=sku) + "#saved")
 
     app.config["DATA_DIR"] = os.environ.get("DATA_DIR", snapshot.DATA_DIR)
     return app

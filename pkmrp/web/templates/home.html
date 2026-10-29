@@ -60,7 +60,7 @@
         <div class="facts">
           <span><b>{{ b.qty|qty }}</b> to buy{% if b.packs %} <span class="muted">({{ b.packs }} {{ b.pack_uom or 'pack' }} of {{ b.pack_qty|qty }})</span>{% endif %}{% if b.spend %} · {{ b.spend|money }}{% endif %}</span>
           <span>{{ b.lead_days|round|int }}-day lead <small>· {{ b.lead_source|lead_words }}</small></span>
-          {% if b.vendor %}<span>vendor {{ b.vendor }}</span>{% endif %}
+          {% if b.vendor %}{% set n = vendor_n.get(b.vendor, 1) %}<span>vendor <a class="vendor-link" href="{{ script_root }}/vendor?v={{ b.vendor|urlencode }}&part={{ b.part|urlencode }}" title="Everything PK needs from {{ b.vendor|title }}, on one PO">{{ b.vendor }}{% if n > 1 %} · +{{ n - 1 }} more to order with it{% endif %}</a></span>{% endif %}
           {% if b.buyer %}<span>buyer {{ b.buyer }}</span>{% endif %}
         </div>
         {% if b.orders %}
@@ -119,7 +119,7 @@
   </div>
   {% for v in snap.shelf_orders %}
   <details class="cart">
-    <summary><b>{{ v.vendor|title }}</b> · {{ v.lines }} line{{ '' if v.lines == 1 else 's' }} · about {{ v.spend|money }}{% if v.days %} · usually delivers in {{ v.days|round|int }} working day{{ '' if v.days|round|int == 1 else 's' }}{% endif %}</summary>
+    <summary><b>{{ v.vendor|title }}</b> · {{ v.lines }} line{{ '' if v.lines == 1 else 's' }} · about {{ v.spend|money }}{% if v.days %} · usually delivers in {{ v.days|round|int }} working day{{ '' if v.days|round|int == 1 else 's' }}{% endif %} · <a href="{{ script_root }}/vendor?v={{ v.vendor|urlencode }}">full order</a></summary>
     {% set pasted = v['items']|selectattr('vendor_part')|list %}
     {% if pasted %}
     <p class="cart-tools">

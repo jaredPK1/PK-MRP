@@ -14,11 +14,13 @@ import tempfile
 from collections import Counter
 from datetime import date, datetime
 
+from .core.analytics import breakdown, trend_point
 from .core.calendar import plus_workdays
 from .core.overbuy import overbuys
 from .core.params import purlt_proposals
 from .core.rank import buy_list
 from .core.story import build_story
+from .core.vendor_order import recent_open_pos, vendor_plan
 
 DATA_DIR = os.environ.get("DATA_DIR", os.path.join(os.getcwd(), "data"))
 
@@ -119,7 +121,7 @@ def build(run, so_df):
         )
         b["late_lines"] = late_by_part.get(part, 0)
         b["pegs"] = [
-            {"ref": p.ref}
+            {"ref": p.ref, "root": p.root_part}
             for o in res.planned
             if o.part == part and o.kind == "buy"
             for p in o.pegs
@@ -174,6 +176,29 @@ def build(run, so_df):
         "committed_plans": [_iso_deep(cp) for cp in run.get("committed_plans", [])],
         "pipeline": _iso_deep(run.get("pipeline") or {"status": "off"}),
         "shelf_orders": _iso_deep(run.get("shelf_orders") or []),
+        # USD value of each open SO a buy holds up, so counts across buys
+        # can add orders once (Analytics, the Decision Ledger's why)
+        "so_values": {
+            so: round(so_values.get(so, 0.0), 2) for b in buys for so in b["sales_orders"]
+        },
+        "analytics": {
+            "vendor_delivery": run.get("vendor_delivery") or {},
+            "breakdown": breakdown([{k: _iso(v) for k, v in b.items()} for b in buys], so_values),
+        },
+        "vendor_plan": _iso_deep(
+            vendor_plan(
+                res.planned,
+                run["parts"],
+                run.get("vendor_name") or {},
+                run.get("vendor_part") or {},
+                so_values,
+                so_customers,
+                today,
+            )
+        ),
+        "vendor_pos": _iso_deep(
+            recent_open_pos(run["open_pos"], run.get("vendor_names_by_id") or {}, today)
+        ),
         "overbuys": _iso_deep(
             overbuys(
                 [e for e in res.exceptions if e.part not in (run.get("shelf") or {})],
@@ -200,6 +225,36 @@ def write(snap):
         with os.fdopen(fd, "w", encoding="utf-8") as fh:
             fh.write(payload)
         os.replace(tmp, path)
+    _add_trend(snap)
+
+
+def _add_trend(snap):
+    """data/trend.json: {day: headline numbers}, the last plan of each day.
+    Started from the history snapshots when it doesn't exist yet."""
+    path = os.path.join(DATA_DIR, "trend.json")
+    trend = load_trend()
+    if not trend:
+        hist = os.path.join(DATA_DIR, "history")
+        for f in sorted(os.listdir(hist)):
+            if f.endswith(".json") and f[:-5] != snap["today"]:
+                try:
+                    with open(os.path.join(hist, f), encoding="utf-8") as fh:
+                        trend[f[:-5]] = trend_point(json.load(fh))
+                except (OSError, ValueError):
+                    continue
+    trend[snap["today"]] = trend_point(snap)
+    fd, tmp = tempfile.mkstemp(dir=DATA_DIR, prefix=".trend-")
+    with os.fdopen(fd, "w", encoding="utf-8") as fh:
+        json.dump(trend, fh, sort_keys=True)
+    os.replace(tmp, path)
+
+
+def load_trend():
+    try:
+        with open(os.path.join(DATA_DIR, "trend.json"), encoding="utf-8") as fh:
+            return json.load(fh)
+    except (OSError, ValueError):
+        return {}
 
 
 def load_latest():
@@ -262,7 +317,7 @@ def build_atp(run):
         },
         "children": run["children"],
         "parts": {
-            p: [v.type, v.description, v.mfg_lt, v.purchase_lt]
+            p: [v.type, v.description, v.mfg_lt, v.purchase_lt, v.unit_cost]
             for p, v in parts.items()
             if v.type in ("A", "B")
         },

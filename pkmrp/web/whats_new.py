@@ -6,6 +6,26 @@ Every feature people can see gets a line here in the same change
 
 WHATS_NEW = (
     (
+        "2026-10-29",
+        "Analytics",
+        "A new tab answers four questions: is PK-MRP saving money and orders (where what buyers did matched the advice, and the orders and dollars behind it — counted honestly, since shadow mode can't prove cause), is the plan getting healthier day by day, where today's lateness comes from (how late, product, vendor, buyer), and which vendors deliver — on-time % against the date first asked on the PO and real lead time vs MAX's, from 24 months of PK's own POs, with a quarterly trend.",
+    ),
+    (
+        "2026-10-29",
+        "One order per vendor",
+        "Placing a buy now pulls in everything else PK needs from that vendor. Click the vendor on any buy (\"XOMETRY · +20 more to order with it\") or open By vendor: the order lists what's late and due now plus what comes due in the next 1–12 weeks, with the vendor's part numbers, pack counts and totals. Untick what shouldn't go, then copy it for the PO or download a CSV. Recent open POs with the vendor are shown, in case adding lines beats a new PO. Committed parts show their blanket release as a note, never added on top.",
+    ),
+    (
+        "2026-10-29",
+        "Pipeline: match sales SKUs to MAX parts",
+        'PK-MRP can now read Book/Bill 2.0, but sales books "2300AG-B" where MAX has CF-0016-00G, so none of the forecast reached the committed parts. The new Pipeline page proposes the MAX part for each SKU — from its part number, its description, and what MAX put on the orders past bookings became — surest first, and an admin confirms it with one click (or picks another part, or marks it not material). Confirmed matches feed Committed from the next plan. Bookings with no billing month have their own list to fix in Book/Bill.',
+    ),
+    (
+        "2026-10-29",
+        "The decision ledger is recording",
+        "The PK_Ops tables are in, so every plan's recommendations are now recorded and later matched to what buyers did. The footer shows how many are open.",
+    ),
+    (
         "2026-10-28",
         "Needs a source",
         "Parts nobody has bought before and that have no vendor in MAX — new magnets, fittings, 3D-printed brackets — left the ranked list (where MAX's placeholder lead time made them look months late) for their own list on Today, sorted by the orders waiting, with a Why? on each. Quote them, set the vendor up, and they join the ranking.",

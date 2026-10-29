@@ -220,6 +220,42 @@ WHERE b.status IN ('new', 'open', 'needs_review', 'po_received')
   AND a.name NOT LIKE 'Region Actuals%'
 """
 
+# Bookings that became SOs: what sales called each item, and what MAX put on
+# the order. core/skumap.py learns pipeline_sku_map proposals from the pair.
+BOOKED_SKUS_SQL = """
+SELECT LTRIM(RTRIM(b.so_number)) AS so, RTRIM(ISNULL(p.sku, '')) AS sku,
+       li.quantity AS qty
+FROM pk_sales.dbo.bookings b
+JOIN pk_sales.dbo.booking_line_items li ON li.booking_id = b.id
+LEFT JOIN pk_sales.dbo.products p ON p.id = li.product_id
+WHERE b.so_number IS NOT NULL AND LTRIM(RTRIM(b.so_number)) <> ''
+UNION ALL
+SELECT LTRIM(RTRIM(b.so_number)), RTRIM(ISNULL(p.sku, '')), o.quantity * li.quantity
+FROM pk_sales.dbo.bookings b
+JOIN pk_sales.dbo.booking_line_items li ON li.booking_id = b.id
+JOIN pk_sales.dbo.booking_line_item_options o ON o.booking_line_item_id = li.id
+LEFT JOIN pk_sales.dbo.products p ON p.id = o.product_id
+WHERE b.so_number IS NOT NULL AND LTRIM(RTRIM(b.so_number)) <> ''
+"""
+
+BOOKED_SO_LINES_SQL = """
+SELECT LTRIM(RTRIM(d.ORDNUM_28)) AS so, RTRIM(d.PRTNUM_28) AS part, d.CURQTY_28 AS qty
+FROM SO_Detail d
+WHERE d.STYPE_28 = 'CU' AND d.CURQTY_28 > 0
+  AND LTRIM(RTRIM(d.ORDNUM_28)) IN (
+      SELECT LTRIM(RTRIM(so_number)) FROM pk_sales.dbo.bookings
+      WHERE so_number IS NOT NULL AND LTRIM(RTRIM(so_number)) <> '')
+"""
+
+# The last time each part was on a customer order (any status), so a
+# proposal prefers the revision PK sells now over one retired years ago.
+LAST_SOLD_SQL = """
+SELECT RTRIM(PRTNUM_28) AS part, MAX(ORGDUE_28) AS last_sold
+FROM SO_Detail
+WHERE STYPE_28 = 'CU' AND CURQTY_28 > 0
+GROUP BY RTRIM(PRTNUM_28)
+"""
+
 VENDORS_SQL = """
 SELECT RTRIM(VENID_08) AS vendor_id, RTRIM(ISNULL(COMNAM_08, '')) AS name,
        RTRIM(ISNULL(STATUS_08, '')) AS status
@@ -244,6 +280,9 @@ ALL_SQL = {
     "po_history": PO_HISTORY_SQL,
     "consign_moves": CONSIGN_MOVES_SQL,
     "pipeline_lines": PIPELINE_LINES_SQL,
+    "booked_skus": BOOKED_SKUS_SQL,
+    "booked_so_lines": BOOKED_SO_LINES_SQL,
+    "last_sold": LAST_SOLD_SQL,
     "po_parts": PO_PARTS_SQL,
     "subcontract_reqs": SUBCONTRACT_REQ_SQL,
     "vendors": VENDORS_SQL,
@@ -261,6 +300,7 @@ _DATES = {
     "due",
     "first_receipt",
     "last_receipt",
+    "last_sold",
 }
 _TEXT = {
     "part",
@@ -382,3 +422,18 @@ def pipeline_lines(erp):
     """Open Book/Bill 2.0 bookings' line items and options, with their SKUs.
     Raises if the login has no access to pk_sales -- the caller decides."""
     return _run(erp, "pipeline_lines")
+
+
+def booked_skus(erp):
+    """Sales SKUs on bookings that became SOs, with the SO number."""
+    return _run(erp, "booked_skus")
+
+
+def booked_so_lines(erp):
+    """MAX customer-order lines on the SOs Book/Bill 2.0 bookings name."""
+    return _run(erp, "booked_so_lines")
+
+
+def last_sold(erp):
+    """Each part's latest customer-order due date."""
+    return _run(erp, "last_sold")

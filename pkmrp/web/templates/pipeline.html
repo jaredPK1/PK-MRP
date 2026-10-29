@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+{% block title %}Pipeline · PK-MRP{% endblock %}
+{% block content %}
+<section class="page-intro">
+  <h1 class="h1-small">Pipeline — which MAX part is each sales SKU?</h1>
+  <p class="lede"><b>The question this page answers: what does Book/Bill 2.0's forecast mean in MAX parts?</b> Sales books "2300AG-B" or "FK11-SAE-U"; MAX knows <span class="mono">CF-0016-00G</span> and <span class="mono">01-0351-00G</span>. Until a SKU is matched to a part, its forecast can't reach the <a href="{{ script_root }}/committed">committed parts</a> it would need. PK-MRP proposes a match from two kinds of evidence — <b>the name</b> (the part number or MAX description says it) and <b>past orders</b> (on bookings that became SOs, what MAX actually put on the order) — and a person confirms it. Nothing is used until it's confirmed.</p>
+  {% if pl.status != 'ok' %}
+  <p class="lede small-gap promise-error">The pipeline didn't load on the last plan{% if pl.status == 'no_access' %} (no read access to pk_sales){% endif %}, so there's nothing to match right now.</p>
+  {% else %}
+  <p class="lede small-gap"><b>{{ todo|length }}</b> SKUs to check · <b>{{ done|length }}</b> confirmed · <b>{{ pl.undated_bookings or 0 }}</b> bookings with no billing month. A confirmation takes effect on the next plan, within the hour.</p>
+  {% endif %}
+  {% if error %}<p class="lede small-gap promise-error">Can't read the confirmed matches from PK_Ops right now ({{ error }}). Proposals are shown; confirming is off until it's back.</p>
+  {% elif not editable %}<p class="lede small-gap muted">You can look; confirming needs an admin or developer role in PK-MRP.</p>{% endif %}
+  {% if saved %}<p class="lede small-gap" id="saved"><span class="chip soon">Saved</span> {{ saved }} — used from the next plan.</p>{% endif %}
+</section>
+
+{% if todo %}
+<h3 class="steps-h">To check — surest first, then by forecast quantity</h3>
+<div class="table-tools"><input type="search" class="table-filter" placeholder="Filter: SKU or part — e.g. 2300 cleaver" aria-label="Filter the table"><span class="muted small filter-count"></span></div>
+<div class="table-wrap">
+<table class="dense sku-map">
+  <thead><tr><th>Sales SKU</th><th class="r" title="Units in the pipeline, weighted by win probability">Forecast</th><th>How sure</th><th>Proposed MAX part — and why</th><th></th></tr></thead>
+  <tbody>
+  {% for u in todo %}{% set pr = u.proposal %}
+    <tr>
+      <td><b class="mono">{{ u.sku }}</b>{% if u.description %}<div class="muted small">{{ u.description|striptags|truncate(70) }}</div>{% endif %}</td>
+      <td class="r">{{ u.weighted_qty|qty }}<div class="muted small">{{ u.bookings }} booking{{ 's' if u.bookings != 1 }}</div></td>
+      <td>{% if pr.catch_all %}<span class="chip quiet" title="A catch-all SKU: the booking's line text says which option">catch-all</span>
+          {% elif pr.confidence == 'strong' %}<span class="chip soon">sure</span>
+          {% elif pr.confidence == 'likely' %}<span class="chip today">likely</span>
+          {% elif pr.confidence == 'weak' %}<span class="chip late">a guess</span>
+          {% else %}<span class="chip quiet">no idea</span>{% endif %}
+          <div class="muted small">{{ pr.orders or 0 }} past order{{ 's' if pr.orders != 1 }}</div></td>
+      <td>
+        {% if pr.catch_all %}<span class="muted small">"{{ u.sku }}" covers any option for that model — no one part. Mark it <i>not material</i>, or pick the part most of these bookings mean.</span>{% endif %}
+        {% for c in pr.candidates %}
+        <form class="cand" method="post" action="{{ script_root }}/pipeline/map">
+          <input type="hidden" name="sku" value="{{ u.sku }}"><input type="hidden" name="part" value="{{ c.part }}">
+          <span class="mono">{{ c.part }}</span> <span>{{ c.description|lower|capitalize }}</span>
+          <span class="muted small">— {{ c.evidence|join('; ') }}</span>
+          {% if editable %}<label class="small">× <input name="qty_per" type="number" step="any" min="0.01" value="{{ c.qty_per }}" class="per" title="MAX units per sales unit"></label>
+          <button class="btn" name="action" value="use">{{ 'Use this' if loop.first else 'Use' }}</button>{% endif %}
+        </form>
+        {% else %}{% if not pr.catch_all %}<span class="muted small">Nothing in MAX names it and no past order had it.</span>{% endif %}{% endfor %}
+        {% if editable %}
+        <details class="other"><summary class="small">Another part, or not material…</summary>
+          <form method="post" action="{{ script_root }}/pipeline/map" class="cand">
+            <input type="hidden" name="sku" value="{{ u.sku }}">
+            <label class="picker small">Part
+              <input name="part" placeholder="number or description" autocomplete="off" data-suggest="{{ script_root }}/api/parts" role="combobox" aria-expanded="false" aria-autocomplete="list">
+              <ul class="suggest" role="listbox" hidden></ul></label>
+            <label class="small">× <input name="qty_per" type="number" step="any" min="0.01" value="1" class="per"></label>
+            <button class="btn" name="action" value="use">Use</button>
+          </form>
+          <form method="post" action="{{ script_root }}/pipeline/map" class="cand">
+            <input type="hidden" name="sku" value="{{ u.sku }}">
+            <button class="btn" name="action" value="skip" title="A license, service, note or freight line — no material to plan">Not material — ignore it</button>
+          </form>
+        </details>{% endif %}
+      </td>
+      <td></td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% endif %}
+
+{% if done %}
+<h3 class="steps-h">Confirmed</h3>
+<div class="table-wrap">
+<table class="dense">
+  <thead><tr><th>Sales SKU</th><th>MAX part</th><th class="r">Per sales unit</th><th>By</th><th></th></tr></thead>
+  <tbody>
+  {% for sku, e in done %}
+    <tr>
+      <td class="mono">{{ sku }}</td>
+      <td>{% if e.skip %}<span class="muted">not material — ignored</span>{% else %}<span class="mono">{{ e.part }}</span>{% endif %}</td>
+      <td class="r">{{ '' if e.skip else (e.qty_per|qty) }}</td>
+      <td class="muted small">{{ (e.by or '').split('@')[0] }} {{ (e.at or '')[:10] }}</td>
+      <td>{% if editable %}<form method="post" action="{{ script_root }}/pipeline/map"><input type="hidden" name="sku" value="{{ sku }}"><button class="btn" name="action" value="clear">Undo</button></form>{% endif %}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% endif %}
+
+{% if pl.undated %}
+<h3 class="steps-h">Bookings with no billing month — fix these in Book/Bill 2.0</h3>
+<p class="muted small">Without a month there's no telling when the material is needed, so these aren't counted at all. Most likely first.</p>
+<div class="table-wrap">
+<table class="dense">
+  <thead><tr><th>Booking</th><th>Customer</th><th>Status</th><th class="r">Win</th><th>SKUs</th></tr></thead>
+  <tbody>
+  {% for b in pl.undated %}
+    <tr><td class="mono">{{ b.booking }}</td><td>{{ b.customer }}</td><td class="small">{{ b.status|replace('_', ' ') }}</td><td class="r">{{ b.p_win|int }}%</td><td class="small">{{ b.skus|join(', ') }}</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% endif %}
+<p class="foot-note">Forecast = units in open bookings × win probability, as Book/Bill 2.0 weights its own forecast. "× n" is how many of the MAX part one sales unit means — learned from past orders where it can be. Only make and buy parts can be chosen, since only they become planned material.</p>
+{% endblock %}

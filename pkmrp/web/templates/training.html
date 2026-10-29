@@ -18,10 +18,11 @@
 </section>
 
 <section class="lesson" id="morning">
-  <h2>Your morning, in four steps</h2>
+  <h2>Your morning, in five steps</h2>
   <ol class="steps">
     <li><b>Open Today.</b> The top 10 buys are ranked by the booked orders each one is holding up. Start at number 1.</li>
     <li><b>Open "Why this buy?"</b> on anything that surprises you. It says when the part runs out, how many to order and from whom, when it would land, and which orders slip.</li>
+    <li><b>Place it with everything else from that vendor.</b> Click the vendor's name on the card ("+3 more to order with it"): the vendor's whole order opens — what's due now plus what comes due in the next few weeks — with their part numbers, ticked and totalled. Untick what shouldn't go, then Copy for the PO or download the CSV.</li>
     <li><b>Press Done</b> (or <kbd>d</kbd>) when you've handled one. The card folds to a line — Undo brings it back — and the counter shows how far through the ten you are.</li>
     <li><b>Check Overbuys once a week.</b> It lists open POs nobody needs and what was placed in the last 30 days beyond need — the cheapest money we'll ever save.</li>
   </ol>
@@ -32,8 +33,11 @@
   <dl class="pages">
     <dt>Today</dt><dd>This week's buys, top 10 first, and what came off the list since the last run. <span class="who">Buyers, every morning.</span></dd>
     <dt>All buys</dt><dd>Everything to place within five working days, filter by buyer or search by part or description. <span class="who">Buyers.</span></dd>
+    <dt>By vendor</dt><dd><b>Who do we need to order from, and what all goes on it?</b> Every vendor with something to buy in the next 4 weeks, those with buys due now first. Each opens one order: due-now and late lines plus what's coming up (choose 1 to 12 weeks), with their part numbers, pack counts, totals, recent open POs with that vendor, and Copy / CSV for keying the PO. <span class="who">Buyers, whenever placing a PO.</span></dd>
+    <dt>Analytics</dt><dd>Four questions. <b>Is PK-MRP saving money and orders?</b> — where what buyers did matched its advice (POs placed by the order-by date, push-outs and cancels done), the orders and dollars behind them, and the money found on Overbuys. In shadow mode a match isn't proof PK-MRP caused it. <b>Is the plan getting healthier?</b> — buys due, late, and orders waiting, day by day. <b>Where is today's lateness?</b> — by how late, product, vendor and buyer. <b>Which vendors deliver?</b> — on-time % against the date first asked, and real lead time vs MAX's. <span class="who">Jared, Chad and supply chain, weekly.</span></dd>
     <dt>Promise</dt><dd>Type a part, a quantity and the date a customer wants: the earliest date material supports, and the part that decides it. Material only — build capacity isn't in yet. <span class="who">Order Admin, before dating an order.</span></dd>
     <dt>Committed</dt><dd><b>Which parts can't wait for an order?</b> The few whose real lead time is longer than orders give warning of get a 12-month plan: requirement, buffer, a proposed blanket order with monthly releases, and a forecast letter for the supplier. It's a buying page. <span class="who">Buyers and supply chain, monthly.</span></dd>
+    <dt>Pipeline</dt><dd><b>Which MAX part is each sales SKU?</b> Book/Bill 2.0 forecasts in sales names ("2300AG-B", "FK11-SAE-U"), so each SKU is matched to a MAX part once, by a person, before its forecast can feed Committed. PK-MRP proposes the match from the part number, the description and past orders, surest first; you click <i>Use this</i>, pick another part, or mark it <i>not material</i>. Bookings with no billing month are listed for fixing in Book/Bill. <span class="who">Whoever has an admin role in PK-MRP, as new SKUs appear.</span></dd>
     <dt>Lead times</dt><dd><b>Which numbers in MAX are wrong?</b> Where MAX's stored lead time is more than 25% off what the part really takes, with a proposed value and a CSV to key in. It's a data clean-up page — nothing to buy. <span class="who">Whoever maintains part data, quarterly.</span></dd>
     <dt>Overbuys</dt><dd>Open POs nobody needs, POs bought for more than will be needed, POs arriving early, and stock with no order behind it — in dollars, by buyer. <span class="who">Buyers and supply chain, weekly.</span></dd>
   </dl>
@@ -84,6 +88,8 @@
     <dt>Needs a source</dt><dd>A part booked orders need that has never been on a PO and has no approved vendor in MAX. Its lead time and price are MAX's placeholders, so it isn't ranked — it's quoted.</dd>
     <dt>Shelf part</dt><dd>A part of $50 or less from a catalog distributor — or from any vendor whose orders usually arrive within 6 working days (Webstaurant, Amazon Business, Zoro…). It's planned on that distributor's real delivery time (McMaster: about 2 working days) and ordered in the Shelf order, not ranked.</dd>
     <dt>Packs</dt><dd>Quantities are in the unit MAX stocks (usually each). Where MAX buys in packs, reels or boxes, the buy is rounded up to whole packs and says so: "100 to buy (1 PK of 100)". Key the PO in MAX in each, as always; the Shelf order's paste uses pack counts, which is what the catalog sells.</dd>
+    <dt>Sales SKU / catch-all</dt><dd>The name Book/Bill 2.0 sells a thing under. A catch-all like "2304 Option" stands for any option of that model — the booking's line text says which — so it maps to no one part.</dd>
+    <dt>Due now / coming up</dt><dd>On a vendor order: "due now" must be placed within 5 working days; "coming up" isn't late yet but falls in the window you chose, so it can ride on the same PO.</dd>
     <dt>Shadow mode</dt><dd>PK-MRP records its advice and compares it with what was done, but nobody is asked to follow it yet.</dd>
   </dl>
 </section>

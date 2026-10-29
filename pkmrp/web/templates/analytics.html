@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+{% block title %}Analytics · PK-MRP{% endblock %}
+
+{% macro bars(rows, key, label, fmt='n', note=None) %}
+{% set top = (rows|map(attribute=key)|max) if rows else 0 %}
+<div class="hbars">
+  {% for r in rows %}{% set v = r[key] or 0 %}
+  <div class="hbar" title="{{ r[label] }}: {{ v|money if fmt == '$' else v|qty }}{% if note %} — {{ note(r) }}{% endif %}">
+    <span class="hb-name">{{ r[label] }}</span>
+    <span class="hb-track"><span class="hb-fill" style="width: {{ (100 * v / top) if top else 0 }}%"></span></span>
+    <span class="hb-val">{{ v|money if fmt == '$' else v|qty }}</span>
+  </div>
+  {% endfor %}
+</div>
+{% endmacro %}
+
+{% macro line(points, fmt='n', unit='', h=120) %}
+{# points: [(label, value)] -- one series, one axis, baseline at zero #}
+{% set vals = points|map(attribute=1)|select('number')|list %}
+{% if vals|length < 2 %}
+<p class="muted small chart-empty">{{ vals|length }} day{{ 's' if vals|length != 1 }} so far — the line starts at two.</p>
+{% else %}
+{% set w = 520 %}{% set pad_l = 8 %}{% set pad_r = 8 %}{% set pad_t = 14 %}{% set pad_b = 22 %}
+{% set top = (vals|max) * 1.15 or 1 %}
+{% set n = points|length %}
+{% set step = (w - pad_l - pad_r) / ((n - 1) if n > 1 else 1) %}
+<svg class="line-chart" viewBox="0 0 {{ w }} {{ h }}" role="img">
+  {% for g in (0.5, 1.0) %}<line class="grid" x1="{{ pad_l }}" x2="{{ w - pad_r }}" y1="{{ pad_t + (h - pad_t - pad_b) * (1 - g / 1.15) }}" y2="{{ pad_t + (h - pad_t - pad_b) * (1 - g / 1.15) }}"/>{% endfor %}
+  <line class="base" x1="{{ pad_l }}" x2="{{ w - pad_r }}" y1="{{ h - pad_b }}" y2="{{ h - pad_b }}"/>
+  <polyline class="ln" points="{% for lab, v in points %}{% if v is number %}{{ pad_l + loop.index0 * step }},{{ pad_t + (h - pad_t - pad_b) * (1 - v / top) }} {% endif %}{% endfor %}"/>
+  {% for lab, v in points %}{% if v is number %}{% set x = pad_l + loop.index0 * step %}{% set y = pad_t + (h - pad_t - pad_b) * (1 - v / top) %}
+  <g class="pt"><circle class="hit" cx="{{ x }}" cy="{{ y }}" r="12"/><circle class="dot" cx="{{ x }}" cy="{{ y }}" r="4"/>
+    <title>{{ lab }}: {{ v|money if fmt == '$' else (v|round(1) if fmt == '%' else v|qty) }}{{ unit }}</title></g>
+  {% if loop.first or loop.last or (n > 6 and loop.index0 % ((n // 4) or 1) == 0) %}<text class="xl" x="{{ x }}" y="{{ h - 6 }}" text-anchor="{{ 'start' if loop.first else 'end' if loop.last else 'middle' }}">{{ lab }}</text>{% endif %}
+  {% endif %}{% endfor %}
+</svg>
+{% set last = vals[-1] %}<p class="chart-now">Latest <b>{{ last|money if fmt == '$' else (last|round(1) if fmt == '%' else last|qty) }}{{ unit }}</b></p>
+{% endif %}
+{% endmacro %}
+
+{% block content %}
+<section class="page-intro">
+  <h1 class="h1-small">Analytics</h1>
+  <p class="lede">Four questions: <a href="#impact">is PK-MRP saving money and orders?</a> · <a href="#health">is the plan getting healthier?</a> · <a href="#today">where is today's lateness?</a> · <a href="#vendors">which vendors deliver?</a></p>
+</section>
+
+<section class="lesson" id="impact">
+  <h2>Is it saving money and orders?</h2>
+  <p class="lede">PK-MRP is in <b>shadow mode</b>: nobody is asked to follow it yet. So this counts where <b>what buyers did matched the advice</b> — a PO placed by the order-by date, a PO pushed out or cancelled as suggested. A match doesn't prove PK-MRP caused it; the buyer may have done it anyway. It is the yardstick going live should move.{% if imp and imp.first_day %} Counting since {{ imp.first_day|nice_date }}.{% endif %}</p>
+  {% if imp_error %}<p class="promise-error small">Can't read the decision ledger right now ({{ imp_error }}).</p>
+  {% elif imp %}
+  <section class="tiles">
+    <div class="tile{% if imp.placed_on_time %} win lit{% endif %}" title="Parts PK-MRP said to buy where a PO was placed on or before the order-by date — the booked orders those buys feed">
+      <span class="num">{{ imp.orders_protected }}</span><span class="lbl">orders' parts placed in time</span><span class="sub">{{ imp.order_value_protected|money }} of orders · {{ imp.placed_on_time }} of {{ imp.buys }} parts</span></div>
+    <div class="tile{% if imp.not_placed_overdue %} warn{% endif %}" title="Parts past their order-by date with no PO yet — the orders they feed are at risk of slipping">
+      <span class="num">{{ imp.orders_at_risk }}</span><span class="lbl">orders waiting on a part past its order-by</span><span class="sub">{{ imp.order_value_at_risk|money }} · {{ imp.not_placed_overdue }} parts not placed{% if imp.overdue_inherited %}, {{ imp.overdue_inherited }} already late when first advised{% endif %}</span></div>
+    <div class="tile" title="Open POs PK-MRP said to push out or cancel where MAX shows that happened — cash not spent now">
+      <span class="num">{{ (imp.pushed_usd + imp.cancelled_usd)|money }}</span><span class="lbl">spend deferred or avoided</span><span class="sub">{{ imp.pushed }} of {{ imp.push_outs }} push-outs · {{ imp.cancelled }} of {{ imp.cancels }} cancels</span></div>
+    <div class="tile" title="Median calendar days from PK-MRP first recommending a buy to the PO being keyed">
+      <span class="num">{{ imp.median_days_to_po|round|int if imp.median_days_to_po is not none else '—' }}</span><span class="lbl">days from advice to PO (median)</span><span class="sub">{{ imp.placed_late }} placed after order-by · {{ imp.expedited }} of {{ imp.expedites }} expedites done</span></div>
+  </section>
+  {% endif %}
+  <h3 class="steps-h">Money it has found — not saved until someone acts</h3>
+  <section class="tiles">
+    <div class="tile"><span class="num">{{ (ob.not_needed or 0)|money }}</span><span class="lbl">on open POs nothing needs</span></div>
+    <div class="tile"><span class="num">{{ (ob.more_than_needed or 0)|money }}</span><span class="lbl">ordered beyond what's needed</span></div>
+    <div class="tile"><span class="num">{{ (ob.early or 0)|money }}</span><span class="lbl">arriving well before it's needed</span></div>
+    <div class="tile"><span class="num">{{ (ob.stock_extra or 0)|money }}</span><span class="lbl">in stock beyond all demand</span></div>
+  </section>
+  <p class="muted small">From <a href="{{ script_root }}/overbuys">Overbuys</a>. Cancelling or pushing out what's on POs is cash kept; stock beyond demand is already spent.</p>
+</section>
+
+<section class="lesson" id="health">
+  <h2>Is the plan getting healthier?</h2>
+  <p class="lede">The last plan of each day. Lower is better on all four.</p>
+  <div class="multiples">
+    <figure><figcaption>Buys due now</figcaption>{{ line(trend|map('pick', 'buy_now')|list) }}</figure>
+    <figure><figcaption>Of those, already late</figcaption>{{ line(trend|map('pick', 'late')|list) }}</figure>
+    <figure><figcaption>Orders waiting on a buy</figcaption>{{ line(trend|map('pick', 'orders_waiting')|list) }}</figure>
+    <figure><figcaption>$ of orders waiting</figcaption>{{ line(trend|map('pick', 'order_value_waiting')|list, '$') }}</figure>
+  </div>
+</section>
+
+<section class="lesson" id="today">
+  <h2>Where is today's lateness?</h2>
+  <p class="lede">The {{ h.buy_now }} buys due now, cut four ways.</p>
+  <div class="multiples two">
+    <figure><figcaption>How late (days past order-by)</figcaption>{{ bars(bd.lateness or [], 'buys', 'name') }}</figure>
+    <figure><figcaption>Products held up, by $ of their orders</figcaption>{{ bars(bd.products or [], 'value', 'name', '$') }}</figure>
+    <figure><figcaption>Late buys by vendor (top {{ (bd.by_vendor or [])|length }})</figcaption>{{ bars(bd.by_vendor or [], 'late', 'name') }}</figure>
+    <figure><figcaption>By buyer</figcaption>
+      <table class="dense"><thead><tr><th>Buyer</th><th class="r">Buys</th><th class="r">Late</th><th class="r">Orders</th><th class="r">Spend</th></tr></thead><tbody>
+      {% for r in bd.by_buyer or [] %}<tr><td>{{ r.name }}</td><td class="r">{{ r.buys }}</td><td class="r">{{ r.late }}</td><td class="r">{{ r.orders }}</td><td class="r">{{ r.spend|money }}</td></tr>{% endfor %}
+      </tbody></table></figure>
+  </div>
+</section>
+
+<section class="lesson" id="vendors">
+  <h2>Which vendors deliver?</h2>
+  <p class="lede">From PK's own POs: <b>on time</b> = first receipt on or before the date first asked on the PO (early counts). <b>Real lead</b> = working days from PO to first receipt, vs the lead time MAX holds for those parts.</p>
+  {% set qs = vd.quarters or [] %}
+  <figure class="wide-fig"><figcaption>On time, all vendors, by quarter (%)</figcaption>{{ line(qs|map('pick', 'on_time_pct', 'quarter')|list, '%', '%', 140) }}</figure>
+  <p class="muted small">{% if qs %}{{ qs[-1].quarter }} is the quarter so far ({{ qs[-1].lines }} lines).{% endif %}</p>
+  <div class="table-tools"><input type="search" class="table-filter" placeholder="Filter: vendor name" aria-label="Filter vendors"><span class="muted small filter-count"></span></div>
+  <div class="table-wrap">
+  <table class="dense">
+    <thead><tr><th>Vendor</th><th class="r">PO lines (24 mo)</th><th>On time</th><th class="r">Late by (median)</th><th class="r">Real lead</th><th class="r">MAX says</th></tr></thead>
+    <tbody>
+    {% for v in (vd.vendors or [])[:60] %}
+      <tr><td>{{ v.vendor|title }}</td><td class="r">{{ v.lines }}</td>
+        <td><span class="pct" title="{{ v.on_time_pct }}% on time — {{ v.late_lines }} of {{ v.lines }} lines late"><span class="hb-track"><span class="hb-fill" style="width: {{ v.on_time_pct }}%"></span></span> {{ v.on_time_pct|round|int }}%</span></td>
+        <td class="r">{{ (v.median_days_late|round|int ~ ' d') if v.late_lines else '—' }}</td>
+        <td class="r">{{ v.real_lead_wd|round|int }} wd</td>
+        <td class="r muted">{{ (v.max_lead_wd|round|int ~ ' wd') if v.max_lead_wd is not none else '—' }}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  <p class="foot-note">The 60 vendors with the most received PO lines in the last 24 months. wd = working days. A vendor whose real lead is far below what MAX says is making MAX order too early — see <a href="{{ script_root }}/lead-times">Lead times</a>.</p>
+</section>
+{% endblock %}

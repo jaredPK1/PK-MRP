@@ -169,3 +169,35 @@ def ops_engine(cfg):
     return create_engine(
         "mssql+pyodbc:///?odbc_connect=" + quote_plus(cfg.ops_conn_str()), pool_pre_ping=True
     )
+
+
+def get_setting(engine, key, default=None):
+    """A stored setting (JSON), or `default` when it was never set."""
+    import json
+
+    from sqlalchemy import select
+
+    with engine.connect() as conn:
+        row = conn.execute(
+            select(settings.c.setting_value).where(settings.c.setting_key == key)
+        ).first()
+    return json.loads(row[0]) if row and row[0] else default
+
+
+def put_setting(engine, key, value, by, now=None):
+    """Store a setting (JSON), replacing what was there."""
+    import json
+    from datetime import datetime
+
+    from sqlalchemy import delete, insert
+
+    with engine.begin() as conn:
+        conn.execute(delete(settings).where(settings.c.setting_key == key))
+        conn.execute(
+            insert(settings).values(
+                setting_key=key,
+                setting_value=json.dumps(value, sort_keys=True),
+                updated_at=now or datetime.now(),
+                updated_by=by,
+            )
+        )

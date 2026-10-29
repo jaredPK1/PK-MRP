@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}{{ vendor|title }} order · PK-MRP{% endblock %}
+{% block content %}
+<section class="page-intro">
+  <p class="small"><a href="{{ script_root }}/vendors">← All vendors</a></p>
+  <h1 class="h1-small">One order for {{ vendor|title }}</h1>
+  <p class="lede"><b>Everything PK needs to buy from {{ vendor|title }}</b> — what's due now, and what comes due in the next {{ weeks }} week{{ 's' if weeks != 1 }}, so it can go on the same PO. Untick what shouldn't go; the totals, copy and CSV follow your ticks. Nothing here is placed in MAX — key the PO as usual.</p>
+  <p class="filters">
+    <span class="small">Include what's due within</span>
+    {% for w in (1, 2, 4, 8, 12) %}<a class="btn{% if w == weeks %} primary{% endif %}" href="{{ script_root }}/vendor?v={{ vendor|urlencode }}&weeks={{ w }}{% if focus %}&part={{ focus|urlencode }}{% endif %}">{{ w }} wk</a>{% endfor %}
+    {% if later > 0 %}<span class="muted small">{{ later }} more part{{ 's' if later != 1 }} come due later (up to 12 weeks).</span>{% endif %}
+  </p>
+  {% if pos %}<p class="lede small-gap small"><b>Already open with {{ vendor|title }}:</b>
+    {% for po in pos[:6] %}<span class="chip quiet" title="{{ po.lines }} line{{ 's' if po.lines != 1 }}, created {{ po.created|nice_date }}">PO {{ po.po }} · {{ po.created|nice_date }}</span> {% endfor %}
+    <span class="muted">— adding lines to a recent one may beat a new PO.</span></p>{% endif %}
+</section>
+
+{% if not lines %}
+<p class="lede">Nothing from {{ vendor|title }} comes due in the next {{ weeks }} week{{ 's' if weeks != 1 }}. Try a longer window.</p>
+{% else %}
+<div class="table-wrap">
+<table class="dense vendor-order" data-vendor="{{ vendor }}">
+  <thead><tr><th><input type="checkbox" class="all" checked aria-label="Tick all"></th><th>When</th><th>Our part</th><th>Their part</th><th>Description</th><th class="r">Qty</th><th class="r">Unit</th><th class="r">Extended</th><th>Order by</th><th>Need by</th><th>For</th></tr></thead>
+  <tbody>
+  {% for ln in lines %}
+    <tr class="{% if ln.part == focus %}focus{% endif %}" data-part="{{ ln.part }}" data-vpart="{{ ln.vendor_part }}" data-qty="{{ ln.qty }}" data-unit="{{ ln.unit_cost }}" data-spend="{{ ln.spend }}" data-need="{{ ln.need_by }}" data-desc="{{ ln.description }}">
+      <td><input type="checkbox" class="pick" checked aria-label="Include {{ ln.part }}"></td>
+      <td>{% if ln.status == 'late' %}<span class="chip late">late</span>{% elif ln.status == 'now' %}<span class="chip today">due now</span>{% else %}<span class="chip soon">coming up</span>{% endif %}</td>
+      <td class="mono">{{ ln.part }}</td>
+      <td class="mono">{{ ln.vendor_part or '—' }}</td>
+      <td>{{ ln.description|lower|capitalize }}{% if ln.release %}<div class="muted small" title="This part is on a 12-month blanket plan (Committed). The qty here is what booked orders need; the blanket release covers the same need, so it isn't added on top.">on a blanket plan — next release {{ ln.release.qty|qty }} by {{ ln.release.order_by|nice_date }}</div>{% endif %}</td>
+      <td class="r">{{ ln.qty|qty }}{% if ln.packs %}<div class="muted small">{{ ln.packs }} {{ ln.pack_uom or 'pk' }} of {{ ln.pack_qty|qty }}</div>{% endif %}</td>
+      <td class="r">{{ ln.unit_cost|money if ln.unit_cost else '—' }}</td>
+      <td class="r">{{ ln.spend|money if ln.spend else '—' }}</td>
+      <td>{{ ln.place_by|nice_date }}</td>
+      <td>{{ ln.need_by|nice_date }}</td>
+      <td class="small">{% if ln.customers %}{{ ln.customers[:2]|join(', ') }}{% if ln.customers|length > 2 %} +{{ ln.customers|length - 2 }}{% endif %}{% else %}<span class="muted">open WOs</span>{% endif %}{% if ln.order_value %}<div class="muted">{{ ln.sales_orders|length }} order{{ 's' if ln.sales_orders|length != 1 }}, {{ ln.order_value|money }}</div>{% endif %}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+<p class="order-tools">
+  <b class="sel-count"></b> <span class="sel-total"></span>
+  <span class="grow"></span>
+  <button type="button" class="btn copy-po">Copy for the PO</button>
+  <button type="button" class="btn csv-po">Download CSV</button>
+</p>
+<p class="foot-note">Qty is in the unit MAX stocks; where MAX buys in packs the pack count is shown under it. Order by = last day to place it and still arrive in time ({{ vendor|title }}'s lead time from PK's own POs where there's history). "Coming up" lines aren't late yet — they ride along to save a PO and a freight charge. Copy gives tab-separated lines (our part, their part, qty, unit cost, need by) that paste into Excel or an email.</p>
+{% endif %}
+{% endblock %}

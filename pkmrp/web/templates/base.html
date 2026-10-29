@@ -17,10 +17,13 @@
     <nav>
       <a href="{{ script_root }}/" class="{% if request.endpoint == 'home' %}on{% endif %}">Today</a>
       <a href="{{ script_root }}/buys" class="{% if request.endpoint == 'buys_page' %}on{% endif %}">All buys</a>
+      <a href="{{ script_root }}/vendors" class="{% if request.endpoint in ('vendors_page', 'vendor_page') %}on{% endif %}">By vendor</a>
       <a href="{{ script_root }}/promise" class="{% if request.endpoint == 'promise_page' %}on{% endif %}">Promise</a>
       <a href="{{ script_root }}/committed" class="{% if request.endpoint == 'committed_page' %}on{% endif %}">Committed</a>
+      <a href="{{ script_root }}/pipeline" class="{% if request.endpoint == 'pipeline_page' %}on{% endif %}">Pipeline</a>
       <a href="{{ script_root }}/lead-times" class="{% if request.endpoint == 'params_page' %}on{% endif %}">Lead times</a>
       <a href="{{ script_root }}/overbuys" class="{% if request.endpoint == 'overbuys_page' %}on{% endif %}">Overbuys</a>
+      <a href="{{ script_root }}/analytics" class="{% if request.endpoint == 'analytics_page' %}on{% endif %}">Analytics</a>
       <a href="{{ script_root }}/training" class="{% if request.endpoint == 'training_page' %}on{% endif %}">Training</a>
     </nav>
     <span class="grow"></span>

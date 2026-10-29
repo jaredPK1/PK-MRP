@@ -57,6 +57,10 @@ def recommendations(run, snap, mode_of=lambda segment: "shadow"):
     for b in snap["buys"]:
         why = {
             "sales_orders": b.get("sales_orders", [])[:40],
+            "order_values": {
+                so: (snap.get("so_values") or {}).get(so, 0.0)
+                for so in b.get("sales_orders", [])[:40]
+            },
             "for_parts": b.get("for_parts", [])[:20],
             "pegs": [p["ref"] for p in b.get("pegs", [])][:40],
             "vendor": b.get("vendor"),

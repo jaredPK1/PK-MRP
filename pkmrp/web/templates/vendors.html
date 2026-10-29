@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}By vendor · PK-MRP{% endblock %}
+{% block content %}
+<section class="page-intro">
+  <h1 class="h1-small">By vendor — one PO each</h1>
+  <p class="lede"><b>The question this page answers: who do we need to order from, and what all goes on it?</b> Every vendor with something to buy in the next 4 weeks, those with buys due now first. Open one to see the whole order — due now plus what's coming up — and copy it for the PO.</p>
+</section>
+<div class="table-tools"><input type="search" class="table-filter" placeholder="Filter: vendor name" aria-label="Filter the table"><span class="muted small filter-count"></span></div>
+<div class="table-wrap">
+<table class="dense">
+  <thead><tr><th>Vendor</th><th class="r">Due now or late</th><th class="r">Parts in 4 weeks</th><th class="r">About</th><th></th></tr></thead>
+  <tbody>
+  {% for v, due, n, spend in rows %}
+    <tr><td><a href="{{ script_root }}/vendor?v={{ v|urlencode }}">{{ v|title }}</a></td>
+      <td class="r">{% if due %}<span class="chip today">{{ due }}</span>{% else %}<span class="muted">—</span>{% endif %}</td>
+      <td class="r">{{ n }}</td><td class="r">{{ spend|money }}</td>
+      <td><a class="btn" href="{{ script_root }}/vendor?v={{ v|urlencode }}">Build the order</a></td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% endblock %}
