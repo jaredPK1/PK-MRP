@@ -284,17 +284,23 @@ def create_app():
     def buys_page():
         snap, on_hold = without_held(snapshot.load_latest() or abort(404))
         today = date.today()
-        buyer = request.args.get("buyer", "")
-        rows = [b for b in snap["buys"] if not buyer or b["buyer"] == buyer]
+        who = request.args.get("who", "")
+        status, _ = buy_status()
+
+        def owner(part):
+            return (status.get(part) or {}).get("owner", "")
+
+        rows = [
+            b for b in snap["buys"]
+            if not who or (who == "-" and not owner(b["part"])) or owner(b["part"]) == who
+        ]
         for b in rows:
             b["when"], b["tone"] = _when(b["place_by"], today)
-        buyers = sorted({b["buyer"] for b in snap["buys"] if b["buyer"]})
         return render_template(
             "buys.html",
             snap=snap,
             rows=rows,
-            buyers=buyers,
-            buyer=buyer,
+            who=who,
             vendor_n=vendor_n(snap),
             on_hold=on_hold,
         )

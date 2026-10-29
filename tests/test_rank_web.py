@@ -534,3 +534,18 @@ def test_top_ten_is_renumbered_when_a_part_is_held(client, tmp_path, monkeypatch
     import re
     ranks = re.findall(r'<div class="rank" aria-hidden="true">(\d+)</div>', home)
     assert ranks == ["1", "2"]
+
+
+def test_no_max_buyer_codes_and_all_buys_filters_by_who_is_on_it(client, tmp_path, monkeypatch):
+    c, engine = _overbuy_client(tmp_path, monkeypatch, "viewer")
+    from pkmrp import snapshot
+
+    part = snapshot.load_latest()["buys"][0]["part"]
+    home = c.get("/").get_data(as_text=True)
+    assert "buyer RB" not in home
+    page = c.get("/buys").get_data(as_text=True)
+    assert "<th>Buyer</th>" not in page and 'name="who"' in page
+    c.post("/buy-status", data={"part": part, "action": "owner", "owner": "Rob", "next": "/buys"})
+    assert part in c.get("/buys?who=Rob").get_data(as_text=True)
+    assert part not in c.get("/buys?who=Aaron").get_data(as_text=True).split("<tbody>")[1]
+    assert part not in c.get("/buys?who=-").get_data(as_text=True).split("<tbody>")[1]

@@ -97,7 +97,6 @@
           <span><b>{{ b.qty|qty }}</b> to buy{% if b.packs %} <span class="muted">({{ b.packs }} {{ b.pack_uom or 'pack' }} of {{ b.pack_qty|qty }})</span>{% endif %}{% if b.spend %} · {{ b.spend|money }}{% endif %} <small class="muted" title="Only the buys whose order-by date falls in the next 5 working days — the minimum to place now. Later needs come up as their dates get close.">· the minimum this week{% if b.vendor %} — <a href="{{ script_root }}/vendor?v={{ b.vendor|urlencode }}&weeks=4&part={{ b.part|urlencode }}">4-week order</a>{% endif %}</small></span>
           <span>{{ b.lead_days|round|int }}-day lead <small>· {{ b.lead_source|lead_words }}</small></span>
           {% if b.vendor %}{% set n = vendor_n.get(b.vendor, 1) %}<span>vendor <a class="vendor-link" href="{{ script_root }}/vendor?v={{ b.vendor|urlencode }}&part={{ b.part|urlencode }}" title="Everything PK needs from {{ b.vendor|title }}, on one PO">{{ b.vendor }}{% if n > 1 %} · +{{ n - 1 }} more to order with it{% endif %}</a></span>{% endif %}
-          {% if b.buyer %}<span>buyer {{ b.buyer }}</span>{% endif %}
         </div>
         {% if b.orders %}
         <div class="unblocks">
@@ -135,13 +134,13 @@
   <details class="cart">
     <summary><b>{{ snap.needs_source|length }} part{{ '' if snap.needs_source|length == 1 else 's' }} to quote</b>{% set v = snap.needs_source|sum(attribute='order_value') %}{% if v %} · orders worth {{ v|money }} wait on at least one{% endif %}{% set nc = snap.needs_source|rejectattr('unit_cost')|list|length %}{% if nc %} · {{ nc }} with no cost in MAX{% endif %}</summary>
     <table class="ledger cart-items">
-      <thead><tr><th>Part</th><th>Description</th><th class="r">Qty</th><th>First needed</th><th class="r">Orders</th><th class="r">Order value</th><th>Buyer</th><th></th></tr></thead>
+      <thead><tr><th>Part</th><th>Description</th><th class="r">Qty</th><th>First needed</th><th class="r">Orders</th><th class="r">Order value</th><th></th></tr></thead>
       <tbody>
       {% for b in snap.needs_source %}
         <tr><td class="mono">{{ b.part }} {{ part_note(b.part) }}</td><td class="dcol">{{ b.description|lower|capitalize }}</td><td class="r">{{ b.qty|qty }}</td>
-            <td>{{ b.need_by|nice_date }}</td><td class="r">{{ b.orders or 'WO' }}</td><td class="r">{{ b.order_value|money if b.order_value else '' }}</td><td>{{ b.buyer }}</td>
+            <td>{{ b.need_by|nice_date }}</td><td class="r">{{ b.orders or 'WO' }}</td><td class="r">{{ b.order_value|money if b.order_value else '' }}</td>
             <td><button class="why-btn" data-why="{{ script_root }}/why/{{ b.part }}" data-target="#src-why-{{ loop.index }}" aria-expanded="false">Why?</button></td></tr>
-        <tr class="cp-row"><td colspan="8" id="src-why-{{ loop.index }}" class="cp-cell why-cell" hidden></td></tr>
+        <tr class="cp-row"><td colspan="7" id="src-why-{{ loop.index }}" class="cp-cell why-cell" hidden></td></tr>
       {% endfor %}
       </tbody>
     </table>
