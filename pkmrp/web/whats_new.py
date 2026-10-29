@@ -7,6 +7,11 @@ Every feature people can see gets a line here in the same change
 WHATS_NEW = (
     (
         "2026-10-29",
+        "Friday summary email, feedback button, back to PK Connect",
+        "Every Friday at 3 pm a one-page email sums up the week: how the plan moved (buys due, late, orders and dollars waiting), what got placed and whether MAX confirmed it, whether buying followed PK-MRP's advice, the top of next week's list, and the Fix in MAX counts. See it — and send yourself a test — on the Weekly email page (link at the bottom of Training). PK-MRP also has PK's feedback button now (bottom right), and \"‹ PK Connect\" at the top left takes you back to the app launcher.",
+    ),
+    (
+        "2026-10-29",
         "Who's on it, and Done that MAX checks",
         "Each buy on Today and All buys has an \"On it\" dropdown (Chad / Rob / Aaron) so everyone can see who is working what. Done is now shared and recorded — who, when and the PO number — instead of a fold in your own browser, and it's checked: on the next plan, a buy MAX no longer needs is confirmed, and one MAX still needs comes back flagged \"no PO in MAX\". The new Done page lists every one, by period and person. The d shortcut is gone (it folded cards by accident), and Today's top ten is numbered 1-10 again when a part is on hold.",
     ),

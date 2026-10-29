@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Weekly email · PK-MRP{% endblock %}
+{% block content %}
+<section class="page-intro">
+  <h1 class="h1-small">The weekly email</h1>
+  <p class="lede">Goes out <b>Fridays at 3 pm Pacific</b> through pk-notify: how the plan moved this week, what got placed (and whether MAX confirmed it), whether buying followed PK-MRP's advice, the top of next week's list, and the Fix in MAX / obsolete-part counts. Below is exactly what it looks like with today's numbers.</p>
+  {% if not scheduler %}<p class="lede small-gap muted">This copy doesn't send it — only production does (SCHEDULER_ENABLED). A test from here still sends to you.</p>{% endif %}
+  {% if last.week_of %}<p class="lede small-gap">Last sent {{ last.at[:16]|replace('T', ' ') }} for the week of {{ last.week_of|nice_date(False) }} to {{ last.to|length }} people.</p>{% endif %}
+  {% if sent %}<p class="lede small-gap"><span class="chip soon">Sent</span> Test sent to {{ sent }}.</p>{% elif error %}<p class="lede small-gap promise-error">Test not sent: {{ error }}</p>{% endif %}
+</section>
+<section class="weekly-controls">
+  <form method="post" action="{{ script_root }}/weekly/test" class="inline-form"><button class="btn">Send me a test</button> <span class="muted small">to {{ me or 'you' }}</span></form>
+  <h3 class="steps-h">Who gets it</h3>
+  {% if editable %}
+  <form method="post" action="{{ script_root }}/weekly/recipients" class="note-form">
+    <textarea name="emails" rows="3" cols="70" aria-label="Recipients">{{ to|join(', ') }}</textarea>
+    <button class="btn">Save</button> <span class="muted small">PK emails, separated by commas or new lines.</span>
+  </form>
+  {% else %}<p>{{ to|join(', ') }} <span class="muted small">— an admin can change the list.</span></p>{% endif %}
+</section>
+<iframe class="weekly-frame" src="{{ script_root }}/weekly/email" title="The weekly email"></iframe>
+{% endblock %}

@@ -549,3 +549,64 @@ def test_no_max_buyer_codes_and_all_buys_filters_by_who_is_on_it(client, tmp_pat
     assert part in c.get("/buys?who=Rob").get_data(as_text=True)
     assert part not in c.get("/buys?who=Aaron").get_data(as_text=True).split("<tbody>")[1]
     assert part not in c.get("/buys?who=-").get_data(as_text=True).split("<tbody>")[1]
+
+
+def test_weekly_email_preview_renders(client, tmp_path, monkeypatch):
+    c, _ = _overbuy_client(tmp_path, monkeypatch, "viewer")
+    html = c.get("/weekly/email").get_data(as_text=True)
+    assert "The week in buying" in html and "Placed this week" in html and "Open PK-MRP" in html
+    page = c.get("/weekly").get_data(as_text=True)
+    assert "Fridays at 3 pm" in page and "Send me a test" in page and "an admin can change" in page
+    assert c.post("/weekly/recipients", data={"emails": "x@pkinetics.com"}).status_code == 403
+    c.application.config["DEFAULT_ROLE"] = None
+    assert c.get("/weekly").status_code == 403
+
+
+def test_weekly_recipients_admin_only_pk_addresses(client, tmp_path, monkeypatch):
+    from pkmrp.db import store
+
+    c, engine = _overbuy_client(tmp_path, monkeypatch, "admin")
+    assert c.post("/weekly/recipients", data={"emails": "a@gmail.com"}).status_code == 400
+    c.post("/weekly/recipients", data={"emails": "Chad.Marsh@pkinetics.com, jared.green@pkinetics.com"})
+    assert store.get_setting(engine, "weekly_recipients") == ["chad.marsh@pkinetics.com", "jared.green@pkinetics.com"]
+
+
+def test_dev_lock_sends_others_to_production(client, tmp_path, monkeypatch):
+    monkeypatch.setenv("DEV_ALLOWED_EMAILS", "jared.green@pkinetics.com")
+    monkeypatch.setenv("PROD_URL", "https://10.6.1.80/pk-mrp")
+    c, _ = _overbuy_client(tmp_path, monkeypatch, "viewer")
+    r = c.get("/", headers={"X-Auth-Request-Email": "rob.maier@pkinetics.com"})
+    assert r.status_code == 403 and "https://10.6.1.80/pk-mrp/" in r.get_data(as_text=True)
+    assert c.get("/", headers={"X-Auth-Request-Email": "jared.green@pkinetics.com"}).status_code == 200
+    assert c.get("/health").status_code == 200
+
+
+def test_weekly_due_and_scheduler_gate(monkeypatch):
+    from datetime import datetime
+
+    from pkmrp import cli
+
+    assert cli._weekly_due(datetime(2026, 10, 30, 15, 5)) and not cli._weekly_due(datetime(2026, 10, 30, 14, 59))
+    assert not cli._weekly_due(datetime(2026, 10, 29, 16, 0))
+    monkeypatch.delenv("SCHEDULER_ENABLED", raising=False)
+    assert not cli.scheduler_on()
+    monkeypatch.setenv("SCHEDULER_ENABLED", "1")
+    assert cli.scheduler_on()
+
+
+def test_notify_needs_a_token_and_recipients(monkeypatch):
+    from pkmrp import notify
+
+    monkeypatch.delenv("PK_NOTIFY_TOKEN", raising=False)
+    assert notify.fire("x", "t", []) == ([], "no recipients")
+    assert notify.fire("x", "t", ["a@pkinetics.com"])[1].startswith("pk-notify not configured")
+
+
+def test_weekly_email_leaves_held_parts_out(client, tmp_path, monkeypatch):
+    from pkmrp import snapshot
+
+    c, _ = _overbuy_client(tmp_path, monkeypatch, "viewer")
+    part = snapshot.load_latest()["buys"][0]["part"]
+    assert part in c.get("/weekly/email").get_data(as_text=True)
+    c.post("/notes", data={"part": part, "tag": "hold", "text": "x", "action": "add", "next": "/"})
+    assert part not in c.get("/weekly/email").get_data(as_text=True)

@@ -1,0 +1,81 @@
+{# End-of-week summary email. Inline styles only: mail clients drop <style>. #}
+{% set w = wk %}
+{% macro num(v, kind) %}{% if kind == 'money' %}{{ v|money }}{% else %}{{ '{:,.0f}'.format(v) }}{% endif %}{% endmacro %}
+<!doctype html>
+<html><body style="margin:0;padding:0;background:#f5f6f4;font-family:Segoe UI,Helvetica,Arial,sans-serif;color:#14181d;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f5f6f4;"><tr><td align="center" style="padding:20px 10px;">
+<table role="presentation" width="640" cellpadding="0" cellspacing="0" style="max-width:640px;width:100%;background:#ffffff;border:1px solid #e5e7eb;border-radius:12px;">
+  <tr><td style="padding:22px 26px 6px;">
+    <div style="font-size:12px;color:#6b7280;letter-spacing:.04em;text-transform:uppercase;">PK-MRP · week of {{ w.week_of|nice_date(False) }}</div>
+    <div style="font-size:22px;font-weight:700;margin-top:4px;">The week in buying</div>
+    <div style="font-size:14px;color:#3a4049;margin-top:6px;">From PK-MRP's plan of {{ (w.generated_at or '')[:16]|replace('T', ' ') }}. Shadow mode: these are PK-MRP's numbers and what MAX shows, not targets.</div>
+  </td></tr>
+
+  {% if w.trend %}
+  <tr><td style="padding:14px 26px 4px;"><div style="font-size:15px;font-weight:700;">How the plan moved</div>
+    <div style="font-size:12px;color:#6b7280;">{{ w.trend_from|nice_date(False) }} → {{ w.trend_to|nice_date(False) }}</div></td></tr>
+  <tr><td style="padding:4px 26px 8px;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="font-size:14px;border-collapse:collapse;">
+      {% for r in w.trend %}
+      <tr style="border-bottom:1px solid #eef0f2;">
+        <td style="padding:7px 0;color:#3a4049;">{{ r.label }}</td>
+        <td align="right" style="padding:7px 0;font-weight:700;">{{ num(r.now, r.kind) }}</td>
+        <td align="right" style="padding:7px 0 7px 12px;width:110px;color:{% if r.good is none %}#6b7280{% elif r.good %}#007a61{% else %}#c2410c{% endif %};font-size:13px;">
+          {% if not r.delta %}no change{% else %}{{ '▼' if r.delta < 0 else '▲' }} {{ num(r.delta|abs, r.kind) }}{% endif %}</td>
+      </tr>
+      {% endfor %}
+    </table>
+  </td></tr>
+  {% endif %}
+
+  <tr><td style="padding:14px 26px 4px;"><div style="font-size:15px;font-weight:700;">Placed this week</div></td></tr>
+  <tr><td style="padding:2px 26px 8px;font-size:14px;color:#3a4049;line-height:1.6;">
+    {% set d = w.done %}
+    {% if d.marked %}
+      <b>{{ d.marked }}</b> buy{{ 's' if d.marked != 1 }} marked done{% if d.by_person %} — {% for who, n in d.by_person %}{{ who }} {{ n }}{{ ', ' if not loop.last }}{% endfor %}{% endif %}.
+      MAX confirmed <b style="color:#007a61;">{{ d.confirmed }}</b>{% if d.no_po %}; <b style="color:#c2410c;">{{ d.no_po }}</b> still show as needed in MAX{% endif %}{% if d.waiting %}; {{ d.waiting }} waiting for the next plan{% endif %}.
+      {% if d.flagged %}<div style="margin-top:6px;font-size:13px;">Marked done but still a buy in MAX: {% for e in d.flagged %}<span style="font-family:Consolas,monospace;">{{ e.part }}</span>{% if e.po %} (PO {{ e.po }}){% endif %}{{ ', ' if not loop.last }}{% endfor %}.</div>{% endif %}
+    {% else %}No buys were marked done in PK-MRP this week.{% endif %}
+  </td></tr>
+
+  {% if w.impact %}{% set i = w.impact %}
+  <tr><td style="padding:14px 26px 4px;"><div style="font-size:15px;font-weight:700;">Did buying follow the advice?</div>
+    <div style="font-size:12px;color:#6b7280;">Since the ledger started{% if i.first_day %} ({{ i.first_day|nice_date(False) }}){% endif %} — a match, not proof PK-MRP caused it.</div></td></tr>
+  <tr><td style="padding:2px 26px 8px;font-size:14px;color:#3a4049;line-height:1.6;">
+    <b>{{ i.placed_on_time }}</b> placed by the order-by date · <b>{{ i.placed_late }}</b> placed late · <b style="color:#c2410c;">{{ i.not_placed_overdue }}</b> past due and not placed{% if i.overdue_inherited %} ({{ i.overdue_inherited }} were already late when first advised){% endif %}.<br>
+    Orders protected: <b>{{ i.orders_protected }}</b> worth <b>{{ i.order_value_protected|money }}</b> · at risk: <b>{{ i.orders_at_risk }}</b> worth <b>{{ i.order_value_at_risk|money }}</b>.
+  </td></tr>
+  {% endif %}
+
+  {% if w.top %}
+  <tr><td style="padding:14px 26px 4px;"><div style="font-size:15px;font-weight:700;">Top of the list going into next week</div></td></tr>
+  <tr><td style="padding:2px 26px 8px;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="font-size:13px;border-collapse:collapse;">
+      {% for b in w.top %}
+      <tr style="border-bottom:1px solid #eef0f2;">
+        <td style="padding:6px 8px 6px 0;color:#6b7280;width:18px;">{{ loop.index }}</td>
+        <td style="padding:6px 8px 6px 0;font-family:Consolas,monospace;white-space:nowrap;">{{ b.part }}</td>
+        <td style="padding:6px 8px 6px 0;color:#3a4049;">{{ (b.description or '')|lower|capitalize|truncate(34) }}</td>
+        <td align="right" style="padding:6px 0;white-space:nowrap;">{% if b.days_late %}<span style="color:#c2410c;">{{ b.days_late }}d late</span> · {% endif %}{{ b.orders or 0 }} order{{ 's' if b.orders != 1 }}{% if b.order_value %} · {{ b.order_value|money }}{% endif %}</td>
+      </tr>
+      {% endfor %}
+    </table>
+  </td></tr>
+  {% endif %}
+
+  <tr><td style="padding:14px 26px 4px;"><div style="font-size:15px;font-weight:700;">Housekeeping</div></td></tr>
+  <tr><td style="padding:2px 26px 14px;font-size:14px;color:#3a4049;line-height:1.7;">
+    {% if w.fix_max %}Fix in MAX: <b>{{ w.fix_max.so_scheduled }}</b> scheduled order lines, <b>{{ w.fix_max.ms_entries }}</b> forecast entries and <b>{{ w.fix_max.work_orders }}</b> work orders still name an ECN-obsoleted part.<br>{% elif w.ecn_status == 'no_access' %}Fix in MAX is waiting on read access to the ECN database.<br>{% endif %}
+    {% if w.obsolete_buys %}<b style="color:#c2410c;">{{ w.obsolete_buys }}</b> buy{{ 's' if w.obsolete_buys != 1 }} on parts an ECN obsoleted — check before placing.<br>{% endif %}
+    {% if w.vendor_on_time %}Vendor on-time (first receipt by the date first asked): {% for q in w.vendor_on_time %}{{ q.quarter }} <b>{{ q.on_time_pct|round|int }}%</b>{{ ' · ' if not loop.last }}{% endfor %}.{% endif %}
+  </td></tr>
+
+  <tr><td style="padding:12px 26px 22px;border-top:1px solid #eef0f2;font-size:13px;">
+    <a href="{{ base_url }}/" style="color:#007a61;font-weight:700;text-decoration:none;">Open PK-MRP</a>
+    &nbsp;·&nbsp;<a href="{{ base_url }}/analytics" style="color:#007a61;text-decoration:none;">Analytics</a>
+    &nbsp;·&nbsp;<a href="{{ base_url }}/done" style="color:#007a61;text-decoration:none;">Done</a>
+    &nbsp;·&nbsp;<a href="{{ base_url }}/fix-max" style="color:#007a61;text-decoration:none;">Fix in MAX</a>
+  </td></tr>
+</table>
+</td></tr></table>
+</body></html>

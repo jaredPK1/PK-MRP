@@ -237,6 +237,22 @@ def create_app():
         snap = snapshot.load_latest() or {}
         return ((snap.get("ecn") or {}).get("parts") or {}).get(part)
 
+    @app.before_request
+    def _dev_lock():
+        """On the test copy (.70), DEV_ALLOWED_EMAILS keeps everyone but the
+        named people on production (PROD_URL)."""
+        allowed = os.environ.get("DEV_ALLOWED_EMAILS", "").strip()
+        if not allowed or request.endpoint in ("health", "static"):
+            return None
+        me = (request.headers.get("X-Auth-Request-Email") or "").strip().lower()
+        if me in {e.strip().lower() for e in allowed.split(",") if e.strip()}:
+            return None
+        prod = os.environ.get("PROD_URL", "").rstrip("/")
+        link = f'<p><a href="{prod}/">Open PK-MRP</a></p>' if prod else ""
+        return (f"<!doctype html><title>PK-MRP test copy</title><body style='font-family:sans-serif;"
+                f"padding:40px'><h1>This is the PK-MRP test copy.</h1><p>Use the live one instead.</p>"
+                f"{link}</body>"), 403
+
     @app.get("/health")
     def health():
         return {"ok": True, "snapshot": bool(snapshot.load_latest())}
@@ -687,6 +703,81 @@ def create_app():
             ob=(snap.get("overbuys") or {}).get("totals") or {},
             h=snap["headline"],
         )
+
+    def weekly_html(base_url):
+        """The end-of-week email, rendered with live data (also /weekly)."""
+        from ..core import weekly
+        from ..db import store
+
+        # held parts are off the buy lists here too (same view as Today)
+        snap, _ = without_held(snapshot.load_latest() or abort(404))
+        today = date.fromisoformat(snap["today"])
+        try:
+            log = store.get_setting(ops_engine(), LOG_KEY, [])
+        except Exception:  # noqa: BLE001 -- send without the Done section
+            log = []
+        imp, _ = ledger_impact(today, snap.get("so_values") or {})
+        wk = weekly.build(snap, snapshot.load_trend(), log, imp, today)
+        return render_template("email_weekly.html", wk=wk, base_url=base_url.rstrip("/")), wk
+
+    app.config["WEEKLY_HTML"] = weekly_html
+
+    @app.get("/weekly/email")
+    def weekly_email():
+        if not signed_in():
+            abort(403)
+        html, _ = weekly_html(request.url_root.rstrip("/") + request.script_root)
+        return html
+
+    @app.get("/weekly")
+    def weekly_page():
+        from ..cli import DEFAULT_RECIPIENTS, RECIPIENTS_KEY, WEEKLY_KEY
+        from ..db import store
+
+        if not signed_in():
+            abort(403)
+        try:
+            engine = ops_engine()
+            to = store.get_setting(engine, RECIPIENTS_KEY, DEFAULT_RECIPIENTS)
+            last = store.get_setting(engine, WEEKLY_KEY, {})
+        except Exception:  # noqa: BLE001
+            to, last = DEFAULT_RECIPIENTS, {}
+        return render_template(
+            "weekly.html", snap=snapshot.load_latest(), to=to, last=last,
+            editable=can_edit(), scheduler=os.environ.get("SCHEDULER_ENABLED", "0") == "1",
+            me=request.headers.get("X-Auth-Request-Email", ""),
+            sent=request.args.get("sent"), error=request.args.get("error"),
+        )
+
+    @app.post("/weekly/recipients")
+    def weekly_recipients():
+        from ..cli import RECIPIENTS_KEY
+        from ..db import store
+
+        if not can_edit():
+            abort(403)
+        emails = sorted({
+            e.strip().lower() for e in re.split(r"[\s,;]+", request.form.get("emails", ""))
+            if e.strip()
+        })
+        bad = [e for e in emails if not e.endswith(("@pkinetics.com", "@photonkinetics.com"))]
+        if bad:
+            abort(400, f"Only PK addresses: {', '.join(bad)}")
+        who = request.headers.get("X-Auth-Request-Email", "") or "unknown"
+        store.put_setting(ops_engine(), RECIPIENTS_KEY, emails, who)
+        return redirect(url_for("weekly_page"))
+
+    @app.post("/weekly/test")
+    def weekly_test():
+        from ..cli import send_weekly
+
+        if not signed_in():
+            abort(403)
+        me = request.headers.get("X-Auth-Request-Email", "")
+        if "@" not in me:
+            abort(400, "Can't tell who you are to send you a test.")
+        sent, err = send_weekly([me], record=False)
+        return redirect(url_for("weekly_page", sent=",".join(sent), error=err or None))
 
     @app.get("/vendors")
     def vendors_page():

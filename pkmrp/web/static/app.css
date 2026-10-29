@@ -360,3 +360,7 @@ footer { max-width: 1600px; margin: 0 auto; padding: 18px 20px 30px; color: var(
 .card.flagged { border-color: var(--late); }
 .no-po { background: var(--late-soft); color: var(--ink); border-radius: 8px; padding: 6px 10px; margin: 8px 0 4px; font-size: 13.5px; }
 .done-wait { color: var(--soon); font-size: 13px; margin: 4px 0; }
+.back-connect { color: var(--muted); font-size: 13px; font-weight: 600; margin-right: 6px; white-space: nowrap; }
+.back-connect:hover { color: var(--leaf); }
+.weekly-controls { margin: 8px 0 14px; } .weekly-controls textarea { font: inherit; font-size: 13px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); color: var(--ink); max-width: 100%; }
+.weekly-frame { width: 100%; max-width: 720px; height: 1200px; border: 1px solid var(--line); border-radius: 12px; background: #f5f6f4; }

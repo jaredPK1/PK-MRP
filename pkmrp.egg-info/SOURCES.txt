@@ -2,6 +2,7 @@ pyproject.toml
 pkmrp/__init__.py
 pkmrp/cli.py
 pkmrp/config.py
+pkmrp/notify.py
 pkmrp/run.py
 pkmrp/snapshot.py
 pkmrp.egg-info/PKG-INFO
@@ -37,6 +38,7 @@ pkmrp/core/story.py
 pkmrp/core/supersede.py
 pkmrp/core/supply.py
 pkmrp/core/vendor_order.py
+pkmrp/core/weekly.py
 pkmrp/db/__init__.py
 pkmrp/db/erp.py
 pkmrp/db/extract.py
@@ -72,3 +74,4 @@ tests/test_skumap.py
 tests/test_story.py
 tests/test_supersede.py
 tests/test_vendor_order.py
+tests/test_weekly.py
