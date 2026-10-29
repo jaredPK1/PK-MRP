@@ -15,22 +15,34 @@
     <a class="brand" href="{{ script_root }}/" aria-label="PK-MRP home">
       <img class="mark" src="{{ script_root }}/static/favicon.svg?v={{ version }}" alt="" width="26" height="26"><span>PK&#8209;MRP</span>
     </a>
-    <nav>
-      <a href="{{ script_root }}/" class="{% if request.endpoint == 'home' %}on{% endif %}">Today</a>
-      <a href="{{ script_root }}/buys" class="{% if request.endpoint == 'buys_page' %}on{% endif %}">All buys</a>
-      <a href="{{ script_root }}/vendors" class="{% if request.endpoint in ('vendors_page', 'vendor_page') %}on{% endif %}">By vendor</a>
-      <a href="{{ script_root }}/promise" class="{% if request.endpoint == 'promise_page' %}on{% endif %}">Promise</a>
-      <a href="{{ script_root }}/committed" class="{% if request.endpoint == 'committed_page' %}on{% endif %}">Committed</a>
-      <a href="{{ script_root }}/pipeline" class="{% if request.endpoint == 'pipeline_page' %}on{% endif %}">Pipeline</a>
-      <a href="{{ script_root }}/lead-times" class="{% if request.endpoint == 'params_page' %}on{% endif %}">Lead times</a>
-      <a href="{{ script_root }}/done" class="{% if request.endpoint == 'done_page' %}on{% endif %}">Done</a>
-      <a href="{{ script_root }}/notes" class="{% if request.endpoint == 'notes_page' %}on{% endif %}">Notes</a>
-      <a href="{{ script_root }}/fix-max" class="{% if request.endpoint == 'fix_max_page' %}on{% endif %}">Fix in MAX</a>
-      <a href="{{ script_root }}/overbuys" class="{% if request.endpoint == 'overbuys_page' %}on{% endif %}">Overbuys</a>
-      <a href="{{ script_root }}/analytics" class="{% if request.endpoint == 'analytics_page' %}on{% endif %}">Analytics</a>
-      <a href="{{ script_root }}/training" class="{% if request.endpoint == 'training_page' %}on{% endif %}">Training</a>
+    {% set menus = [
+      ('Buying', [('buys_page', '/buys', 'All buys', 'Everything to place this week'),
+                  ('vendors_page', '/vendors', 'By vendor', 'One order per vendor'),
+                  ('done_page', '/done', 'Done', 'What was placed, and whether MAX agrees'),
+                  ('committed_page', '/committed', 'Committed', 'Long-lead parts planned a year out'),
+                  ('params_page', '/lead-times', 'Lead times', 'Real vs MAX lead times')]),
+      ('Planning', [('promise_page', '/promise', 'Promise', 'Earliest date material supports'),
+                    ('pipeline_page', '/pipeline', 'Pipeline', 'Sales SKUs to MAX parts')]),
+      ('Cleanup', [('fix_max_page', '/fix-max', 'Fix in MAX', 'Records naming obsolete parts'),
+                   ('overbuys_page', '/overbuys', 'Overbuys', 'Money committed beyond need'),
+                   ('notes_page', '/notes', 'Notes', 'Holds, replacements, part notes')]),
+      ('Reports', [('analytics_page', '/analytics', 'Analytics', 'Is the plan getting healthier?'),
+                   ('weekly_page', '/weekly', 'Weekly email', 'Friday summary — preview and test')]),
+    ] %}
+    {% set active = request.endpoint %}
+    <nav aria-label="PK-MRP">
+      <a href="{{ script_root }}/" class="{% if active == 'home' %}on{% endif %}">Today</a>
+      {% for title, items in menus %}{% set here = active in items|map(attribute=0)|list or (active == 'vendor_page' and title == 'Buying') %}
+      <details class="menu{% if here %} on{% endif %}">
+        <summary>{{ title }}</summary>
+        <div class="menu-panel">
+          {% for ep, href, label, hint in items %}<a href="{{ script_root }}{{ href }}" class="{% if active == ep or (ep == 'vendors_page' and active == 'vendor_page') %}on{% endif %}"><b>{{ label }}</b><small>{{ hint }}</small></a>{% endfor %}
+        </div>
+      </details>
+      {% endfor %}
     </nav>
     <span class="grow"></span>
+    <a class="help-link{% if request.endpoint == 'training_page' %} on{% endif %}" href="{{ script_root }}/training">Training</a>
     <span class="pill shadow" title="PK-MRP is recording what it would recommend and comparing it with what actually happens. Nothing here changes MAX.">Shadow mode</span>
   </header>
   <main>{% block content %}{% endblock %}</main>

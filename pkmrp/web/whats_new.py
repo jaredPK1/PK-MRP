@@ -7,6 +7,11 @@ Every feature people can see gets a line here in the same change
 WHATS_NEW = (
     (
         "2026-10-29",
+        "A shorter top menu",
+        "Thirteen links became Today plus four menus: Buying (All buys, By vendor, Done, Committed, Lead times), Planning (Promise, Pipeline), Cleanup (Fix in MAX, Overbuys, Notes) and Reports (Analytics, Weekly email). Each page has a one-line description in its menu, and the menu you're in is highlighted. Training is at the right.",
+    ),
+    (
+        "2026-10-29",
         "Friday summary email, feedback button, back to PK Connect",
         "Every Friday at 3 pm a one-page email sums up the week: how the plan moved (buys due, late, orders and dollars waiting), what got placed and whether MAX confirmed it, whether buying followed PK-MRP's advice, the top of next week's list, and the Fix in MAX counts. See it — and send yourself a test — on the Weekly email page (link at the bottom of Training). PK-MRP also has PK's feedback button now (bottom right), and \"‹ PK Connect\" at the top left takes you back to the app launcher.",
     ),

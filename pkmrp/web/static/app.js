@@ -303,3 +303,18 @@ document.querySelectorAll('table.vendor-order').forEach(function (table) {
     }, { once: true });
   }
 })();
+
+
+// Top menus: one open at a time; click outside or Escape closes.
+(function () {
+  const menus = Array.from(document.querySelectorAll('details.menu'));
+  menus.forEach(m => m.addEventListener('toggle', () => {
+    if (m.open) menus.forEach(o => { if (o !== m) o.open = false; });
+  }));
+  document.addEventListener('click', e => {
+    if (!e.target.closest('details.menu')) menus.forEach(m => { m.open = false; });
+  });
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') menus.forEach(m => { m.open = false; });
+  });
+})();
