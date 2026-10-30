@@ -20,11 +20,13 @@ call, so the pages work even when nothing new was fetched.
 
 import json
 import os
+import re
 from collections import defaultdict
 from datetime import datetime, timedelta
 
 from ..core import eol
 from . import ai, distributors
+from .http import HttpError
 from .mailbox import Mailbox, looks_like_notice
 
 DIST_EVERY = timedelta(hours=1)
@@ -75,28 +77,47 @@ def _annual(run):
     return out
 
 
+DISTRIBUTOR_NAMES = ("DIGIKEY", "DIGI-KEY", "MOUSER", "ARROW", "NEWARK", "AVNET", "FUTURE ELEC",
+                     "TTI", "ALLIED", "RS COMPONENTS", "SAGER", "MASTER ELEC", "HEILIND", "RICHARDSON")
+# Machined/sheet-metal parts, documents, packaging, equipment and PK's own
+# assemblies: no distributor carries them.
+SKIP_PREFIXES = ("00-", "01-", "02-", "03-", "06-", "62-", "64-", "65-", "66-", "67-", "68-",
+                 "90-", "94-", "97-", "98-", "99-")
+PK_NUMBER = re.compile(r"^\d{2}-\d{4}")
+
+
 def candidates(run, annual):
-    """[(part, lookup number)] worth a distributor check, biggest yearly spend first."""
+    """[(part, lookup number)] worth a distributor check: catalog parts with a
+    real manufacturer number (or a distributor SKU), those bought from a
+    distributor first, then by yearly spend."""
     parts = run["parts"]
     mpns = run.get("mpns")
     if mpns is None or not len(mpns):
         return []
-    first = {}
+    names = run.get("vendor_names_by_id") or {}
+    best = {}
     for r in mpns.itertuples(index=False):
-        rank = {"mpn_file": 0, "vendor_mpn": 1, "vendor_sku": 2}.get(r.source, 3)
-        if r.part not in first or rank < first[r.part][0]:
-            first[r.part] = (rank, r.mpn)
+        mpn = (r.mpn or "").strip()
+        if len(mpn) < 4 or PK_NUMBER.match(mpn) or "PHOTON" in (r.maker or "").upper():
+            continue
+        vname = names.get(r.vendor_id, "").upper()
+        at_dist = any(d in vname for d in DISTRIBUTOR_NAMES)
+        if r.source == "vendor_sku" and not at_dist:
+            continue  # a machine shop's own number means nothing to DigiKey
+        rank = 0 if at_dist else {"mpn_file": 1, "vendor_mpn": 1}.get(r.source, 2)
+        if r.part not in best or rank < best[r.part][0]:
+            best[r.part] = (rank, mpn)
     out = []
-    for part, (_rank, mpn) in first.items():
+    for part, (rank, mpn) in best.items():
         info = parts.get(part)
-        if not info or info.type not in ("B",):
+        if not info or info.type != "B" or part.startswith(SKIP_PREFIXES):
             continue
         q = annual.get(part, 0.0) or run["stock"].get(part, 0.0)
         if q <= 0:
             continue
-        out.append((q * float(info.unit_cost or 0.0), part, mpn))
-    out.sort(reverse=True)
-    return [(p, m) for _v, p, m in out]
+        out.append((rank, -q * float(info.unit_cost or 0.0), part, mpn))
+    out.sort()
+    return [(p, m) for _r, _v, p, m in out]
 
 
 def run_distributors(run, annual, data_dir, state, now):
@@ -110,25 +131,41 @@ def run_distributors(run, annual, data_dir, state, now):
     left = {c.name: DIST_PER_TICK.get(c.name, 10) for c in cls}
     if "nexar" in left:
         left["nexar"] = min(left["nexar"], max(NEXAR_PER_WEEK - used.get(week, 0), 0))
+    refused = set()  # clients whose keys were refused this run
     for part, mpn in candidates(run, annual):
-        if not any(left.values()):
+        if not any(v > 0 for k, v in left.items() if k not in refused):
             break
         c = cache.get(part) or {}
         if c.get("checked") and now - datetime.fromisoformat(c["checked"]) < DIST_STALE:
             continue
-        offers = []
+        offers, failed = [], False
         for cl in cls:
-            if left.get(cl.name, 0) <= 0:
+            if cl.name in refused or left.get(cl.name, 0) <= 0:
                 continue
             left[cl.name] -= 1
             if cl.name == "nexar":
                 used[week] = used.get(week, 0) + 1
             try:
                 offers += cl.lookup(mpn)
+            except HttpError as exc:
+                if exc.status == 404:
+                    continue  # not carried: a real answer
+                failed = True
+                if exc.status in (401, 403):
+                    refused.add(cl.name)
+                    status["errors"].append(f"{cl.name}: keys refused ({exc.status}) - {str(exc)[:160]}")
+                else:
+                    status["errors"].append(f"{cl.name} {mpn}: {str(exc)[:120]}")
             except Exception as exc:  # noqa: BLE001 -- one bad lookup doesn't stop the rest
+                failed = True
                 status["errors"].append(f"{cl.name} {mpn}: {str(exc)[:120]}")
+        if failed and not offers:
+            continue  # try again next run rather than call it checked
         cache[part] = {"checked": now.isoformat(timespec="minutes"), "mpn": mpn, "offers": offers}
         status["checked"] += 1
+    if refused:
+        status["state"] = "keys_refused"
+        status["refused"] = sorted(refused)
     state["dist_at"] = now.isoformat(timespec="minutes")
     status["errors"] = status["errors"][:10]
     _save(data_dir, "distributor_cache.json", cache)

@@ -135,3 +135,59 @@ def test_read_notice_sends_schema_and_fallback():
     kw = fc.calls[0]
     assert kw["model"] == ai.MODEL and kw["fallbacks"] == "default"
     assert kw["output_config"]["format"]["type"] == "json_schema"
+
+
+def _run_for(mpn_rows, parts, names):
+    import pandas as pd
+
+    from pkmrp.core.netting import Part
+
+    return {
+        "parts": {p: Part(p, t, unit_cost=c) for p, t, c in parts},
+        "mpns": pd.DataFrame(mpn_rows, columns=["part", "mpn", "maker", "vendor_id", "source"]),
+        "vendor_names_by_id": names,
+        "stock": {},
+    }
+
+
+def test_candidates_skip_custom_parts_and_prefer_distributor_buys():
+    from pkmrp.integrations.research import candidates
+
+    run = _run_for(
+        [("30-0699-00SG", "OPA699ID", "TI", "", "mpn_file"),
+         ("30-1111-00SG", "296-1234-ND", "", "DK", "vendor_sku"),
+         ("98-0885-00G", "N1040A", "KEYSIGHT", "", "mpn_file"),
+         ("62-2522-00G", "QQ-PKINET-04", "", "DUYCK", "vendor_sku"),
+         ("45-3029-01G", "45-3029-01G", "", "", "mpn_file")],
+        [("30-0699-00SG", "B", 5.0), ("30-1111-00SG", "B", 1.0), ("98-0885-00G", "B", 40000),
+         ("62-2522-00G", "B", 35), ("45-3029-01G", "B", 124)],
+        {"DK": "DIGIKEY CORPORATION", "DUYCK": "DUYCK MACHINE INC"},
+    )
+    annual = {p: 100 for p in run["parts"]}
+    assert candidates(run, annual) == [("30-1111-00SG", "296-1234-ND"), ("30-0699-00SG", "OPA699ID")]
+
+
+def test_refused_keys_stop_the_run_and_nothing_is_marked_checked(tmp_path, monkeypatch):
+    from datetime import datetime
+
+    from pkmrp.integrations import research
+    from pkmrp.integrations.http import HttpError
+
+    class Refuse:
+        name = "digikey"
+
+        def __init__(self):
+            self.calls = 0
+
+        def lookup(self, mpn):
+            self.calls += 1
+            raise HttpError(401, "invalid_client")
+
+    cl = Refuse()
+    monkeypatch.setattr(research.distributors, "clients", lambda: [cl])
+    run = _run_for([("30-0699-00SG", "OPA699ID", "TI", "", "mpn_file"),
+                    ("30-0700-00SG", "OPA700ID", "TI", "", "mpn_file")],
+                   [("30-0699-00SG", "B", 5.0), ("30-0700-00SG", "B", 5.0)], {})
+    cache, st = research.run_distributors(run, {"30-0699-00SG": 10, "30-0700-00SG": 10},
+                                          str(tmp_path), {}, datetime(2026, 10, 30, 13))
+    assert cl.calls == 1 and cache == {} and st["state"] == "keys_refused"
