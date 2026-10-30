@@ -238,6 +238,70 @@ def _vendor_price_summary(vp):
     )
 
 
+def _write_json(name, data):
+    os.makedirs(DATA_DIR, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(dir=DATA_DIR, prefix=".tmp-")
+    with os.fdopen(fd, "w", encoding="utf-8") as fh:
+        json.dump(_iso_deep(data), fh, separators=(",", ":"), default=str)
+    os.replace(tmp, os.path.join(DATA_DIR, name))
+
+
+_json_cache = {}
+
+
+def load_json(name):
+    """A data file, re-read only when it changes; None if it isn't there."""
+    path = os.path.join(DATA_DIR, name)
+    try:
+        mtime = os.path.getmtime(path)
+    except OSError:
+        return None
+    hit = _json_cache.get(name)
+    if not hit or hit[0] != mtime:
+        with open(path, encoding="utf-8") as fh:
+            hit = _json_cache[name] = (mtime, json.load(fh))
+    return hit[1]
+
+
+def add_sourcing(run, snap):
+    """Sourcing ideas -> data/sourcing.json; a summary for the snapshot. Never
+    fails the plan."""
+    from .core import sourcing
+
+    try:
+        data = sourcing.build(
+            run["vendor_prices"],
+            (run.get("vendor_delivery") or {}).get("vendors", []),
+            run["dmrs"],
+            run["price_breaks"],
+            run["make_costs"],
+            run["wo_builds"],
+            snap.get("buys") or [],
+            run["parts"],
+            run["bom_all"],
+            run["result"].demands,
+            run.get("vendor_names_by_id") or {},
+            run["today"],
+        )
+        _write_json("sourcing.json", data)
+        return _iso_deep({"status": "ok", "counts": data["counts"], "savings": data["savings"],
+                          "ideas": len(data["ideas"]), "top": data["ideas"][:5]})
+    except Exception as exc:  # noqa: BLE001 -- the plan still publishes
+        return {"status": "error", "error": str(exc)[:300]}
+
+
+def add_research(run, snap):
+    """Distributor checks, the purchasing mailbox and vendor news, each on its
+    own interval and only where its keys are set (integrations/research.py).
+    The EOL watch list is rebuilt from whatever has been collected."""
+    try:
+        from .integrations import research
+
+        return _iso_deep(research.tick(run, snap, DATA_DIR))
+    except Exception as exc:  # noqa: BLE001 -- the plan still publishes
+        return {"status": "error", "error": str(exc)[:300]}
+
+
 def write_vendor_prices(data):
     os.makedirs(DATA_DIR, exist_ok=True)
     fd, tmp = tempfile.mkstemp(dir=DATA_DIR, prefix=".vp-")

@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% from "_notes.html" import part_note with context %}
+{% block title %}Sourcing ideas · PK-MRP{% endblock %}
+{% set kinds = {
+  'switch': ('Switch vendor', 'Another vendor sold it for less and isn’t worse on delivery or returns.'),
+  'catalog': ('Catalog price', 'DigiKey, Mouser or an Octopart seller lists it well under what PK paid.'),
+  'price_break': ('Price break', 'The vendor’s quoted break makes a slightly bigger order cost no more, or saves on parts booked orders use soon.'),
+  'make': ('Build it here', 'PK buys it, but its parts cost well under the price — building pays if it takes under the break-even hours.'),
+  'buy': ('Buy it instead', 'PK builds it, but a vendor sold it for less than material plus labour — or it takes many hours a vendor could take on.'),
+  'negotiate': ('Negotiate', 'Big spend with rising prices, or many small POs: worth an annual agreement or a blanket.'),
+} %}
+{% macro idea_table(rows) %}
+<div class="table-wrap"><table class="dense">
+  <thead><tr><th>Idea</th><th>Part</th><th>Vendor now</th><th>What we found</th><th class="r">A year</th><th>What to do</th><th></th></tr></thead>
+  <tbody>{% for s in rows %}
+    <tr>
+      <td><span class="chip {{ 'soon' if s.kind in ('switch','catalog','price_break') else 'today' }}">{{ kinds[s.kind][0] }}</span></td>
+      <td>{% if s.part %}<span class="mono">{{ s.part }}</span> {{ part_note(s.part, False) }}<div class="muted small">{{ (s.description or '')|lower|capitalize|truncate(40, True, '…') }}</div>{% else %}<span class="muted">—</span>{% endif %}</td>
+      <td class="small">{% if s.vendor_id %}<a href="{{ script_root }}/vendor-prices?v={{ s.vendor_id|urlencode }}{% if s.part %}&part={{ s.part|urlencode }}{% endif %}">{{ (s.vendor or s.vendor_id)|title }}</a>{% else %}{{ s.vendor|title }}{% endif %}{% if s.to_vendor %}<div class="muted">→ {% if s.to_vendor_id %}<a href="{{ script_root }}/vendor-prices?v={{ s.to_vendor_id|urlencode }}&part={{ s.part|urlencode }}">{{ s.to_vendor|title }}</a>{% else %}{{ s.to_vendor|title }}{% endif %}</div>{% endif %}</td>
+      <td class="small">{% if s.check_scope %}<span class="chip today" title="More than 2.5x apart — usually a different job (raw vs finished, bare vs assembled, lot size)">check scope</span> {% endif %}{{ s.what }}{% if s.kind == 'catalog' and s.evidence.url %} <a href="{{ s.evidence.url }}" target="_blank" rel="noopener">listing</a>{% endif %}</td>
+      <td class="r">{% if s.saving %}{{ s.saving|money }}{% elif s.hours_year %}{{ s.hours_year|qty }} h{% else %}—{% endif %}</td>
+      <td class="small">{{ s.do }}</td>
+      <td>{% if s.review %}<span class="muted small">Reviewed by {{ s.review.by.split('@')[0] }} {{ s.review.at[:10]|nice_date(False) }}{% if s.review.note %}: “{{ s.review.note }}”{% endif %}</span>
+          {% if reviewable %}<form method="post" action="{{ script_root }}/review/sourcing" class="inline"><input type="hidden" name="key" value="{{ key_of(s) }}"><input type="hidden" name="back" value="{{ here }}"><button class="btn" name="action" value="undo">Put back</button></form>{% endif %}
+        {% elif reviewable %}<details class="clear-ob"><summary class="small">Reviewed…</summary>
+          <form method="post" action="{{ script_root }}/review/sourcing"><input type="hidden" name="key" value="{{ key_of(s) }}"><input type="hidden" name="back" value="{{ here }}">
+            <input type="text" name="note" maxlength="300" placeholder="What you decided (optional)" aria-label="Note"> <button class="btn" name="action" value="review">Done</button></form></details>{% endif %}</td>
+    </tr>
+  {% else %}<tr><td colspan="7" class="muted">Nothing here. Good.</td></tr>{% endfor %}</tbody>
+</table></div>
+{% endmacro %}
+{% block content %}
+<section class="page-intro">
+  <h1 class="h1-small">Sourcing ideas</h1>
+  <p class="lede"><b>The question this page answers: where would buying differently save money or build hours?</b> Rebuilt every hour from PK's own POs, receipts, returns (DMRs), vendor price breaks, bills of material and standard costs — and, once the keys are in, DigiKey / Mouser / Octopart. Each idea shows the dollars a year it's worth (at a year's quantity: booked orders for the next 12 months or the last 12 months' receipts, whichever is more) and what to do. Mark it Reviewed with what you decided.</p>
+  {% if error %}<p class="lede small-gap late-text">Couldn't read the Reviewed list from PK_Ops: {{ error }}</p>{% endif %}
+  {% if saved %}<p class="lede small-gap">{{ 'Marked reviewed.' if saved == 'review' else 'Put back on the list.' }}</p>{% endif %}
+</section>
+<section class="tiles" aria-label="At a glance">
+  <div class="tile"><span class="num">{{ savings|money }}</span><span class="lbl">a year in open ideas</span><span class="sub">estimates — each needs a quote or a check{% if scope_n %}; {{ scope_n }} big-gap ideas marked “check scope” not counted{% endif %}</span></div>
+  <div class="tile"><span class="num">{{ counts.values()|sum }}</span><span class="lbl">ideas to look at</span><span class="sub">{% for k, v in counts.items() %}{{ v }} {{ kinds[k][0]|lower }}{{ ' · ' if not loop.last }}{% endfor %}</span></div>
+  <div class="tile"><span class="num">{{ (data.standards or [])|length }}</span><span class="lbl">standard costs to fix</span><span class="sub"><a href="{{ script_root }}/sourcing/standards.csv">download the list</a></span></div>
+</section>
+{% set r = research or {} %}
+<p class="muted small">Catalog prices: {% if r.status == 'on' and (r.distributors or {})['keys'] %}checking {{ r.distributors['keys']|join(', ') }} — {{ (r.distributors or {}).cached or 0 }} parts checked so far{% elif r.status == 'on' %}waiting on DigiKey / Mouser / Nexar API keys{% else %}off on this copy (RESEARCH_ENABLED){% endif %}. Shop rate for build-vs-buy: ${{ data.policy.shop_rate|round|int }}/h, fully loaded.</p>
+
+<nav class="filters small" id="list">
+  <a class="chip {{ 'soon' if not kind else 'quiet' }}" href="{{ script_root }}/sourcing">All</a>
+  {% for k, w in kinds.items() %}<a class="chip {{ 'soon' if kind == k else 'quiet' }}" href="{{ script_root }}/sourcing?kind={{ k }}" title="{{ w[1] }}">{{ w[0] }} · {{ counts.get(k, 0) }}</a>{% endfor %}
+</nav>
+{% if kind %}<p class="muted small">{{ kinds[kind][1] }}</p>{% endif %}
+<div class="table-tools"><input type="search" class="table-filter" placeholder="Filter: part, vendor, words" aria-label="Filter ideas"><span class="muted small filter-count"></span></div>
+{{ idea_table(ideas) }}
+{% if done %}<details class="small-gap"><summary class="muted">Reviewed · {{ done|length }}</summary>{{ idea_table(done) }}</details>{% endif %}
+
+<h3 class="steps-h">Standard costs far from what we pay <span class="muted">· {{ (data.standards or [])|length }}</span></h3>
+<p class="muted small">Parts with $5K+ spent in 12 months whose last price is 15%+ off standard. Not a saving — but it skews PPV, margins and every make-vs-buy above. <a href="{{ script_root }}/sourcing/standards.csv">CSV for the cost roll</a>.</p>
+<div class="table-wrap"><table class="dense">
+  <thead><tr><th>Part</th><th class="r">Standard</th><th class="r">Last paid</th><th class="r">Gap</th><th class="r">Qty (12 mo)</th><th class="r">PPV a year</th></tr></thead>
+  <tbody>{% for s in (data.standards or [])[:60] %}
+    <tr><td><a class="mono" href="{{ script_root }}/vendor-prices?v={{ s.vendor_id|urlencode }}&part={{ s.part|urlencode }}">{{ s.part }}</a><div class="muted small">{{ s.description|lower|capitalize|truncate(44, True, '…') }}</div></td>
+      <td class="r">{{ s.evidence.std|money2 }}</td><td class="r">{{ s.evidence.last_price|money2 }}</td>
+      <td class="r {{ 'late-text' if s.evidence.gap_pct > 0 else '' }}">{{ '%+.0f'|format(s.evidence.gap_pct) }}%</td>
+      <td class="r">{{ s.evidence.ttm_qty|qty }}</td><td class="r">{{ s.ppv_year|money }}</td></tr>
+  {% endfor %}</tbody>
+</table></div>
+{% endblock %}

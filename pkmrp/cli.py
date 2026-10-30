@@ -146,14 +146,16 @@ def _plan_once(erp):
     run = build_plan(erp, sku_map=_sku_map(), replacements=_replacements())
     snap = snapshot.build(run, run["so_lines"])
     snapshot.add_audit(snap, run)
+    if run.get("vendor_prices"):
+        snapshot.write_vendor_prices(run["vendor_prices"])
+        snap["sourcing"] = snapshot.add_sourcing(run, snap)
+    snap["research"] = snapshot.add_research(run, snap)
     if scheduler_on():
         snap["ledger"] = _ledger(run, snap)
     else:
         snap["ledger"] = {"status": "off", "why": "SCHEDULER_ENABLED is not 1 on this host"}
     snapshot.write(snap)
     snapshot.write_atp(snapshot.build_atp(run))
-    if run.get("vendor_prices"):
-        snapshot.write_vendor_prices(run["vendor_prices"])
     if scheduler_on():
         _reconcile_done(snap)
         _weekly_tick()

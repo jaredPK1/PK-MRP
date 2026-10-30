@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% from "_notes.html" import part_note with context %}
+{% block title %}EOL watch · PK-MRP{% endblock %}
+{% set kw = {'obsolete': ('Obsolete', 'late'), 'eol': ('End of life', 'late'), 'last_time_buy': ('Last-time buy', 'late'), 'nrnd': ('Not for new designs', 'today'), 'pcn': ('Change notice', 'today'), 'price': ('Price notice', 'quiet'), 'other': ('Notice', 'quiet')} %}
+{% macro eol_table(rows) %}
+<div class="table-wrap"><table class="dense">
+  <thead><tr><th>Part</th><th>What</th><th>Last order</th><th>Where we heard</th><th class="r">Booked</th><th class="r">Have</th><th class="r">Cover</th><th class="r">Last-time buy</th><th></th></tr></thead>
+  <tbody>{% for i in rows %}{% set k = kw.get(i.kind, kw.other) %}
+    <tr>
+      <td><span class="mono">{{ i.part }}</span> {{ part_note(i.part, False) }}<div class="muted small">{{ i.description|lower|capitalize|truncate(40, True, '…') }}</div>{% if i.systems %}<div class="muted small">in {{ i.systems[:3]|join(', ') }}{% if i.systems|length > 3 %} +{{ i.systems|length - 3 }}{% endif %}{% if i.orders %} · {{ i.orders }} order{{ 's' if i.orders != 1 }}{% endif %}</div>{% endif %}</td>
+      <td><span class="chip {{ k[1] }}">{{ k[0] }}</span>{% if i.replacements %}<div class="small">use {{ i.replacements[:2]|join(' / ') }}</div>{% endif %}</td>
+      <td>{% if i.last_order %}{{ i.last_order|nice_date(False) }}<div class="small {{ 'late-text' if i.days_left is not none and i.days_left < 60 else 'muted' }}">{{ ('in ' ~ i.days_left ~ ' days') if i.days_left >= 0 else ('passed ' ~ (-i.days_left) ~ ' days ago') }}</div>{% else %}<span class="muted">not stated</span>{% endif %}</td>
+      <td class="small">{% for s in i.signals[:3] %}<div>{{ s.source }}{% if s.where %} · {{ s.where }}{% endif %}{% if s.date %} · {{ s.date[:10] }}{% endif %}: {{ s.detail|truncate(140) }}{% if s.link %} <a href="{{ s.link }}" target="_blank" rel="noopener">open</a>{% endif %}</div>{% endfor %}{% if i.signals|length > 3 %}<div class="muted">+{{ i.signals|length - 3 }} more</div>{% endif %}</td>
+      <td class="r">{{ i.booked|qty }}<div class="muted small">{{ i.yearly|qty }}/yr</div></td>
+      <td class="r">{{ (i.on_hand + i.on_order)|qty }}<div class="muted small">{{ i.on_hand|qty }} + {{ i.on_order|qty }} on order</div></td>
+      <td class="r">{{ (i.cover_months ~ ' mo') if i.cover_months is not none else '—' }}</td>
+      <td class="r">{% if i.ltb_qty %}<b>{{ i.ltb_qty|qty }}</b><div class="muted small">{{ i.ltb_cost|money }}</div>{% else %}<span class="muted">covered</span>{% endif %}</td>
+      <td>{% if i.review %}<span class="muted small">Reviewed by {{ i.review.by.split('@')[0] }} {{ i.review.at[:10]|nice_date(False) }}{% if i.review.note %}: “{{ i.review.note }}”{% endif %}</span>
+          {% if reviewable %}<form method="post" action="{{ script_root }}/review/eol" class="inline"><input type="hidden" name="key" value="{{ key_of(i) }}"><input type="hidden" name="back" value="{{ here }}"><button class="btn" name="action" value="undo">Put back</button></form>{% endif %}
+        {% elif reviewable %}<details class="clear-ob"><summary class="small">Reviewed…</summary>
+          <form method="post" action="{{ script_root }}/review/eol"><input type="hidden" name="key" value="{{ key_of(i) }}"><input type="hidden" name="back" value="{{ here }}">
+            <input type="text" name="note" maxlength="300" placeholder="What you did (LTB placed, ECN opened…)" aria-label="Note"> <button class="btn" name="action" value="review">Done</button></form></details>{% endif %}</td>
+    </tr>
+  {% else %}<tr><td colspan="9" class="muted">Nothing on the watch list.</td></tr>{% endfor %}</tbody>
+</table></div>
+{% endmacro %}
+{% block content %}
+<section class="page-intro">
+  <h1 class="h1-small">EOL watch</h1>
+  <p class="lede"><b>The question this page answers: which parts are makers ending, and what should we buy before they go?</b> From three places: DigiKey / Mouser / Octopart lifecycle status, PCN and end-of-life notices in the purchasing mailbox (read by Claude), and a weekly web search of the makers behind our most-booked parts. Each part number is matched to ours through MAX's manufacturer part numbers. <b>Last-time buy</b> = booked orders plus two years at the yearly rate, less stock and open POs — a starting point for the conversation with Engineering, not an order.</p>
+  {% if error %}<p class="lede small-gap late-text">Couldn't read the Reviewed list from PK_Ops: {{ error }}</p>{% endif %}
+  {% if saved %}<p class="lede small-gap">{{ 'Marked reviewed.' if saved == 'review' else 'Put back on the list.' }}</p>{% endif %}
+</section>
+{% set r = research or {} %}{% set d = r.distributors or {} %}{% set m = r.mailbox or {} %}{% set n = r.news or {} %}
+<section class="tiles" aria-label="Sources">
+  <div class="tile"><span class="num small-num">{% if d.state == 'ok' %}{{ d.cached or 0 }}{% else %}—{% endif %}</span><span class="lbl">parts checked at distributors</span><span class="sub">{% if r.status != 'on' %}off on this copy{% elif d.state == 'no_keys' %}waiting on API keys{% else %}{{ (d['keys'] or [])|join(', ') }}{% if r.last and r.last.dist_at %} · last {{ r.last.dist_at[5:16] }}{% endif %}{% endif %}</span></div>
+  <div class="tile"><span class="num small-num">{% if m.state == 'ok' %}{{ m.notices_total or 0 }}{% else %}—{% endif %}</span><span class="lbl">notices from purchasing email</span><span class="sub">{% if r.status != 'on' %}off on this copy{% elif m.state == 'no_mailbox' %}waiting on mailbox access (IT){% elif m.state == 'no_ai_key' %}waiting on a Claude API key{% elif m.state == 'error' %}<span class="late-text">{{ m.error|truncate(80) }}</span>{% else %}last {{ (r.last.mail_at or '')[5:16] }}{% endif %}</span></div>
+  <div class="tile"><span class="num small-num">{% if n.state == 'ok' %}{{ n.batches or 0 }}{% else %}—{% endif %}</span><span class="lbl">maker news searches</span><span class="sub">{% if r.status != 'on' %}off on this copy{% elif n.state == 'no_ai_key' %}waiting on a Claude API key{% else %}weekly{% if r.last and r.last.news_at %} · last {{ r.last.news_at[5:10] }}{% endif %}{% endif %}</span></div>
+</section>
+<div id="list"></div>
+<div class="table-tools"><input type="search" class="table-filter" placeholder="Filter: part, maker, words" aria-label="Filter"><span class="muted small filter-count"></span></div>
+{{ eol_table(items) }}
+{% if done %}<details class="small-gap"><summary class="muted">Reviewed · {{ done|length }}</summary>{{ eol_table(done) }}</details>{% endif %}
+<p class="foot-note">Parts Engineering has already obsoleted by ECN are on <a href="{{ script_root }}/fix-max">Fix in MAX</a>; this page is about makers ending what we buy.</p>
+{% endblock %}

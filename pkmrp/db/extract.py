@@ -188,6 +188,63 @@ LEFT JOIN Part_Master pm ON pm.PRTNUM_01 = o.PRTNUM_10
 WHERE o.TYPE_10 = 'PO' AND o.STATUS_10 = '3' AND o.DUEQTY_10 > 0 AND o.COST_10 > 0
 """
 
+# Parts returned to the vendor (a negative receipt, REFDES "DMR nnnnn"), by
+# vendor and part: PK's only vendor-quality record in MAX.
+DMR_SQL = """
+SELECT RTRIM(ISNULL(VENID_55, '')) AS vendor_id, RTRIM(PRTNUM_55) AS part,
+       COUNT(*) AS returns, -SUM(TNXQTY_55) AS qty_returned
+FROM PO_Receipts
+WHERE RTRIM(TYPE_55) = 'PO' AND TNXQTY_55 < 0 AND TNXDTE_55 >= ?
+GROUP BY VENID_55, PRTNUM_55
+"""
+
+# Quoted price breaks per part and vendor (up to three). COST*_07 is kept
+# inconsistently -- per each on some rows, per pack on others -- so callers
+# sanity-check it against what PK actually paid before using it.
+PRICE_BREAKS_SQL = """
+SELECT RTRIM(PRTNUM_07) AS part, RTRIM(VENID_07) AS vendor_id,
+       BREAK1_07 AS break1, COST1_07 AS cost1, BREAK2_07 AS break2, COST2_07 AS cost2,
+       BREAK3_07 AS break3, COST3_07 AS cost3
+FROM Part_Vendor
+WHERE BREAK2_07 > 0 AND COST2_07 > 0
+"""
+
+# Standard cost build-up for make-vs-buy, per stocking unit: material and
+# labour roll-up and the labour hours behind it.
+MAKE_COSTS_SQL = """
+SELECT RTRIM(PRTNUM_01) AS part,
+       MATL_01 / ISNULL(NULLIF(CSTCNV_01, 0), 1) AS material,
+       LABOR_01 / ISNULL(NULLIF(CSTCNV_01, 0), 1) AS labor,
+       HRS_01 / ISNULL(NULLIF(CSTCNV_01, 0), 1) AS hours
+FROM Part_Master
+WHERE TYPE_01 IN ('A', 'B')
+"""
+
+# Work orders PK has run, any status, by part since ? -- a bought part that
+# shows up here has been built in-house (62-3850-00G on rework WOs).
+WO_BUILDS_SQL = """
+SELECT RTRIM(PRTNUM_10) AS part, COUNT(*) AS work_orders, SUM(CURQTY_10) AS qty_built,
+       CAST(MAX(CREDTE_10) AS date) AS last_built
+FROM Order_Master
+WHERE TYPE_10 = 'MF' AND LINNUM_10 = '00' AND DELNUM_10 = '00' AND CREDTE_10 >= ?
+GROUP BY PRTNUM_10
+"""
+
+# Manufacturer part numbers: MAX's MPN file plus the MPN and vendor SKU on
+# each approved-vendor row. What the distributor checks and EOL matching
+# look a part up by.
+MPN_SQL = """
+SELECT RTRIM(PRTNUM_49) AS part, RTRIM(MPNNUM_49) AS mpn, RTRIM(ISNULL(MPNMFG_49, '')) AS maker,
+       '' AS vendor_id, 'mpn_file' AS source
+FROM Mfg_Part_Master WHERE ISNULL(MPNNUM_49, '') <> ''
+UNION ALL
+SELECT RTRIM(PRTNUM_07), RTRIM(MFGPRT_07), RTRIM(ISNULL(MPNMFG_07, '')), RTRIM(VENID_07), 'vendor_mpn'
+FROM Part_Vendor WHERE ISNULL(MFGPRT_07, '') <> ''
+UNION ALL
+SELECT RTRIM(PRTNUM_07), RTRIM(VENPRT_07), '', RTRIM(VENID_07), 'vendor_sku'
+FROM Part_Vendor WHERE ISNULL(VENPRT_07, '') <> ''
+"""
+
 # Components PK sent to a vendor to build with (consigned kits): issues and
 # transfers with no order number whose reference names a PO (70xxxxxx).
 # Chad moves parts into an "OFFSITE @ vendor" location citing the PO, then
@@ -369,6 +426,11 @@ ALL_SQL = {
     "wo_requirements": WO_REQ_SQL,
     "po_history": PO_HISTORY_SQL,
     "receipt_prices": RECEIPT_PRICES_SQL,
+    "dmrs": DMR_SQL,
+    "price_breaks": PRICE_BREAKS_SQL,
+    "make_costs": MAKE_COSTS_SQL,
+    "wo_builds": WO_BUILDS_SQL,
+    "mpns": MPN_SQL,
     "open_po_prices": OPEN_PO_PRICES_SQL,
     "consign_moves": CONSIGN_MOVES_SQL,
     "pipeline_lines": PIPELINE_LINES_SQL,
@@ -399,6 +461,7 @@ _DATES = {
     "opened",
     "closed",
     "date",
+    "last_built",
 }
 _TEXT = {
     "part",
@@ -445,6 +508,9 @@ _TEXT = {
     "obsolete",
     "released",
     "invoice",
+    "mpn",
+    "maker",
+    "source",
 }
 
 
@@ -510,6 +576,31 @@ def receipt_prices(erp, since):
 def open_po_prices(erp):
     """The price on each open PO line, per stocking unit, with standard cost."""
     return _run(erp, "open_po_prices")
+
+
+def dmrs(erp, since):
+    """Returns to the vendor (negative receipts) by vendor and part since `since`."""
+    return _run(erp, "dmrs", [since])
+
+
+def price_breaks(erp):
+    """Quoted price breaks per part and vendor (Part_Vendor)."""
+    return _run(erp, "price_breaks")
+
+
+def make_costs(erp):
+    """Material, labour and hours in each part's standard cost, per stocking unit."""
+    return _run(erp, "make_costs")
+
+
+def wo_builds(erp, since):
+    """Work orders run per part since `since`, any status."""
+    return _run(erp, "wo_builds", [since])
+
+
+def mpns(erp):
+    """Manufacturer part numbers and vendor SKUs per part."""
+    return _run(erp, "mpns")
 
 
 def vendors(erp):

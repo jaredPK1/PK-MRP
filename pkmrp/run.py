@@ -70,6 +70,11 @@ def build_plan(
     hist_df = deep_df[deep_df["created"] >= pd.Timestamp(recent)]
     price_df = timed("receipt_prices", extract.receipt_prices, erp, today - timedelta(days=1500))
     open_price_df = timed("open_po_prices", extract.open_po_prices, erp)
+    dmr_df = timed("dmrs", extract.dmrs, erp, today - timedelta(days=1095))
+    breaks_df = timed("price_breaks", extract.price_breaks, erp)
+    make_cost_df = timed("make_costs", extract.make_costs, erp)
+    wo_builds_df = timed("wo_builds", extract.wo_builds, erp, today - timedelta(days=1095))
+    mpn_df = timed("mpns", extract.mpns, erp)
 
     parts = {
         r.part: Part(
@@ -316,6 +321,12 @@ def build_plan(
         "vendor_name": vendor_name,
         "vendor_names_by_id": names,
         "vendor_delivery": delivery,
+        "bom_all": bom_df,
+        "dmrs": dmr_df,
+        "price_breaks": breaks_df,
+        "make_costs": make_cost_df,
+        "wo_builds": wo_builds_df,
+        "mpns": mpn_df,
         "vendor_prices": vendor_price.build(
             price_df,
             open_price_df,

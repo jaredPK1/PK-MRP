@@ -7,6 +7,11 @@ Every feature people can see gets a line here in the same change
 WHATS_NEW = (
     (
         "2026-10-30",
+        "Sourcing ideas and EOL watch",
+        "Two new Buying pages. Sourcing ideas lists where buying differently would save money or build hours, each with dollars a year and what to do: switch to a vendor who sold the part for less and isn't worse on delivery or returns (big gaps are marked check scope — usually raw vs finished or bare vs assembled), order up to a quoted price break, build a bought part here (with the hours that still break even at the shop rate), buy a part we build (or get quotes for long builds when hours are short), and vendors worth an annual agreement or blanket. It also lists standard costs far from what we pay, with a CSV for the cost roll. EOL watch lists parts makers are ending, from distributor lifecycle data, PCN/EOL emails in the purchasing mailbox and a weekly web search of makers — with where each part is used, booked demand, months of cover and a last-time-buy quantity. Catalog prices, the mailbox and news switch on once the keys and IT's mailbox access are in place. Mark items Reviewed with a note.",
+    ),
+    (
+        "2026-10-30",
         "Vendor prices: who is raising prices, down to the PO",
         "A new Vendor prices page (Reports menu, and linked from Analytics) shows how much more PK pays for the same parts than a year ago — overall and per vendor, with a line by month so you can see whether increases are speeding up. Click a vendor for its parts (price a year ago, latest, standard, dollars), and a part for every PO and open PO with its unit price, PPV and invoice. At the top is a list worth a look, biggest dollars first: a PO priced 10%+ above the one before, an open PO 20%+ over standard, the same part 15%+ cheaper from another vendor, a vendor-wide increase, and prices 4x off (usually a pack/each slip). Mark each one Reviewed with a note when it's handled. The Friday email lists the top five.",
     ),

@@ -12,6 +12,7 @@ dependencies = [
     "click>=8.1",
     "gunicorn>=22",
     "pymssql>=2.3",  # pk_access (PK sign-in) reads the permissions DB with it
+    "anthropic>=1.17,<2",  # EOL notices and vendor news (integrations/ai.py)
 ]
 
 [project.optional-dependencies]

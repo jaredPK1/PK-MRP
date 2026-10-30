@@ -103,6 +103,7 @@ def _lead_words(source):
 
 SKU_MAP_KEY = "pipeline_sku_map"
 PRICE_REVIEWED_KEY = "price_alerts_reviewed"
+REVIEW_LISTS = {"sourcing": "sourcing_reviewed", "eol": "eol_reviewed"}
 CLEARED_KEY = "overbuy_cleared"
 NOTES_KEY = "part_notes"
 REPLACE_KEY = "part_replacements"
@@ -504,6 +505,108 @@ def create_app():
             back = url_for("vendor_prices_page")
         sep = "&" if "?" in back else "?"
         return redirect(f"{back.split('#')[0]}{sep}saved={action}#look")
+
+    def idea_key(s):
+        return f"{s['kind']}|{s.get('vendor_id') or ''}|{s.get('part') or ''}|{s.get('to_vendor_id') or s.get('to_vendor') or ''}"
+
+    def reviewed_list(name):
+        from ..db import store
+
+        try:
+            return store.get_setting(ops_engine(), REVIEW_LISTS[name], {}), None
+        except Exception as exc:  # noqa: BLE001 -- page still shows
+            return {}, str(exc)[:200]
+
+    @app.get("/sourcing")
+    def sourcing_page():
+        data = snapshot.load_json("sourcing.json") or abort(404)
+        catalog = snapshot.load_json("distributor_ideas.json") or []
+        kind = request.args.get("kind", "")
+        reviewed, error = reviewed_list("sourcing")
+        # ideas ready to act on first; big gaps that need a scope check after them
+        ideas = sorted(data["ideas"] + catalog,
+                       key=lambda s: (bool(s.get("check_scope")), -s["saving"], -s.get("hours_year", 0)))
+        shown = [s for s in ideas if (not kind or s["kind"] == kind)]
+        open_ = [s for s in shown if idea_key(s) not in reviewed]
+        done = [dict(s, review=reviewed[idea_key(s)]) for s in shown if idea_key(s) in reviewed]
+        counts = {}
+        for s in ideas:
+            if idea_key(s) not in reviewed:
+                counts[s["kind"]] = counts.get(s["kind"], 0) + 1
+        snap = snapshot.load_latest()
+        return render_template(
+            "sourcing.html", snap=snap, data=data, ideas=open_, done=done, kind=kind,
+            counts=counts,
+            savings=sum(s["saving"] for s in ideas
+                        if idea_key(s) not in reviewed and not s.get("check_scope")),
+            scope_n=sum(1 for s in ideas if s.get("check_scope") and idea_key(s) not in reviewed),
+            research=(snap or {}).get("research") or {}, key_of=idea_key,
+            reviewable=signed_in() and error is None, error=error, saved=request.args.get("saved"),
+        )
+
+    @app.get("/sourcing/standards.csv")
+    def sourcing_standards_csv():
+        import csv
+        import io
+
+        data = snapshot.load_json("sourcing.json") or abort(404)
+        buf = io.StringIO()
+        w = csv.writer(buf)
+        w.writerow(["part", "description", "standard", "last_paid", "last_po", "gap_pct",
+                    "qty_12m", "ppv_12m"])
+        for s in data.get("standards", []):
+            e = s["evidence"]
+            w.writerow([s["part"], s["description"], e["std"], e["last_price"], e["last_po"],
+                        e["gap_pct"], e["ttm_qty"], s["ppv_year"]])
+        return buf.getvalue(), 200, {
+            "Content-Type": "text/csv; charset=utf-8",
+            "Content-Disposition": f'attachment; filename="standard-cost-fixes-{date.today()}.csv"',
+        }
+
+    def eol_key(i):
+        sig = i["signals"][0] if i.get("signals") else {}
+        return f"{i['part']}|{i['kind']}|{sig.get('source', '')}|{i.get('last_order') or ''}"
+
+    @app.get("/eol")
+    def eol_page():
+        data = snapshot.load_json("eol.json") or {"items": [], "counts": {}}
+        reviewed, error = reviewed_list("eol")
+        items = [i for i in data["items"] if eol_key(i) not in reviewed]
+        done = [dict(i, review=reviewed[eol_key(i)]) for i in data["items"] if eol_key(i) in reviewed]
+        snap = snapshot.load_latest()
+        return render_template(
+            "eol.html", snap=snap, items=items, done=done, research=(snap or {}).get("research") or {},
+            key_of=eol_key, reviewable=signed_in() and error is None, error=error,
+            saved=request.args.get("saved"),
+        )
+
+    @app.post("/review/<name>")
+    def review_save(name):
+        from ..db import store
+
+        if name not in REVIEW_LISTS or not signed_in():
+            abort(403)
+        key = request.form.get("key") or ""
+        action = request.form.get("action")
+        if action not in ("review", "undo") or not key:
+            abort(400)
+        engine = ops_engine()
+        current = store.get_setting(engine, REVIEW_LISTS[name], {})
+        who = request.headers.get("X-Auth-Request-Email", "") or "unknown"
+        if action == "undo":
+            current.pop(key, None)
+        else:
+            current[key] = {
+                "note": (request.form.get("note") or "").strip()[:300],
+                "by": who,
+                "at": datetime.now().isoformat(timespec="minutes"),
+            }
+        store.put_setting(engine, REVIEW_LISTS[name], current, who)
+        back = request.form.get("back") or ""
+        if not back.startswith("/") or back.startswith("//") or "\\" in back:
+            back = url_for("sourcing_page" if name == "sourcing" else "eol_page")
+        sep = "&" if "?" in back else "?"
+        return redirect(f"{back.split('#')[0]}{sep}saved={action}#list")
 
     @app.get("/training")
     def training_page():
