@@ -191,3 +191,33 @@ def test_refused_keys_stop_the_run_and_nothing_is_marked_checked(tmp_path, monke
     cache, st = research.run_distributors(run, {"30-0699-00SG": 10, "30-0700-00SG": 10},
                                           str(tmp_path), {}, datetime(2026, 10, 30, 13))
     assert cl.calls == 1 and cache == {} and st["state"] == "keys_refused"
+
+
+def test_a_new_distributor_checks_parts_already_checked_by_another(tmp_path, monkeypatch):
+    import json as _json
+    from datetime import datetime
+
+    from pkmrp.integrations import research
+
+    class Mouser:
+        name = "mouser"
+
+        def lookup(self, mpn):
+            return [{"source": "mouser", "mpn": mpn, "lifecycle": "active", "breaks": [[1, 2.0]]}]
+
+    class DigiKey:
+        name = "digikey"
+
+        def lookup(self, mpn):  # pragma: no cover - must not be asked again
+            raise AssertionError("digikey re-asked")
+
+    (tmp_path / "distributor_cache.json").write_text(_json.dumps({"30-0699-00SG": {
+        "checked": "2026-10-30T12:00", "mpn": "OPA699ID",
+        "offers": [{"source": "digikey", "mpn": "OPA699ID", "lifecycle": "active", "breaks": []}]}}))
+    monkeypatch.setattr(research.distributors, "clients", lambda: [DigiKey(), Mouser()])
+    run = _run_for([("30-0699-00SG", "OPA699ID", "TI", "", "mpn_file")], [("30-0699-00SG", "B", 5.0)], {})
+    cache, st = research.run_distributors(run, {"30-0699-00SG": 10}, str(tmp_path), {},
+                                          datetime(2026, 10, 30, 14))
+    e = cache["30-0699-00SG"]
+    assert {o["source"] for o in e["offers"]} == {"digikey", "mouser"}
+    assert e["sources"] == ["digikey", "mouser"] and e["checked"] == "2026-10-30T12:00"

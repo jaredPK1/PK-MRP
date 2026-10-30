@@ -136,9 +136,12 @@ def run_distributors(run, annual, data_dir, state, now):
         if not any(v > 0 for k, v in left.items() if k not in refused):
             break
         c = cache.get(part) or {}
-        if c.get("checked") and now - datetime.fromisoformat(c["checked"]) < DIST_STALE:
+        fresh = c.get("checked") and now - datetime.fromisoformat(c["checked"]) < DIST_STALE
+        # entries from before "sources" was kept count as checked by whoever answered
+        had = set(c.get("sources") or {o["source"].split(":")[0] for o in c.get("offers") or []})
+        if fresh and {cl.name for cl in cls} <= had:
             continue
-        offers, failed = [], False
+        offers, failed, asked = [], False, set()
         for cl in cls:
             if cl.name in refused or left.get(cl.name, 0) <= 0:
                 continue
@@ -147,8 +150,10 @@ def run_distributors(run, annual, data_dir, state, now):
                 used[week] = used.get(week, 0) + 1
             try:
                 offers += cl.lookup(mpn)
+                asked.add(cl.name)
             except HttpError as exc:
                 if exc.status == 404:
+                    asked.add(cl.name)
                     continue  # not carried: a real answer
                 failed = True
                 if exc.status in (401, 403):
@@ -161,7 +166,12 @@ def run_distributors(run, annual, data_dir, state, now):
                 status["errors"].append(f"{cl.name} {mpn}: {str(exc)[:120]}")
         if failed and not offers:
             continue  # try again next run rather than call it checked
-        cache[part] = {"checked": now.isoformat(timespec="minutes"), "mpn": mpn, "offers": offers}
+        if fresh:  # only a new distributor was asked: add to what's there
+            keep = [o for o in c.get("offers") or [] if o["source"].split(":")[0] not in asked]
+            cache[part] = dict(c, offers=keep + offers, sources=sorted(had | asked))
+        else:
+            cache[part] = {"checked": now.isoformat(timespec="minutes"), "mpn": mpn,
+                           "offers": offers, "sources": sorted(asked)}
         status["checked"] += 1
     if refused:
         status["state"] = "keys_refused"
