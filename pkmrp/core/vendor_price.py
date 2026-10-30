@@ -45,15 +45,15 @@ class PricePolicy:
     months: int = 36  # receipts shown in the drill-down
     series_months: int = 24  # points on the "vs a year earlier" lines
     jump_pct: float = 0.10
-    jump_min_impact: float = 500.0
+    jump_min_impact: float = 2000.0
     recent_days: int = 120
     over_std_pct: float = 0.20
-    over_std_min_impact: float = 500.0
+    over_std_min_impact: float = 2000.0
     drift_pct: float = 0.08
     drift_min_spend: float = 25000.0
     elsewhere_pct: float = 0.15
     elsewhere_days: int = 730
-    elsewhere_min_impact: float = 500.0
+    elsewhere_min_impact: float = 2000.0
     odd_ratio: float = 4.0
     odd_min_value: float = 200.0
 

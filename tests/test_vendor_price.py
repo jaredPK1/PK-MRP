@@ -56,10 +56,10 @@ def test_yoy_drops_pack_slips():
 
 def test_price_up_over_std_cheaper_elsewhere_and_drill_down():
     rec = _rec([
-        (D(400), "70100001", "35-0126-00G", "DATAPRO", 100, 29.30, 29.30),
-        (D(30), "70110001", "35-0126-00G", "DATAPRO", 100, 36.00, 29.30),
+        (D(400), "70100001", "35-0126-00G", "DATAPRO", 400, 29.30, 29.30),
+        (D(30), "70110001", "35-0126-00G", "DATAPRO", 400, 36.00, 29.30),
         (D(200), "70105000", "62-2522-00G", "AMS", 50, 7.60, 7.6),
-        (D(20), "70110824", "62-2522-00G", "DUYCK", 50, 35.16, 7.6),
+        (D(20), "70110824", "62-2522-00G", "DUYCK", 100, 35.16, 7.6),
     ])
     opn = _open([("70110956", "41-3294-00G", "OSI", D(5), 50, 920.0, 467.30)])
     vp = build(rec, opn, {"DATAPRO": "DATAPRO INTL", "DUYCK": "DUYCK", "AMS": "AMS", "OSI": "OSI"},
@@ -101,8 +101,8 @@ def test_snapshot_summary_reads_the_build_output():
     from pkmrp.snapshot import _vendor_price_summary
 
     rec = _rec([
-        (D(400), "70100001", "35-0126-00G", "DATAPRO", 100, 29.30, 29.30),
-        (D(30), "70110001", "35-0126-00G", "DATAPRO", 100, 36.00, 29.30),
+        (D(400), "70100001", "35-0126-00G", "DATAPRO", 400, 29.30, 29.30),
+        (D(30), "70110001", "35-0126-00G", "DATAPRO", 400, 36.00, 29.30),
     ])
     s = _vendor_price_summary(build(rec, _open([]), {}, {}, {}, TODAY))
     assert s["status"] == "ok" and s["alerts"] == 1 and s["top"][0]["part"] == "35-0126-00G"
@@ -116,3 +116,11 @@ def test_open_po_at_dearer_vendor_flags_even_if_other_sold_later():
     ce = [a for a in vp["alerts"] if a["kind"] == "cheaper_else"]
     assert len(ce) == 1 and ce[0]["vendor_id"] == "DUYCK" and ce[0]["po"] == "70110821"
     assert round(ce[0]["impact"]) == round((197.56 - 123.91) * 250)
+
+
+def test_small_increases_stay_off_the_list():
+    rec = _rec([
+        (D(400), "70100001", "35-0126-00G", "DATAPRO", 100, 29.30, 29.30),
+        (D(30), "70110001", "35-0126-00G", "DATAPRO", 100, 36.00, 29.30),  # $670 at stake
+    ])
+    assert build(rec, _open([]), {}, {}, {}, TODAY)["alerts"] == []
