@@ -89,6 +89,11 @@ def build(snap, trend, log, impact, today=None):
             for b in buys[:5]
         ],
         "fix_max": (fx.get("counts") if fx.get("status") == "ok" else None),
+        "audit": {
+            "pos_30d": (snap.get("audit") or {}).get("pos_30d", 0),
+            "extra_pos_30d": (snap.get("audit") or {}).get("extra_pos_30d", 0),
+            "repeat_parts": ((snap.get("audit") or {}).get("counts") or {}).get("repeat_po", 0),
+        },
         "obsolete_buys": len(ecn.get("obsolete_buys") or []),
         "ecn_status": ecn.get("status", "off"),
         "vendor_on_time": quarters[-2:] if quarters else [],

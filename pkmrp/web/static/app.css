@@ -384,3 +384,4 @@ footer a { color: var(--leaf); }
 .help-link.on { background: var(--soon-soft); color: var(--leaf-dark); }
 .bar nav .menu-panel a { color: var(--ink); white-space: normal; padding: 8px 10px; }
 .bar nav .menu-panel a.on { color: var(--leaf-dark); }
+.add-to-po { margin-top: 6px; color: var(--ink-2, inherit); }

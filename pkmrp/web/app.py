@@ -971,6 +971,15 @@ def create_app():
         sep = "&" if "?" in back else "?"
         return redirect(f"{back.split('#')[0]}{sep}noted={part}")
 
+    @app.get("/check")
+    def audit_page():
+        snap = snapshot.load_latest() or abort(404)
+        au = snap.get("audit") or {"counts": {}, "findings": [], "trend": []}
+        groups = {}
+        for f in au.get("findings", []):
+            groups.setdefault(f["check"], []).append(f)
+        return render_template("audit.html", snap=snap, au=au, groups=groups)
+
     @app.get("/fix-max")
     def fix_max_page():
         snap = snapshot.load_latest() or abort(404)

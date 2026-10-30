@@ -6,6 +6,11 @@ Every feature people can see gets a line here in the same change
 
 WHATS_NEW = (
     (
+        "2026-10-30",
+        "Smarter order quantities, and a decision check",
+        "Buys used to show only what was due this week, so a cheap part came back every few days: 14 of the $36 USB cable on Thursday, 15 more on Friday, 114 behind that. Now each buy is one sensible order: it covers booked orders for a stretch of weeks worked out from the part's cost and how fast orders use it (cheap, steady parts cover more; expensive parts only what's needed now; committed parts follow their blanket plan). The card says how far it covers and how many can't wait, and if a PO for the part went in during the last two weeks it says to add to that PO. A new Decision check page (Reports menu) runs every hour and lists repeat POs, parts wanted again right after a PO, buys that changed sharply since the last plan (a red changed chip on the card), buys that came and went, and late buys left sitting.",
+    ),
+    (
         "2026-10-29",
         "A shorter top menu",
         "Thirteen links became Today plus four menus: Buying (All buys, By vendor, Done, Committed, Lead times), Planning (Promise, Pipeline), Cleanup (Fix in MAX, Overbuys, Notes) and Reports (Analytics, Weekly email). Each page has a one-line description in its menu, and the menu you're in is highlighted. Training is at the right.",

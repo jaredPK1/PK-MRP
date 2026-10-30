@@ -27,7 +27,7 @@
       <td class="r muted">{{ b.rank }}</td>
       <td class="mono">{{ b.part }} {{ part_note(b.part) }}</td>
       <td class="dcol">{{ b.description|lower|capitalize }}</td>
-      <td class="r">{{ b.qty|qty }}{% if b.packs %}<br><span class="muted small">{{ b.packs }} {{ b.pack_uom or 'pack' }} of {{ b.pack_qty|qty }}</span>{% endif %}</td>
+      <td class="r">{{ b.qty|qty }}{% if b.sizing and b.sizing.policy == 'economic' %}<br><span class="muted small" title="{{ b.sizing.why }}">thru {{ b.sizing.covers_until|nice_date(False) }}</span>{% endif %}{% if b.changed and b.changed.kind != 'new' %}<br><span class="chip late" title="{{ b.changed.text }}">changed</span>{% endif %}{% if b.packs %}<br><span class="muted small">{{ b.packs }} {{ b.pack_uom or 'pack' }} of {{ b.pack_qty|qty }}</span>{% endif %}</td>
       <td class="r">{{ b.spend|money if b.spend else '' }}</td>
       <td><span class="chip {{ b.tone }}">{{ b.when }}</span></td>
       <td class="r">{{ b.lead_days|round|int }}d</td>

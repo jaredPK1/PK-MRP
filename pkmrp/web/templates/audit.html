@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% from "_notes.html" import part_note with context %}
+{% block title %}Decision check · PK-MRP{% endblock %}
+{% set words = {
+  'rebuy': ('More wanted right after a PO', 'The plan wants more of a part that got a PO in the last two weeks. Add to that PO instead of cutting a new one.'),
+  'repeat_po': ('Repeat POs', 'The same part on two or more POs within two weeks, in the last 30 days. One PO would have done.'),
+  'jumped': ('Changed since the last plan', 'Buys that grew sharply, or whose need moved two weeks or more earlier, since the hour before. Check before ordering.'),
+  'flip': ('Came and went', 'Buys that showed up and disappeared within a day with no PO placed. Nothing to buy, but someone may have chased it.'),
+  'sitting': ('Late and sitting', 'Ten or more days past the order-by date and on the list for three days or more.'),
+  'sizing': ('Order size to look at', 'The sizer checking itself: a small order with more due soon, or one very large order.'),
+} %}
+{% block content %}
+<section class="page-intro">
+  <h1 class="h1-small">Decision check</h1>
+  <p class="lede"><b>The question this page answers: is PK-MRP steering buyers well, and are buys landing in one go?</b> It runs after every hourly plan, compares with the plan before, and looks at POs placed in MAX over the last 30 days. Each item says what to do; it clears itself when the cause is gone.</p>
+  {% if au.error %}<p class="lede small-gap late-text">The check couldn't run on the last plan: {{ au.error }}</p>{% endif %}
+  {% set c = au.counts or {} %}
+  <p class="lede small-gap">Last run {{ au.at[11:16] if au.at else '—' }} · <b>{{ au.pos_30d or 0 }}</b> PO lines placed in 30 days{% if au.extra_pos_30d %}, <b class="late-text">{{ au.extra_pos_30d }}</b> of them repeats one PO could have covered{% else %}, no repeats{% endif %}.</p>
+</section>
+
+{% if au.trend and au.trend|length > 1 %}
+<h3 class="steps-h">By day</h3>
+<div class="table-wrap"><table class="dense">
+  <thead><tr><th>Day</th><th class="r">PO lines (30d)</th><th class="r">Repeats</th><th class="r">More after a PO</th><th class="r">Changed</th><th class="r">Came and went</th><th class="r">Sitting</th></tr></thead>
+  <tbody>{% for t in au.trend|reverse %}{% if loop.index <= 14 %}
+    <tr><td>{{ t.date|nice_date }}</td><td class="r">{{ t.pos_30d }}</td><td class="r">{{ t.extra_pos_30d }}</td><td class="r">{{ t.rebuy or 0 }}</td><td class="r">{{ t.jumped or 0 }}</td><td class="r">{{ t.flip or 0 }}</td><td class="r">{{ t.sitting or 0 }}</td></tr>
+  {% endif %}{% endfor %}</tbody>
+</table></div>
+{% endif %}
+
+{% for key in ['rebuy', 'jumped', 'repeat_po', 'flip', 'sitting', 'sizing'] %}
+{% set rows = groups.get(key, []) %}
+<h3 class="steps-h">{{ words[key][0] }} <span class="muted">· {{ rows|length }}</span></h3>
+<p class="muted small">{{ words[key][1] }}</p>
+<div class="table-wrap"><table class="dense">
+  <thead><tr><th>Part</th><th>What happened</th>{% if key == 'repeat_po' %}<th>POs</th>{% endif %}<th>What to do</th></tr></thead>
+  <tbody>{% for f in rows %}
+    <tr><td class="mono">{{ f.part }} {{ part_note(f.part, False) }}<div class="muted small">{{ (f.description or '')|lower|capitalize }}</div></td>
+        <td>{{ f.what }}{% if f.cause %}<div class="muted small">Likely: {{ f.cause }}</div>{% endif %}</td>
+        {% if key == 'repeat_po' %}<td class="small">{% for p in f.pos %}<span style="white-space:nowrap"><span class="mono">{{ p.po }}</span> · {{ p.qty|qty }} · {{ p.created|nice_date(False) }}</span><br>{% endfor %}</td>{% endif %}
+        <td class="small">{{ f.do }}</td></tr>
+  {% else %}<tr><td colspan="4" class="muted">Nothing here. Good.</td></tr>{% endfor %}</tbody>
+</table></div>
+{% endfor %}
+{% endblock %}

@@ -59,6 +59,10 @@
 {% if fc and (fc.so_scheduled or fc.ms_entries or fc.work_orders) %}
 <p class="fix-max-line"><a href="{{ script_root }}/fix-max"><b>Fix in MAX:</b> {{ fc.so_scheduled }} order line{{ 's' if fc.so_scheduled != 1 }}{% if fc.ms_entries %}, {{ fc.ms_entries }} forecast entr{{ 'ies' if fc.ms_entries != 1 else 'y' }}{% endif %}{% if fc.work_orders %}, {{ fc.work_orders }} work order{{ 's' if fc.work_orders != 1 }}{% endif %} still name a part an ECN obsoleted — they make MRP buy the dead part →</a></p>
 {% endif %}
+{% set ac = ((snap.audit or {}).get('counts')) or {} %}
+{% if ac.rebuy or ac.repeat_po or ac.jumped %}
+<p class="fix-max-line"><a href="{{ script_root }}/check"><b>Decision check:</b>{% if ac.rebuy %} {{ ac.rebuy }} part{{ 's' if ac.rebuy != 1 }} wanted again right after a PO (add to that PO){% endif %}{% if ac.repeat_po %}{{ ',' if ac.rebuy }} {{ ac.repeat_po }} part{{ 's' if ac.repeat_po != 1 }} on repeat POs this month{% endif %}{% if ac.jumped %}{{ ',' if ac.rebuy or ac.repeat_po }} {{ ac.jumped }} buy{{ 's' if ac.jumped != 1 }} changed since the last plan{% endif %} →</a></p>
+{% endif %}
 {% if on_hold %}
 <section class="on-hold" aria-labelledby="hold-h">
   <h2 id="hold-h">On hold — don't buy <span class="muted">· {{ on_hold|length }}</span></h2>
@@ -89,12 +93,13 @@
         <div class="row1">
           <span class="part">{{ b.part }}</span>
           <span class="chip {{ b.tone }}">{{ b.when }}</span>
+          {% if b.changed and b.changed.kind != 'new' %}<span class="chip late" title="{{ b.changed.text }} — check Why this buy? before ordering">changed</span>{% endif %}
           {% if b.wo_only %}<span class="chip quiet" title="No sales order pegged directly — needed by open work orders or vendor kits">for open WOs</span>{% endif %}
           {{ part_note(b.part) }}
         </div>
         <div class="desc">{{ b.description|lower|capitalize }}</div>
         <div class="facts">
-          <span><b>{{ b.qty|qty }}</b> to buy{% if b.packs %} <span class="muted">({{ b.packs }} {{ b.pack_uom or 'pack' }} of {{ b.pack_qty|qty }})</span>{% endif %}{% if b.spend %} · {{ b.spend|money }}{% endif %} <small class="muted" title="Only the buys whose order-by date falls in the next 5 working days — the minimum to place now. Later needs come up as their dates get close.">· the minimum this week{% if b.vendor %} — <a href="{{ script_root }}/vendor?v={{ b.vendor|urlencode }}&weeks=4&part={{ b.part|urlencode }}">4-week order</a>{% endif %}</small></span>
+          {% set sz = b.sizing or {} %}<span><b>{{ b.qty|qty }}</b> to buy{% if b.packs %} <span class="muted">({{ b.packs }} {{ b.pack_uom or 'pack' }} of {{ b.pack_qty|qty }})</span>{% endif %}{% if b.spend %} · {{ b.spend|money }}{% endif %} <small class="muted" title="{{ sz.why }}">{% if sz.policy == 'economic' %}· covers orders through {{ sz.covers_until|nice_date(False) }} ({{ b.min_qty|qty }} can't wait){% else %}· what booked orders need now{% endif %}</small></span>
           <span>{{ b.lead_days|round|int }}-day lead <small>· {{ b.lead_source|lead_words }}</small></span>
           {% if b.vendor %}{% set n = vendor_n.get(b.vendor, 1) %}<span>vendor <a class="vendor-link" href="{{ script_root }}/vendor?v={{ b.vendor|urlencode }}&part={{ b.part|urlencode }}" title="Everything PK needs from {{ b.vendor|title }}, on one PO">{{ b.vendor }}{% if n > 1 %} · +{{ n - 1 }} more to order with it{% endif %}</a></span>{% endif %}
         </div>
@@ -105,6 +110,8 @@
           {% if b.customers %}<span class="cust">· {{ b.customers[:3]|join(', ') }}{% if b.customers|length > 3 %} +{{ b.customers|length - 3 }}{% endif %}</span>{% endif %}
         </div>
         {% endif %}
+        {% if sz.add_to_po %}<div class="add-to-po small">PO {{ sz.add_to_po.po }} for {{ sz.add_to_po.qty|qty }} went in {{ sz.add_to_po.created|nice_date(False) }} — add these to it rather than a new PO, if the vendor will take it.</div>{% endif %}
+        {% if b.changed and b.changed.kind != 'new' %}<div class="add-to-po small late-text">{{ b.changed.text }}. Check Why this buy? before ordering — a re-dated order can swing back within hours.</div>{% endif %}
         {{ done_note(b.part) }}
         <div class="card-actions">
           <button class="why-btn" data-why="{{ script_root }}/why/{{ b.part }}" data-target="#why-{{ loop.index }}" aria-expanded="false">Why this buy?</button>

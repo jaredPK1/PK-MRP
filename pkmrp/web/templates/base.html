@@ -26,7 +26,8 @@
       ('Cleanup', [('fix_max_page', '/fix-max', 'Fix in MAX', 'Records naming obsolete parts'),
                    ('overbuys_page', '/overbuys', 'Overbuys', 'Money committed beyond need'),
                    ('notes_page', '/notes', 'Notes', 'Holds, replacements, part notes')]),
-      ('Reports', [('analytics_page', '/analytics', 'Analytics', 'Is the plan getting healthier?'),
+      ('Reports', [('audit_page', '/check', 'Decision check', 'Repeat POs, swings, buys left sitting'),
+                   ('analytics_page', '/analytics', 'Analytics', 'Is the plan getting healthier?'),
                    ('weekly_page', '/weekly', 'Weekly email', 'Friday summary — preview and test')]),
     ] %}
     {% set active = request.endpoint %}

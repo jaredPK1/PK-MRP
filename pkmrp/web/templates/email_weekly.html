@@ -66,6 +66,7 @@
   <tr><td style="padding:14px 26px 4px;"><div style="font-size:15px;font-weight:700;">Housekeeping</div></td></tr>
   <tr><td style="padding:2px 26px 14px;font-size:14px;color:#3a4049;line-height:1.7;">
     {% if w.fix_max %}Fix in MAX: <b>{{ w.fix_max.so_scheduled }}</b> scheduled order lines, <b>{{ w.fix_max.ms_entries }}</b> forecast entries and <b>{{ w.fix_max.work_orders }}</b> work orders still name an ECN-obsoleted part.<br>{% elif w.ecn_status == 'no_access' %}Fix in MAX is waiting on read access to the ECN database.<br>{% endif %}
+    {% if w.audit and w.audit.pos_30d %}Decision check: <b>{{ w.audit.pos_30d }}</b> PO lines placed in 30 days{% if w.audit.extra_pos_30d %}, <b style="color:#c2410c;">{{ w.audit.extra_pos_30d }}</b> of them repeats on {{ w.audit.repeat_parts }} part{{ 's' if w.audit.repeat_parts != 1 }} that one PO could have covered{% else %}, no repeat POs{% endif %} (<a href="{{ base_url }}/check" style="color:#007a61;">details</a>).<br>{% endif %}
     {% if w.obsolete_buys %}<b style="color:#c2410c;">{{ w.obsolete_buys }}</b> buy{{ 's' if w.obsolete_buys != 1 }} on parts an ECN obsoleted — check before placing.<br>{% endif %}
     {% if w.vendor_on_time %}Vendor on-time (first receipt by the date first asked): {% for q in w.vendor_on_time %}{{ q.quarter }} <b>{{ q.on_time_pct|round|int }}%</b>{{ ' · ' if not loop.last }}{% endfor %}.{% endif %}
   </td></tr>

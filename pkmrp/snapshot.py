@@ -17,7 +17,7 @@ from datetime import date, datetime
 import pandas as pd
 
 from .core.analytics import breakdown, trend_point
-from .core.calendar import plus_workdays
+from .core.order_qty import size_all
 from .core.overbuy import overbuys
 from .core.params import purlt_proposals
 from .core.rank import buy_list
@@ -98,9 +98,11 @@ def build(run, so_df):
         return parts[p].description if p in parts else ""
 
     late_by_part = Counter(e.part for e in res.exceptions if e.kind == "late_to_place")
-    horizon = plus_workdays(today, 5)  # rank.buy_list's horizon
+    committed = {r["part"] for r in run.get("segments") or [] if r["segment"] == "committed"}
+    size_all(buys, res.planned, res.demands, parts, run["open_pos"], committed, run["settings"], today)
     for b in buys:
         part = b["part"]
+        sz = b["sizing"]
         b["story"] = _iso_deep(
             build_story(
                 part,
@@ -114,11 +116,7 @@ def build(run, so_df):
                 today,
                 describe,
                 so_meta,
-                later_buys=[
-                    (o.place_by, o.qty)
-                    for o in res.planned
-                    if o.part == part and o.kind == "buy" and o.place_by > horizon
-                ],
+                later_buys=[(sz["later_place_by"], sz["later_qty"])] if sz["later_qty"] else [],
             )
         )
         b["late_lines"] = late_by_part.get(part, 0)
@@ -301,6 +299,43 @@ def load_latest():
             return json.load(fh)
     except (OSError, ValueError):
         return None
+
+
+def load_audit_state():
+    try:
+        with open(os.path.join(DATA_DIR, "audit_state.json"), encoding="utf-8") as fh:
+            return json.load(fh)
+    except (OSError, ValueError):
+        return {}
+
+
+def write_audit_state(state):
+    os.makedirs(DATA_DIR, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(dir=DATA_DIR, prefix=".audit-")
+    with os.fdopen(fd, "w", encoding="utf-8") as fh:
+        json.dump(_iso_deep(state), fh, separators=(",", ":"), default=str)
+    os.replace(tmp, os.path.join(DATA_DIR, "audit_state.json"))
+
+
+def add_audit(snap, run):
+    """Run the decision check against the last run's state; never fail the plan."""
+    from .core.audit import run_audit
+
+    try:
+        parts = run["parts"]
+        audit, state = run_audit(
+            snap,
+            load_audit_state(),
+            run["open_pos"],
+            run["today"],
+            datetime.now(),
+            shelf=frozenset(run.get("shelf") or ()),
+            descriptions={p: parts[p].description for p in set(run["open_pos"]["part"]) if p in parts},
+        )
+        snap["audit"] = _iso_deep(audit)
+        write_audit_state(state)
+    except Exception as exc:  # noqa: BLE001 -- the plan still publishes
+        snap["audit"] = {"error": str(exc)[:300], "counts": {}, "findings": [], "trend": []}
 
 
 def load_previous(today_iso):

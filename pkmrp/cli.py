@@ -145,6 +145,7 @@ def _plan_once(erp):
 
     run = build_plan(erp, sku_map=_sku_map(), replacements=_replacements())
     snap = snapshot.build(run, run["so_lines"])
+    snapshot.add_audit(snap, run)
     if scheduler_on():
         snap["ledger"] = _ledger(run, snap)
     else:
