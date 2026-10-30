@@ -385,3 +385,9 @@ footer a { color: var(--leaf); }
 .bar nav .menu-panel a { color: var(--ink); white-space: normal; padding: 8px 10px; }
 .bar nav .menu-panel a.on { color: var(--leaf-dark); }
 .add-to-po { margin-top: 6px; color: var(--ink-2, inherit); }
+/* Vendor prices */
+.crumbs { margin: 2px 0 8px; color: var(--muted); } .crumbs a { color: var(--leaf-dark); text-decoration: none; }
+.spark { color: var(--leaf); vertical-align: middle; }
+.up-text { color: var(--today); font-weight: 600; } .down-text { color: var(--soon); font-weight: 600; }
+tr.muted-row td { background: var(--bg); }
+form.inline { display: inline; }

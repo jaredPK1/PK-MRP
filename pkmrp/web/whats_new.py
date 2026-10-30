@@ -7,6 +7,11 @@ Every feature people can see gets a line here in the same change
 WHATS_NEW = (
     (
         "2026-10-30",
+        "Vendor prices: who is raising prices, down to the PO",
+        "A new Vendor prices page (Reports menu, and linked from Analytics) shows how much more PK pays for the same parts than a year ago — overall and per vendor, with a line by month so you can see whether increases are speeding up. Click a vendor for its parts (price a year ago, latest, standard, dollars), and a part for every PO and open PO with its unit price, PPV and invoice. At the top is a list worth a look, biggest dollars first: a PO priced 10%+ above the one before, an open PO 20%+ over standard, the same part 15%+ cheaper from another vendor, a vendor-wide increase, and prices 4x off (usually a pack/each slip). Mark each one Reviewed with a note when it's handled. The Friday email lists the top five.",
+    ),
+    (
+        "2026-10-30",
         "Smarter order quantities, and a decision check",
         "Buys used to show only what was due this week, so a cheap part came back every few days: 14 of the $36 USB cable on Thursday, 15 more on Friday, 114 behind that. Now each buy is one sensible order: it covers booked orders for a stretch of weeks worked out from the part's cost and how fast orders use it (cheap, steady parts cover more; expensive parts only what's needed now; committed parts follow their blanket plan). The card says how far it covers and how many can't wait, and if a PO for the part went in during the last two weeks it says to add to that PO. A new Decision check page (Reports menu) runs every hour and lists repeat POs, parts wanted again right after a PO, buys that changed sharply since the last plan (a red changed chip on the card), buys that came and went, and late buys left sitting.",
     ),

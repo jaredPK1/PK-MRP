@@ -152,6 +152,8 @@ def _plan_once(erp):
         snap["ledger"] = {"status": "off", "why": "SCHEDULER_ENABLED is not 1 on this host"}
     snapshot.write(snap)
     snapshot.write_atp(snapshot.build_atp(run))
+    if run.get("vendor_prices"):
+        snapshot.write_vendor_prices(run["vendor_prices"])
     if scheduler_on():
         _reconcile_done(snap)
         _weekly_tick()

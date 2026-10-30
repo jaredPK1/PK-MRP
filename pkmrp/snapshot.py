@@ -199,6 +199,7 @@ def build(run, so_df):
         "vendor_pos": _iso_deep(
             recent_open_pos(run["open_pos"], run.get("vendor_names_by_id") or {}, today)
         ),
+        "vendor_prices": _vendor_price_summary(run.get("vendor_prices")),
         "ecn": _ecn(run, buys, needs_source),
         "replaced": _iso_deep(run.get("replaced") or {}),
         "fix_max": _iso_deep(run.get("fix_max") or {"status": "off"}),
@@ -218,6 +219,47 @@ def build(run, so_df):
             )
         ),
     }
+
+
+def _vendor_price_summary(vp):
+    """The headline and top alerts; the full drill-down is vendor_prices.json."""
+    if not vp:
+        return {"status": "off"}
+    return _iso_deep(
+        {
+            "status": "ok",
+            "change_12m": vp["overall"]["change_12m"],
+            "extra_12m": vp["overall"]["extra_12m"],
+            "alert_counts": vp["alert_counts"],
+            "alerts": len(vp["alerts"]),
+            "impact": round(sum(a["impact"] for a in vp["alerts"]), 2),
+            "top": vp["alerts"][:5],
+        }
+    )
+
+
+def write_vendor_prices(data):
+    os.makedirs(DATA_DIR, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(dir=DATA_DIR, prefix=".vp-")
+    with os.fdopen(fd, "w", encoding="utf-8") as fh:
+        json.dump(_iso_deep(data), fh, separators=(",", ":"), default=str)
+    os.replace(tmp, os.path.join(DATA_DIR, "vendor_prices.json"))
+
+
+_vp_cache = {"mtime": None, "data": None}
+
+
+def load_vendor_prices():
+    """The vendor price data, re-read only when the file changes."""
+    path = os.path.join(DATA_DIR, "vendor_prices.json")
+    try:
+        mtime = os.path.getmtime(path)
+    except OSError:
+        return None
+    if _vp_cache["mtime"] != mtime:
+        with open(path, encoding="utf-8") as fh:
+            _vp_cache.update(mtime=mtime, data=json.load(fh))
+    return _vp_cache["data"]
 
 
 def _ecn(run, buys, needs_source):

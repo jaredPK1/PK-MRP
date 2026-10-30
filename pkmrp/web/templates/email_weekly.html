@@ -63,6 +63,16 @@
   </td></tr>
   {% endif %}
 
+  {% set pr = w.prices or {} %}{% if pr.status == 'ok' %}
+  <tr><td style="padding:14px 26px 4px;"><div style="font-size:15px;font-weight:700;">Vendor prices</div></td></tr>
+  <tr><td style="padding:2px 26px 10px;font-size:14px;color:#3a4049;line-height:1.6;">
+    The same parts cost <b>{{ '%+.1f'|format(pr.change_12m) if pr.change_12m is not none else '—' }}%</b> vs a year ago.{% if pr.alerts %} <b>{{ pr.alerts }}</b> price issues worth a look, {{ pr.impact|money }} at stake. The biggest:{% endif %}
+    {% if pr.top %}<table role="presentation" cellpadding="0" cellspacing="0" style="margin-top:6px;font-size:13px;width:100%;">{% for a in pr.top %}
+      <tr><td style="padding:3px 8px 3px 0;vertical-align:top;white-space:nowrap;"><b>{{ a.impact|money }}</b></td><td style="padding:3px 0;">{{ a.vendor|title }}{% if a.part %} · <span style="font-family:monospace;">{{ a.part }}</span>{% endif %} — {{ a.what }}</td></tr>
+    {% endfor %}</table>{% endif %}
+    <a href="{{ base_url }}/vendor-prices" style="color:#007a61;">Open Vendor prices</a>
+  </td></tr>
+  {% endif %}
   <tr><td style="padding:14px 26px 4px;"><div style="font-size:15px;font-weight:700;">Housekeeping</div></td></tr>
   <tr><td style="padding:2px 26px 14px;font-size:14px;color:#3a4049;line-height:1.7;">
     {% if w.fix_max %}Fix in MAX: <b>{{ w.fix_max.so_scheduled }}</b> scheduled order lines, <b>{{ w.fix_max.ms_entries }}</b> forecast entries and <b>{{ w.fix_max.work_orders }}</b> work orders still name an ECN-obsoleted part.<br>{% elif w.ecn_status == 'no_access' %}Fix in MAX is waiting on read access to the ECN database.<br>{% endif %}

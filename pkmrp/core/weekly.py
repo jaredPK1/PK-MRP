@@ -89,6 +89,7 @@ def build(snap, trend, log, impact, today=None):
             for b in buys[:5]
         ],
         "fix_max": (fx.get("counts") if fx.get("status") == "ok" else None),
+        "prices": snap.get("vendor_prices") or {},
         "audit": {
             "pos_30d": (snap.get("audit") or {}).get("pos_30d", 0),
             "extra_pos_30d": (snap.get("audit") or {}).get("extra_pos_30d", 0),

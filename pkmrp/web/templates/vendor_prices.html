@@ -1,0 +1,186 @@
+{% extends "base.html" %}
+{% from "_notes.html" import part_note with context %}
+{% block title %}Vendor prices · PK-MRP{% endblock %}
+
+{% set kinds = {
+  'price_up': ('Price up', 'late'),
+  'over_std': ('Over standard', 'today'),
+  'cheaper_else': ('Cheaper elsewhere', 'today'),
+  'vendor_drift': ('Vendor-wide increase', 'late'),
+  'price_odd': ('Check the unit', 'late'),
+} %}
+
+{% macro trend(points, unit='%', h=130, w=560, zero=True) %}
+{# points: [[label, value]] -- one series; with zero=True the axis includes 0 and a zero line is drawn #}
+{% set vals = points|map(attribute=1)|select('number')|list %}
+{% if vals|length < 2 %}
+<p class="muted small chart-empty">Not enough history for a line yet.</p>
+{% else %}
+{% set pad_l = 8 %}{% set pad_r = 8 %}{% set pad_t = 14 %}{% set pad_b = 22 %}
+{% set lo = [vals|min, 0]|min if zero else vals|min * 0.95 %}{% set hi = [vals|max, 0]|max if zero else vals|max * 1.05 %}
+{% set span = (hi - lo) or 1 %}{% set lo = lo - span * 0.1 %}{% set hi = hi + span * 0.1 %}{% set span = hi - lo %}
+{% set n = points|length %}{% set step = (w - pad_l - pad_r) / ((n - 1) if n > 1 else 1) %}
+{% set ih = h - pad_t - pad_b %}
+<svg class="line-chart" viewBox="0 0 {{ w }} {{ h }}" role="img">
+  {% if zero and lo < 0 < hi %}<line class="base" x1="{{ pad_l }}" x2="{{ w - pad_r }}" y1="{{ pad_t + ih * (hi / span) }}" y2="{{ pad_t + ih * (hi / span) }}"/>{% endif %}
+  <line class="grid" x1="{{ pad_l }}" x2="{{ w - pad_r }}" y1="{{ h - pad_b }}" y2="{{ h - pad_b }}"/>
+  {% set vmax = vals|max %}{% set vmin = vals|min %}
+  <text class="xl" x="{{ w - pad_r }}" y="{{ pad_t + ih * ((hi - vmax) / span) - 4 }}" text-anchor="end">high {% if unit == '$' %}{{ vmax|money2 }}{% else %}{{ '%+.1f'|format(vmax) }}{{ unit }}{% endif %}</text>
+  {% if vmin != vmax %}<text class="xl" x="{{ w - pad_r }}" y="{{ pad_t + ih * ((hi - vmin) / span) + 12 }}" text-anchor="end">low {% if unit == '$' %}{{ vmin|money2 }}{% else %}{{ '%+.1f'|format(vmin) }}{{ unit }}{% endif %}</text>{% endif %}
+  {% if zero and lo < 0 < hi %}<text class="xl" x="{{ pad_l }}" y="{{ pad_t + ih * (hi / span) - 3 }}">0</text>{% endif %}
+  <polyline class="ln" points="{% for lab, v in points %}{% if v is number %}{{ pad_l + loop.index0 * step }},{{ pad_t + ih * ((hi - v) / span) }} {% endif %}{% endfor %}"/>
+  {% for lab, v in points %}{% if v is number %}{% set x = pad_l + loop.index0 * step %}{% set y = pad_t + ih * ((hi - v) / span) %}
+  <g class="pt"><circle class="hit" cx="{{ x }}" cy="{{ y }}" r="12"/><circle class="dot" cx="{{ x }}" cy="{{ y }}" r="3.5"/>
+    <title>{{ lab }}: {% if unit == '$' %}{{ v|money2 }}{% else %}{{ '%+.1f'|format(v) }}{{ unit }}{% endif %}</title></g>
+  {% if loop.first or loop.last or (n > 6 and loop.index0 % ((n // 4) or 1) == 0) %}<text class="xl" x="{{ x }}" y="{{ h - 6 }}" text-anchor="{{ 'start' if loop.first else 'end' if loop.last else 'middle' }}">{{ lab }}</text>{% endif %}
+  {% endif %}{% endfor %}
+</svg>
+{% endif %}
+{% endmacro %}
+
+{% macro spark(points) %}
+{% set vals = points|map(attribute=1)|select('number')|list %}
+{% if vals|length >= 2 %}{% set lo = vals|min %}{% set hi = vals|max %}{% set span = (hi - lo) or 1 %}{% set n = vals|length %}
+<svg class="spark" viewBox="0 0 80 20" width="80" height="20" aria-hidden="true"><polyline fill="none" stroke="currentColor" stroke-width="1.5" points="{% for v in vals %}{{ (loop.index0 * 80 / (n - 1))|round(1) }},{{ (18 - 16 * (v - lo) / span)|round(1) }} {% endfor %}"/></svg>
+{% endif %}
+{% endmacro %}
+
+{% macro pct(v) %}{% if v is none %}<span class="muted">—</span>{% else %}<span class="{{ 'late-text' if v >= 10 else 'up-text' if v > 0 else 'down-text' if v < 0 else '' }}">{{ '%+.1f'|format(v) }}%</span>{% endif %}{% endmacro %}
+
+{% macro alert_table(rows, show_vendor=True) %}
+<div class="table-wrap"><table class="dense">
+  <thead><tr><th>What</th>{% if show_vendor %}<th>Vendor</th>{% endif %}<th>Part</th><th>What happened</th><th class="r">At stake</th><th>What to do</th><th></th></tr></thead>
+  <tbody>{% for a in rows %}{% set k = kinds[a.kind] %}
+    <tr>
+      <td><span class="chip {{ k[1] }}">{{ k[0] }}</span></td>
+      {% if show_vendor %}<td><a href="{{ script_root }}/vendor-prices?v={{ a.vendor_id|urlencode }}">{{ a.vendor|title }}</a></td>{% endif %}
+      <td>{% if a.part %}<a class="mono" href="{{ script_root }}/vendor-prices?v={{ a.vendor_id|urlencode }}&part={{ a.part|urlencode }}">{{ a.part }}</a> {{ part_note(a.part, False) }}<div class="muted small">{{ (a.description or '')|lower|capitalize|truncate(40, True, '…') }}</div>{% else %}<span class="muted">all parts</span>{% endif %}</td>
+      <td class="small">{{ a.what }}</td>
+      <td class="r">{{ a.impact|money }}</td>
+      <td class="small">{{ a.do }}</td>
+      <td>{% if a.review %}<span class="muted small">Reviewed by {{ a.review.by.split('@')[0] }} {{ a.review.at[:10]|nice_date(False) }}{% if a.review.note %}: “{{ a.review.note }}”{% endif %}</span>
+          {% if reviewable %}<form method="post" action="{{ script_root }}/vendor-prices/review" class="inline"><input type="hidden" name="key" value="{{ key_of(a) }}"><input type="hidden" name="back" value="{{ here }}"><button class="btn" name="action" value="undo">Put back</button></form>{% endif %}
+        {% elif reviewable %}<details class="clear-ob"><summary class="small">Reviewed…</summary>
+          <form method="post" action="{{ script_root }}/vendor-prices/review"><input type="hidden" name="key" value="{{ key_of(a) }}"><input type="hidden" name="back" value="{{ here }}">
+            <input type="text" name="note" maxlength="300" placeholder="What you found (optional)" aria-label="Note"> <button class="btn" name="action" value="review">Done</button></form></details>{% endif %}</td>
+    </tr>
+  {% else %}<tr><td colspan="7" class="muted">Nothing to look at. Good.</td></tr>{% endfor %}</tbody>
+</table></div>
+{% endmacro %}
+
+{% block content %}
+{% set o = vp.overall %}
+<section class="page-intro">
+  <h1 class="h1-small">Vendor prices</h1>
+  <nav class="crumbs small"><a href="{{ script_root }}/vendor-prices">All vendors</a>{% if vendor %} › <a href="{{ script_root }}/vendor-prices?v={{ v|urlencode }}">{{ vendor.vendor|title }}</a>{% endif %}{% if part %} › <span class="mono">{{ part }}</span>{% endif %}</nav>
+  {% if not v %}
+  <p class="lede"><b>The question this page answers: are vendors raising prices on us, and where?</b> From every PO receipt in MAX, per unit (packs converted). The headline compares the <b>same parts</b> this year against the year before, weighted by last year's quantities, so buying more or less doesn't move it — only price does. Click a vendor, then a part, to see every PO. The list at the top is what's worth a look; mark each one Reviewed when you've dealt with it.</p>
+  {% endif %}
+  {% if error %}<p class="lede small-gap late-text">Couldn't read the Reviewed list from PK_Ops: {{ error }}</p>{% endif %}
+  {% if saved %}<p class="lede small-gap" id="saved">{{ 'Marked reviewed.' if saved == 'review' else 'Put back on the list.' }}</p>{% endif %}
+</section>
+
+{% if not v %}
+{# ======================= all vendors ======================= #}
+<section class="tiles" aria-label="Prices at a glance">
+  <div class="tile"><span class="num">{{ pct(o.change_12m) }}</span><span class="lbl">same parts vs a year ago</span><span class="sub">{{ o.compared_parts }} parts bought in both years</span></div>
+  <div class="tile"><span class="num">{{ o.extra_12m|money }}</span><span class="lbl">more paid this year for them</span><span class="sub">{{ o.coverage_pct }}% of {{ o.ttm_spend|money }} spent in 12 months</span></div>
+  <div class="tile"><span class="num">{{ alerts|length }}</span><span class="lbl">to look at</span><span class="sub">{{ alerts|sum(attribute='impact')|money }} at stake</span></div>
+</section>
+<figure class="wide-fig"><figcaption>Same parts vs a year earlier, all vendors (%), at each month end</figcaption>{{ trend(o.series) }}</figure>
+<p class="muted small">Each point compares the 12 months to that month with the 12 before. Rising = increases are speeding up; falling = easing. Mark's dashboard chains month to month (start = 100); on parts whose unit price swings with lot size that drifts, so this page compares year to year instead.</p>
+
+<h3 class="steps-h" id="look">Look at these <span class="muted">· {{ alerts|length }}</span></h3>
+<p class="muted small">Biggest dollars first. <b>Price up</b>: the latest PO costs 10%+ more per unit than the one before, from the same vendor, in the last 4 months or still open. <b>Over standard</b>: an open PO 20%+ over standard cost. <b>Cheaper elsewhere</b>: another vendor sold us the part 15%+ cheaper in the last two years. <b>Vendor-wide</b>: the same parts cost 8%+ more than a year ago on $25K+ of spend. <b>Check the unit</b>: a price 4x off the last one — usually a pack/each slip. Each needs $500+ at stake.</p>
+<div class="table-tools"><input type="search" class="table-filter" placeholder="Filter: vendor, part, PO" aria-label="Filter the list"><span class="muted small filter-count"></span></div>
+{{ alert_table(alerts) }}
+{% if done_alerts %}<details class="small-gap"><summary class="muted">Reviewed · {{ done_alerts|length }}</summary>{{ alert_table(done_alerts) }}</details>{% endif %}
+
+<h3 class="steps-h">Vendors</h3>
+<p class="muted small">Everyone PK received from in the last 12 months, by spend. “Compared” is how much of that spend is on parts also bought the year before — a vendor at 10% is mostly new parts, so its % says little.</p>
+<div class="table-tools"><input type="search" class="table-filter" placeholder="Filter: vendor name" aria-label="Filter vendors"><span class="muted small filter-count"></span></div>
+<div class="table-wrap"><table class="dense">
+  <thead><tr><th>Vendor</th><th class="r">Spent (12 mo)</th><th class="r">Same parts vs a year ago</th><th class="r">More paid</th><th class="r">Compared</th><th>Trend (12 mo)</th><th class="r">On time</th><th class="r">To look at</th></tr></thead>
+  <tbody>{% for x in vp.vendors %}{% set na = vp.alerts|selectattr('vendor_id', 'equalto', x.vendor_id)|list|length %}
+    <tr><td><a href="{{ script_root }}/vendor-prices?v={{ x.vendor_id|urlencode }}">{{ x.vendor|title }}</a></td>
+      <td class="r">{{ x.ttm_spend|money }}</td><td class="r">{{ pct(x.change_12m) }}</td>
+      <td class="r">{{ x.extra_12m|money if x.change_12m is not none else '—' }}</td>
+      <td class="r muted">{{ (x.coverage_pct ~ '%') if x.change_12m is not none else '—' }}</td>
+      <td>{{ spark(x.series) }}</td>
+      <td class="r">{{ (x.on_time_pct|round|int ~ '%') if x.on_time_pct is not none else '—' }}</td>
+      <td class="r">{{ na or '' }}</td></tr>
+  {% endfor %}</tbody>
+</table></div>
+
+{% elif not part %}
+{# ======================= one vendor ======================= #}
+{% if not vendor %}<p class="lede">No receipts from this vendor in the last 12 months.</p>{% else %}
+<section class="tiles" aria-label="{{ vendor.vendor|title }}">
+  <div class="tile"><span class="num">{{ vendor.ttm_spend|money }}</span><span class="lbl">spent in 12 months</span><span class="sub">{{ vendor.parts }} parts · {{ vendor.receipts_12m }} receipts</span></div>
+  <div class="tile"><span class="num">{{ pct(vendor.change_12m) }}</span><span class="lbl">same parts vs a year ago</span><span class="sub">{% if vendor.change_12m is not none %}{{ vendor.compared_parts }} parts, {{ vendor.coverage_pct }}% of spend · {{ vendor.extra_12m|money }} more{% else %}nothing bought in both years{% endif %}</span></div>
+  <div class="tile"><span class="num">{{ (vendor.on_time_pct|round|int ~ '%') if vendor.on_time_pct is not none else '—' }}</span><span class="lbl">on time (24 mo)</span><span class="sub">first receipt by the date first asked</span></div>
+</section>
+<figure class="wide-fig"><figcaption>{{ vendor.vendor|title }}: same parts vs a year earlier (%)</figcaption>{{ trend(vendor.series) }}</figure>
+{% endif %}
+<h3 class="steps-h" id="look">Look at these <span class="muted">· {{ alerts|length }}</span></h3>
+{{ alert_table(alerts, False) }}
+{% if done_alerts %}<details class="small-gap"><summary class="muted">Reviewed · {{ done_alerts|length }}</summary>{{ alert_table(done_alerts, False) }}</details>{% endif %}
+
+<h3 class="steps-h">Parts</h3>
+<p class="muted small">Every part bought from them in the last 3 years. “A year ago” is the last PO on or before 12 months back (or the first one, if newer); “latest” is the newest PO, open or received. Biggest dollar change first.</p>
+<div class="table-tools"><input type="search" class="table-filter" placeholder="Filter: part, description" aria-label="Filter parts"><span class="muted small filter-count"></span></div>
+<div class="table-wrap"><table class="dense">
+  <thead><tr><th>Part</th><th class="r">A year ago</th><th class="r">Latest</th><th class="r">Change</th><th>Latest PO</th><th class="r">Standard</th><th class="r">Qty (12 mo)</th><th class="r">$ change</th><th>Price</th></tr></thead>
+  <tbody>{% for r in parts %}
+    <tr><td><a class="mono" href="{{ script_root }}/vendor-prices?v={{ v|urlencode }}&part={{ r.part|urlencode }}">{{ r.part }}</a> {{ part_note(r.part, False) }}<div class="muted small">{{ r.description|lower|capitalize|truncate(44, True, '…') }}</div></td>
+      <td class="r">{{ r.base_price|money2 }}<div class="muted small">{{ r.base_date|nice_date(False) }}</div></td>
+      <td class="r">{{ r.last_price|money2 }}<div class="muted small">{{ r.last_date|nice_date(False) }}</div></td>
+      <td class="r">{{ pct(r.change_pct) if r.pos > 1 else '' }}</td>
+      <td class="mono small">{{ r.last_po }}{% if r.last_open %} <span class="chip quiet">open</span>{% endif %}</td>
+      <td class="r muted">{{ r.std|money2 if r.std else '—' }}</td>
+      <td class="r">{{ r.ttm_qty|qty }}</td>
+      <td class="r">{{ r.impact|money if r.pos > 1 else '' }}</td>
+      <td>{{ spark(r.series) }}</td></tr>
+  {% endfor %}</tbody>
+</table></div>
+
+{% else %}
+{# ======================= one part from one vendor ======================= #}
+{% if prow %}
+<section class="tiles" aria-label="{{ part }}">
+  <div class="tile"><span class="num">{{ prow.last_price|money2 }}</span><span class="lbl">latest, PO {{ prow.last_po }}</span><span class="sub">{{ prow.last_date|nice_date }}{% if prow.last_open %} · open{% endif %}</span></div>
+  <div class="tile"><span class="num">{{ pct(prow.change_pct) if prow.pos > 1 else '—' }}</span><span class="lbl">{% if prow.pos > 1 %}vs {{ prow.base_price|money2 }} a year ago{% else %}only one PO from them{% endif %}</span><span class="sub">{{ prow.pos }} PO{{ 's' if prow.pos != 1 }} in 3 years</span></div>
+  <div class="tile"><span class="num">{{ prow.std|money2 if prow.std else '—' }}</span><span class="lbl">standard cost</span><span class="sub">{{ prow.ttm_qty|qty }} received in 12 months{% if prow.open_qty %} · {{ prow.open_qty|qty }} on order{% endif %}</span></div>
+</section>
+<p class="lede small-gap">{{ prow.description|lower|capitalize }} {{ part_note(part) }}</p>
+<figure class="wide-fig"><figcaption>Price paid per unit, by month (receipts, quantity-weighted)</figcaption>{{ trend(prow.series, '$', 140, 560, False) }}</figure>
+{% endif %}
+<h3 class="steps-h" id="look">Look at these <span class="muted">· {{ alerts|length }}</span></h3>
+{{ alert_table(alerts, False) }}
+{% if done_alerts %}<details class="small-gap"><summary class="muted">Reviewed · {{ done_alerts|length }}</summary>{{ alert_table(done_alerts, False) }}</details>{% endif %}
+
+<h3 class="steps-h">Every PO</h3>
+<p class="muted small">Newest first. Open lines are on order, not yet received. <span class="chip late">up</span> / <span class="chip soon">down</span> = 10%+ from the PO before; <span class="chip late">check unit</span> = 4x off. PPV = (price − standard) × qty.</p>
+<div class="table-wrap"><table class="dense">
+  <thead><tr><th>Date</th><th>PO / line</th><th class="r">Qty</th><th class="r">Unit price</th><th></th><th class="r">Standard</th><th class="r">PPV</th><th>Invoice</th></tr></thead>
+  <tbody>{% for l in lines %}
+    <tr{% if l.open %} class="muted-row"{% endif %}><td>{{ l.date|nice_date(False) if l.date else '' }}{% if l.open %}<div class="muted small">open · due {{ l.due|nice_date(False) if l.due else '?' }}</div>{% endif %}</td>
+      <td class="mono">{{ l.po }}/{{ l.line }}</td><td class="r">{{ l.qty|qty }}</td><td class="r">{{ l.unit_price|money2 }}</td>
+      <td>{% if l.flag == 'up' %}<span class="chip late">up</span>{% elif l.flag == 'down' %}<span class="chip soon">down</span>{% elif l.flag == 'odd' %}<span class="chip late">check unit</span>{% endif %}</td>
+      <td class="r muted">{{ l.std|money2 if l.std else '—' }}</td>
+      <td class="r {{ 'late-text' if l.ppv and l.ppv > 0 else '' }}">{{ l.ppv|money if l.ppv is not none else '—' }}</td>
+      <td class="small">{{ l.invoice }}</td></tr>
+  {% else %}<tr><td colspan="8" class="muted">No POs from this vendor for this part in the last 3 years.</td></tr>{% endfor %}</tbody>
+</table></div>
+
+{% if other_vendors %}
+<h3 class="steps-h">Other vendors for {{ part }}</h3>
+<div class="table-wrap"><table class="dense">
+  <thead><tr><th>Vendor</th><th class="r">Latest</th><th>Latest PO</th><th class="r">POs (3 yr)</th></tr></thead>
+  <tbody>{% for r in other_vendors %}
+    <tr><td><a href="{{ script_root }}/vendor-prices?v={{ r.vendor_id|urlencode }}&part={{ part|urlencode }}">{{ r.vendor|title }}</a></td><td class="r">{{ r.last_price|money2 }}</td><td class="mono small">{{ r.last_po }} · {{ r.last_date|nice_date(False) }}</td><td class="r">{{ r.pos }}</td></tr>
+  {% endfor %}</tbody>
+</table></div>
+{% endif %}
+{% endif %}
+{% endblock %}

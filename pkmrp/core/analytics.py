@@ -71,6 +71,7 @@ def vendor_delivery(po_history, purchase_lt, vendor_names_by_id, today, months=2
         vendors.append(
             {
                 "vendor": vendor_names_by_id.get(vid, vid),
+                "vendor_id": vid,
                 "lines": int(len(g)),
                 "on_time_pct": round(100.0 * float(g["on_time"].mean()), 1),
                 "late_lines": int(len(late)),

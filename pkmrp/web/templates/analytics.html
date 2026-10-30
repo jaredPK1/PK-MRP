@@ -93,6 +93,7 @@
 
 <section class="lesson" id="vendors">
   <h2>Which vendors deliver?</h2>
+  {% set vps = snap.vendor_prices or {} %}{% if vps.status == 'ok' %}<p class="lede small-gap"><b>And what they charge:</b> the same parts cost {{ '%+.1f'|format(vps.change_12m) if vps.change_12m is not none else '—' }}% vs a year ago{% if vps.alerts %}, with <b>{{ vps.alerts }}</b> price issues worth a look ({{ vps.impact|money }} at stake){% endif %}. <a href="{{ script_root }}/vendor-prices">Vendor prices — by vendor, part and PO →</a></p>{% endif %}
   <p class="lede">From PK's own POs: <b>on time</b> = first receipt on or before the date first asked on the PO (early counts). <b>Real lead</b> = working days from PO to first receipt, vs the lead time MAX holds for those parts.</p>
   {% set qs = vd.quarters or [] %}
   <figure class="wide-fig"><figcaption>On time, all vendors, by quarter (%)</figcaption>{{ line(qs|map('pick', 'on_time_pct', 'quarter')|list, '%', '%', 140) }}</figure>
@@ -103,7 +104,7 @@
     <thead><tr><th>Vendor</th><th class="r">PO lines (24 mo)</th><th>On time</th><th class="r">Late by (median)</th><th class="r">Real lead</th><th class="r">MAX says</th></tr></thead>
     <tbody>
     {% for v in (vd.vendors or [])[:60] %}
-      <tr><td>{{ v.vendor|title }}</td><td class="r">{{ v.lines }}</td>
+      <tr><td>{% if v.vendor_id %}<a href="{{ script_root }}/vendor-prices?v={{ v.vendor_id|urlencode }}">{{ v.vendor|title }}</a>{% else %}{{ v.vendor|title }}{% endif %}</td><td class="r">{{ v.lines }}</td>
         <td><span class="pct" title="{{ v.on_time_pct }}% on time — {{ v.late_lines }} of {{ v.lines }} lines late"><span class="hb-track"><span class="hb-fill" style="width: {{ v.on_time_pct }}%"></span></span> {{ v.on_time_pct|round|int }}%</span></td>
         <td class="r">{{ (v.median_days_late|round|int ~ ' d') if v.late_lines else '—' }}</td>
         <td class="r">{{ v.real_lead_wd|round|int }} wd</td>

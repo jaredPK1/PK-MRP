@@ -23,6 +23,8 @@ def _first_name(email):
 
 def _money(v):
     v = float(v or 0)
+    if v < 0:
+        return "\u2212" + _money(-v)
     if v >= 1_000_000:
         return f"${v / 1_000_000:.1f}M"
     if v >= 10_000:
@@ -45,6 +47,14 @@ def _when(place_by, today):
     if days == 0:
         return "Place today", "today"
     return f"By {d:%a %-d %b}", "soon"
+
+
+def _money2(v):
+    """A unit price: cents, or four places under a dollar."""
+    v = float(v or 0)
+    if abs(v) < 1:
+        return f"${v:,.4f}"
+    return f"${v:,.2f}"
 
 
 def _qty(v):
@@ -92,6 +102,7 @@ def _lead_words(source):
 
 
 SKU_MAP_KEY = "pipeline_sku_map"
+PRICE_REVIEWED_KEY = "price_alerts_reviewed"
 CLEARED_KEY = "overbuy_cleared"
 NOTES_KEY = "part_notes"
 REPLACE_KEY = "part_replacements"
@@ -116,6 +127,7 @@ def _pick(item, key, label=None):
 def create_app():
     app = Flask(__name__)
     app.jinja_env.filters["money"] = _money
+    app.jinja_env.filters["money2"] = _money2
     app.jinja_env.filters["qty"] = _qty
     app.jinja_env.filters["nice_date"] = _nice_date
     app.jinja_env.filters["month_name"] = _month_name
@@ -407,6 +419,91 @@ def create_app():
         if request.form.get("new") == "1":
             args["new"] = "1"
         return redirect(url_for("overbuys_page", **args) + "#saved")
+
+    def alert_key(a):
+        return f"{a['kind']}|{a['vendor_id']}|{a.get('part') or ''}|{a.get('po') or ''}"
+
+    @app.get("/vendor-prices")
+    def vendor_prices_page():
+        from ..db import store
+
+        vp = snapshot.load_vendor_prices() or abort(404)
+        v = request.args.get("v", "").strip()
+        part = request.args.get("part", "").strip()
+        try:
+            reviewed, error = store.get_setting(ops_engine(), PRICE_REVIEWED_KEY, {}), None
+        except Exception as exc:  # noqa: BLE001 -- page still shows the prices
+            reviewed, error = {}, str(exc)[:200]
+        alerts = [a for a in vp["alerts"] if (not v or a["vendor_id"] == v)
+                  and (not part or a.get("part") == part)]
+        open_alerts = [a for a in alerts if alert_key(a) not in reviewed]
+        done_alerts = [dict(a, review=reviewed[alert_key(a)]) for a in alerts
+                       if alert_key(a) in reviewed]
+        vendor = next((x for x in vp["vendors"] if x["vendor_id"] == v), None) if v else None
+        parts = vp["parts"].get(v, []) if v else []
+        prow = next((x for x in parts if x["part"] == part), None) if part else None
+        lines = vp["detail"].get(f"{v}|{part}", []) if part else []
+        other_vendors = []
+        if part:
+            for vid, rows in vp["parts"].items():
+                if vid == v:
+                    continue
+                for r in rows:
+                    if r["part"] == part:
+                        name = next((x["vendor"] for x in vp["vendors"] if x["vendor_id"] == vid), vid)
+                        other_vendors.append(dict(r, vendor_id=vid, vendor=name))
+        snap = snapshot.load_latest()
+        return render_template(
+            "vendor_prices.html",
+            snap=snap,
+            vp=vp,
+            v=v,
+            part=part,
+            vendor=vendor,
+            parts=parts,
+            prow=prow,
+            lines=lines,
+            other_vendors=other_vendors,
+            alerts=open_alerts,
+            done_alerts=done_alerts,
+            key_of=alert_key,
+            reviewable=signed_in() and error is None,
+            error=error,
+            saved=request.args.get("saved"),
+        )
+
+    @app.post("/vendor-prices/review")
+    def vendor_prices_review():
+        from ..db import store
+
+        if not signed_in():
+            abort(403)
+        key = request.form.get("key") or ""
+        action = request.form.get("action")
+        if action not in ("review", "undo") or not key:
+            abort(400)
+        engine = ops_engine()
+        current = store.get_setting(engine, PRICE_REVIEWED_KEY, {})
+        who = request.headers.get("X-Auth-Request-Email", "") or "unknown"
+        if action == "undo":
+            current.pop(key, None)
+        else:
+            vp = snapshot.load_vendor_prices() or abort(404)
+            a = next((x for x in vp["alerts"] if alert_key(x) == key), None)
+            if a is None:
+                abort(400, "That item isn't on the current list.")
+            current[key] = {
+                "note": (request.form.get("note") or "").strip()[:300],
+                "impact": a["impact"],
+                "by": who,
+                "at": datetime.now().isoformat(timespec="minutes"),
+            }
+        store.put_setting(engine, PRICE_REVIEWED_KEY, current, who)
+        back = request.form.get("back") or ""
+        if not back.startswith("/") or back.startswith("//") or "\\" in back:
+            back = url_for("vendor_prices_page")
+        sep = "&" if "?" in back else "?"
+        return redirect(f"{back.split('#')[0]}{sep}saved={action}#look")
 
     @app.get("/training")
     def training_page():

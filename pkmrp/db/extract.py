@@ -152,6 +152,42 @@ LEFT JOIN Part_Master pm ON pm.PRTNUM_01 = o.PRTNUM_10
 WHERE o.TYPE_10 = 'PO' AND o.CREDTE_10 >= ?
 """
 
+# What PK paid, receipt by receipt, for vendor price trends. PO_Receipts
+# counts packs (TNXQTY_55) and prices per pack (ORDCST_55, COST_55 = standard
+# per pack), the same pack as the PO line's CSTCNV_10 -- a 1,000 EA line of
+# 50-packs receives 20 at $3.77. Both are put per stocking unit here, so a
+# price is comparable across PO lines and with open POs. Returns to the
+# vendor (negative receipts, "DMR nnnnn") are dropped: they carry no price.
+RECEIPT_PRICES_SQL = """
+SELECT CAST(r.TNXDTE_55 AS date) AS date, RTRIM(r.ORDNUM_55) AS po, RTRIM(r.LINNUM_55) AS line,
+       RTRIM(r.DELNUM_55) AS delivery, RTRIM(r.PRTNUM_55) AS part,
+       RTRIM(ISNULL(r.VENID_55, '')) AS vendor_id,
+       r.TNXQTY_55 * ISNULL(NULLIF(o.CSTCNV_10, 0), ISNULL(NULLIF(pm.PURCNV_01, 0), 1)) AS qty,
+       r.ORDCST_55 / ISNULL(NULLIF(o.CSTCNV_10, 0), ISNULL(NULLIF(pm.PURCNV_01, 0), 1)) AS unit_price,
+       r.COST_55 / ISNULL(NULLIF(o.CSTCNV_10, 0), ISNULL(NULLIF(pm.PURCNV_01, 0), 1)) AS std_cost,
+       RTRIM(ISNULL(r.INVOICE_55, '')) AS invoice
+FROM PO_Receipts r
+LEFT JOIN Order_Master o ON o.ORDNUM_10 = r.ORDNUM_55 AND o.LINNUM_10 = r.LINNUM_55
+                        AND o.DELNUM_10 = r.DELNUM_55
+LEFT JOIN Part_Master pm ON pm.PRTNUM_01 = r.PRTNUM_55
+WHERE RTRIM(r.TYPE_55) = 'PO' AND r.TNXQTY_55 > 0 AND r.ORDCST_55 > 0 AND r.TNXDTE_55 >= ?
+"""
+
+# The price on each open PO line, per stocking unit (COST_10 is per CSTCNV_10
+# pack), with the standard cost to compare it to.
+OPEN_PO_PRICES_SQL = """
+SELECT RTRIM(o.ORDNUM_10) AS po, RTRIM(o.LINNUM_10) AS line, RTRIM(o.DELNUM_10) AS delivery,
+       RTRIM(o.PRTNUM_10) AS part, RTRIM(ISNULL(o.VENID_10, '')) AS vendor_id,
+       CAST(o.CREDTE_10 AS date) AS created, CAST(o.CURDUE_10 AS date) AS cur_due,
+       o.DUEQTY_10 AS qty_due,
+       o.COST_10 / ISNULL(NULLIF(o.CSTCNV_10, 0), 1) AS unit_price,
+       CASE WHEN ISNULL(pm.CSTCNV_01, 0) = 0 THEN pm.COST_01
+            ELSE pm.COST_01 / pm.CSTCNV_01 END AS std_cost
+FROM Order_Master o
+LEFT JOIN Part_Master pm ON pm.PRTNUM_01 = o.PRTNUM_10
+WHERE o.TYPE_10 = 'PO' AND o.STATUS_10 = '3' AND o.DUEQTY_10 > 0 AND o.COST_10 > 0
+"""
+
 # Components PK sent to a vendor to build with (consigned kits): issues and
 # transfers with no order number whose reference names a PO (70xxxxxx).
 # Chad moves parts into an "OFFSITE @ vendor" location citing the PO, then
@@ -332,6 +368,8 @@ ALL_SQL = {
     "open_wos": OPEN_WO_SQL,
     "wo_requirements": WO_REQ_SQL,
     "po_history": PO_HISTORY_SQL,
+    "receipt_prices": RECEIPT_PRICES_SQL,
+    "open_po_prices": OPEN_PO_PRICES_SQL,
     "consign_moves": CONSIGN_MOVES_SQL,
     "pipeline_lines": PIPELINE_LINES_SQL,
     "booked_skus": BOOKED_SKUS_SQL,
@@ -360,6 +398,7 @@ _DATES = {
     "last_sold",
     "opened",
     "closed",
+    "date",
 }
 _TEXT = {
     "part",
@@ -405,6 +444,7 @@ _TEXT = {
     "req_order",
     "obsolete",
     "released",
+    "invoice",
 }
 
 
@@ -460,6 +500,16 @@ def wo_requirements(erp):
 def po_history(erp, since):
     """PO lines created on or after `since` (a date), with their receipts."""
     return _run(erp, "po_history", [since])
+
+
+def receipt_prices(erp, since):
+    """Every priced PO receipt since `since`, per stocking unit."""
+    return _run(erp, "receipt_prices", [since])
+
+
+def open_po_prices(erp):
+    """The price on each open PO line, per stocking unit, with standard cost."""
+    return _run(erp, "open_po_prices")
 
 
 def vendors(erp):

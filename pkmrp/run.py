@@ -6,7 +6,7 @@ from datetime import date, timedelta
 
 import pandas as pd
 
-from .core import analytics, consign, leadtime, segment, skumap, supersede, supply
+from .core import analytics, consign, leadtime, segment, skumap, supersede, supply, vendor_price
 from .core import committed as committed_mod
 from .core import fix_max as fix_max_mod
 from .core import demand as demand_mod
@@ -68,6 +68,8 @@ def build_plan(
     recent = today - timedelta(days=round(history_months * 30.44))
     deep_df = timed("po_history", extract.po_history, erp, today - timedelta(days=3653))
     hist_df = deep_df[deep_df["created"] >= pd.Timestamp(recent)]
+    price_df = timed("receipt_prices", extract.receipt_prices, erp, today - timedelta(days=1500))
+    open_price_df = timed("open_po_prices", extract.open_po_prices, erp)
 
     parts = {
         r.part: Part(
@@ -295,6 +297,9 @@ def build_plan(
         cp["pipeline_12m"] = round(sum(pipe_months.get(p, {}).values()) * settings.growth_bias, 2)
         committed_plans.append(cp)
 
+    delivery = analytics.vendor_delivery(
+        deep_df, {p: v.purchase_lt for p, v in parts.items()}, names, today
+    )
     return {
         "today": today,
         "settings": settings,
@@ -310,8 +315,14 @@ def build_plan(
         "open_pos": po_df,
         "vendor_name": vendor_name,
         "vendor_names_by_id": names,
-        "vendor_delivery": analytics.vendor_delivery(
-            deep_df, {p: v.purchase_lt for p, v in parts.items()}, names, today
+        "vendor_delivery": delivery,
+        "vendor_prices": vendor_price.build(
+            price_df,
+            open_price_df,
+            names,
+            {p: v.description for p, v in parts.items()},
+            {r["vendor_id"]: r["on_time_pct"] for r in delivery.get("vendors", [])},
+            today,
         ),
         "vendor_part": vendor_part_all,
         "segments": segments,
