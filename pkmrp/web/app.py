@@ -574,11 +574,36 @@ def create_app():
         items = [i for i in data["items"] if eol_key(i) not in reviewed]
         done = [dict(i, review=reviewed[eol_key(i)]) for i in data["items"] if eol_key(i) in reviewed]
         snap = snapshot.load_latest()
+        from ..db import store
+        from ..integrations.eol_alert import DEFAULT_RECIPIENTS, RECIPIENTS_KEY
+
+        try:
+            alert_to = store.get_setting(ops_engine(), RECIPIENTS_KEY, DEFAULT_RECIPIENTS)
+        except Exception:  # noqa: BLE001 -- show the default the alert would fall back to
+            alert_to = DEFAULT_RECIPIENTS
         return render_template(
             "eol.html", snap=snap, items=items, done=done, research=(snap or {}).get("research") or {},
             key_of=eol_key, reviewable=signed_in() and error is None, error=error,
-            saved=request.args.get("saved"),
+            saved=request.args.get("saved"), alert_to=alert_to or [], editable=can_edit(),
         )
+
+    @app.post("/eol/recipients")
+    def eol_recipients():
+        from ..db import store
+        from ..integrations.eol_alert import RECIPIENTS_KEY
+
+        if not can_edit():
+            abort(403)
+        emails = sorted({
+            e.strip().lower() for e in re.split(r"[\s,;]+", request.form.get("emails", ""))
+            if e.strip()
+        })
+        bad = [e for e in emails if not e.endswith(("@pkinetics.com", "@photonkinetics.com"))]
+        if bad:
+            abort(400, f"Only PK addresses: {', '.join(bad)}")
+        who = request.headers.get("X-Auth-Request-Email", "") or "unknown"
+        store.put_setting(ops_engine(), RECIPIENTS_KEY, emails, who)
+        return redirect(url_for("eol_page") + "#alerts")
 
     @app.post("/review/<name>")
     def review_save(name):

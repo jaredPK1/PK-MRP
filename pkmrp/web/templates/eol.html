@@ -41,6 +41,16 @@
 <div class="table-tools"><input type="search" class="table-filter" placeholder="Filter: part, maker, words" aria-label="Filter"><span class="muted small filter-count"></span></div>
 {{ eol_table(items) }}
 {% if done %}<details class="small-gap"><summary class="muted">Reviewed · {{ done|length }}</summary>{{ eol_table(done) }}</details>{% endif %}
-{% set al = r.eol_alert or {} %}<p class="foot-note">When a part newly shows up obsolete, end of life, last-time buy or not-recommended, PK-MRP emails it once to Jared and Patrick (production only){% if al.state == 'error' %} — <span class="late-text">the last alert failed: {{ al.error }}</span>{% endif %}.</p>
+{% set al = r.eol_alert or {} %}
+<section class="weekly-controls" id="alerts">
+  <h3 class="steps-h">Who gets the alerts</h3>
+  <p class="muted small">When a part newly shows up obsolete, end of life, last-time buy or not recommended for new designs, PK-MRP emails it once to this list (production only).{% if al.state == 'error' %} <span class="late-text">The last alert failed: {{ al.error }}</span>{% elif al.sent %} Last run emailed {{ al.sent }} part{{ 's' if al.sent != 1 }}.{% endif %}</p>
+  {% if editable %}
+  <form method="post" action="{{ script_root }}/eol/recipients" class="note-form">
+    <textarea name="emails" rows="3" cols="70" aria-label="EOL alert recipients">{{ alert_to|join(', ') }}</textarea>
+    <button class="btn">Save</button> <span class="muted small">PK emails, separated by commas or new lines.</span>
+  </form>
+  {% else %}<p>{{ alert_to|join(', ') }} <span class="muted small">— an admin can change the list.</span></p>{% endif %}
+</section>
 <p class="foot-note">Parts Engineering has already obsoleted by ECN are on <a href="{{ script_root }}/fix-max">Fix in MAX</a>; this page is about makers ending what we buy.</p>
 {% endblock %}

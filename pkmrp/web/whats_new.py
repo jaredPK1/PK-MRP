@@ -8,7 +8,7 @@ WHATS_NEW = (
     (
         "2026-10-30",
         "Email when a part goes obsolete",
-        "When the EOL watch newly finds a part obsolete, end of life, last-time buy or not recommended for new designs, PK-MRP emails it once to Jared and Patrick: the part, where we heard it (with a link), where it's used, booked demand, stock and cover, and the last-time-buy quantity. DigiKey and Mouser lifecycle checks are live; supplier emails and maker news join once their access is set up.",
+        "When the EOL watch newly finds a part obsolete, end of life, last-time buy or not recommended for new designs, PK-MRP emails it once (Jared, Patrick, Chad, Rob and Aaron to start; an admin changes the list at the bottom of the EOL watch page): the part, where we heard it (with a link), where it's used, booked demand, stock and cover, and the last-time-buy quantity. DigiKey and Mouser lifecycle checks are live; supplier emails and maker news join once their access is set up.",
     ),
     (
         "2026-10-30",
