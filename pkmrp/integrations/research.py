@@ -25,7 +25,7 @@ from collections import defaultdict
 from datetime import datetime, timedelta
 
 from ..core import eol
-from . import ai, distributors
+from . import ai, distributors, eol_alert
 from .http import HttpError
 from .mailbox import Mailbox, looks_like_notice
 
@@ -368,6 +368,7 @@ def tick(run, snap, data_dir):
     _save(data_dir, "eol.json", _iso(watch))
     ideas = catalog_ideas(cache, run, annual)
     _save(data_dir, "distributor_ideas.json", _iso(ideas))
+    alert = alert_new(watch["items"], state, data_dir)
     return {
         "status": "on" if on else "off",
         "distributors": dist
@@ -378,9 +379,38 @@ def tick(run, snap, data_dir):
         "eol_items": len(watch["items"]),
         "eol_counts": watch["counts"],
         "catalog_ideas": len(ideas),
+        "eol_alert": alert,
         "ai_key": ai.available(),
         "last": {k: state.get(k) for k in ("dist_at", "mail_at", "news_at")},
     }
+
+
+def alert_new(items, state, data_dir):
+    """Email newly obsolete parts (production only); remember who was told."""
+    if os.environ.get("SCHEDULER_ENABLED", "0").strip() != "1":
+        return {"state": "off"}
+    alerted = state.setdefault("eol_alerted", {})
+    fresh = eol_alert.new_items(items, alerted)
+    if not fresh:
+        return {"state": "ok", "sent": 0}
+    recipients = eol_alert.DEFAULT_RECIPIENTS
+    try:
+        from ..config import DbConfig
+        from ..db import store
+
+        engine = store.ops_engine(DbConfig.from_env())
+        recipients = store.get_setting(engine, eol_alert.RECIPIENTS_KEY, recipients) or recipients
+    except Exception:  # noqa: BLE001 -- fall back to the default list
+        pass
+    sent, err = eol_alert.send(_iso(fresh), recipients,
+                               os.environ.get("APP_BASE_URL", "").rstrip("/"))
+    if sent:
+        today = datetime.now().date().isoformat()
+        for i in fresh:
+            alerted[eol_alert.key(i)] = today
+        _save(data_dir, "research_state.json", state)
+    return {"state": "ok" if sent else "error", "sent": len(fresh) if sent else 0,
+            "to": sent, "error": err}
 
 
 def _iso(v):

@@ -41,5 +41,6 @@
 <div class="table-tools"><input type="search" class="table-filter" placeholder="Filter: part, maker, words" aria-label="Filter"><span class="muted small filter-count"></span></div>
 {{ eol_table(items) }}
 {% if done %}<details class="small-gap"><summary class="muted">Reviewed · {{ done|length }}</summary>{{ eol_table(done) }}</details>{% endif %}
+{% set al = r.eol_alert or {} %}<p class="foot-note">When a part newly shows up obsolete, end of life, last-time buy or not-recommended, PK-MRP emails it once to Jared and Patrick (production only){% if al.state == 'error' %} — <span class="late-text">the last alert failed: {{ al.error }}</span>{% endif %}.</p>
 <p class="foot-note">Parts Engineering has already obsoleted by ECN are on <a href="{{ script_root }}/fix-max">Fix in MAX</a>; this page is about makers ending what we buy.</p>
 {% endblock %}

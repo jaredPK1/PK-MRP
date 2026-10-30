@@ -7,6 +7,11 @@ Every feature people can see gets a line here in the same change
 WHATS_NEW = (
     (
         "2026-10-30",
+        "Email when a part goes obsolete",
+        "When the EOL watch newly finds a part obsolete, end of life, last-time buy or not recommended for new designs, PK-MRP emails it once to Jared and Patrick: the part, where we heard it (with a link), where it's used, booked demand, stock and cover, and the last-time-buy quantity. DigiKey and Mouser lifecycle checks are live; supplier emails and maker news join once their access is set up.",
+    ),
+    (
+        "2026-10-30",
         "Sourcing ideas and EOL watch",
         "Two new Buying pages. Sourcing ideas lists where buying differently would save money or build hours, each with dollars a year and what to do: switch to a vendor who sold the part for less and isn't worse on delivery or returns (big gaps are marked check scope — usually raw vs finished or bare vs assembled), order up to a quoted price break, build a bought part here (with the hours that still break even at the shop rate), buy a part we build (or get quotes for long builds when hours are short), and vendors worth an annual agreement or blanket. It also lists standard costs far from what we pay, with a CSV for the cost roll. EOL watch lists parts makers are ending, from distributor lifecycle data, PCN/EOL emails in the purchasing mailbox and a weekly web search of makers — with where each part is used, booked demand, months of cover and a last-time-buy quantity. Catalog prices, the mailbox and news switch on once the keys and IT's mailbox access are in place. Mark items Reviewed with a note.",
     ),
