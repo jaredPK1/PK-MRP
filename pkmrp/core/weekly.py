@@ -126,14 +126,14 @@ def priorities(snap, today, eol_items=(), price_alerts=(), overbuy_rows=(), done
     out.append(_section(
         "buys", "Buys to place", "Order-by date is this week or already past.", "/buys",
         [{"key": b["part"], "part": b["part"], "description": b.get("description", ""),
-          "money": b.get("order_value") or b.get("protects_value") or 0,
+          "money": b.get("order_value") or (b.get("protects_value") if b.get("critical") else 0) or 0,
           "money_label": "orders waiting" if b.get("order_value") else "orders it protects",
           "detail": " · ".join(x for x in (
               f"{b.get('qty', 0):g} from {(b.get('vendor') or 'no vendor').title()}",
-              "critical part, restores safety stock" if b.get("ss_only") else
+              "critical part, restores safety stock" if b.get("ss_only") and b.get("critical") else
               (f"{b['days_late']}d late" if b.get("days_late") else "due this week"),
-              f"{b.get('orders') or b.get('protects_orders') or 0} order"
-              f"{'s' if (b.get('orders') or b.get('protects_orders')) != 1 else ''}",
+              f"{b.get('orders') or (b.get('protects_orders') if b.get('critical') else 0) or 0} order"
+              f"{'s' if (b.get('orders') or (b.get('protects_orders') if b.get('critical') else 0)) != 1 else ''}",
           ) if x),
           "link": f"/buys?q={b['part']}"} for b in buys], seen,
         total=len(buys)))

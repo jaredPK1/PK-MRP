@@ -110,7 +110,7 @@
           {% if b.order_value %} worth <b>{{ b.order_value|money }}</b>{% endif %}
           {% if b.customers %}<span class="cust">· {{ b.customers[:3]|join(', ') }}{% if b.customers|length > 3 %} +{{ b.customers|length - 3 }}{% endif %}</span>{% endif %}
         </div>
-        {% elif b.protects_orders %}
+        {% elif b.critical and b.protects_orders %}
         <div class="unblocks">
           Critical part: protects <b>{{ b.protects_orders }} order{{ '' if b.protects_orders == 1 else 's' }}</b>{% if b.protects_value %} worth <b>{{ b.protects_value|money }}</b>{% endif %} <span class="cust">· none is short yet; this keeps its safety stock</span>
         </div>

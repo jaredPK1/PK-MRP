@@ -33,6 +33,18 @@ def _so_of(ref):
     return None
 
 
+def sort_key(b):
+    """Critical parts below safety stock first, then order-driven buys by the
+    orders they unblock, then safety-stock top-ups. Also used by the web
+    layer to re-rank when a critical note is added between plans."""
+    if b.get("critical") and b.get("ss_qty"):
+        tier = 0
+    else:
+        tier = 2 if b.get("ss_only") else 1
+    return (tier, -max(b.get("order_value") or 0, b.get("protects_top") or 0),
+            -(b.get("days_late") or 0), b.get("spend") or 0, b["part"])
+
+
 def buy_list(
     planned,
     parts,
@@ -70,8 +82,8 @@ def buy_list(
                 pegs.append(p)
         unit_cost = float(info.unit_cost) if info else 0.0
         ss_qty = sum(o.qty for o in orders if o.reason == "safety_stock")
-        protects = {}
-        if part in critical and ss_qty:
+        protects = {}  # every safety-stock buy: a critical note can come later
+        if ss_qty:
             for d in (demands or {}).get(part, []):
                 for p in d.pegs:
                     so = _so_of(p.ref)
@@ -117,13 +129,7 @@ def buy_list(
                 "protects_top": round(max(protects.values(), default=0.0), 2),
             }
         )
-    def tier(b):
-        if b["critical"] and b["ss_qty"]:
-            return 0  # critical part below its safety stock: first
-        return 2 if b["ss_only"] else 1
-
-    out.sort(key=lambda b: (tier(b), -max(b["order_value"], b["protects_top"]),
-                            -b["days_late"], b["spend"], b["part"]))
+    out.sort(key=sort_key)
     for i, b in enumerate(out, 1):
         b["rank"] = i
     return out

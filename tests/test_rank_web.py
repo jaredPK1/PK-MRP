@@ -637,3 +637,23 @@ def test_weekly_email_leaves_held_parts_out(client, tmp_path, monkeypatch):
 def test_weekly_email_is_linked_from_analytics_and_every_footer(client):
     assert 'href="/weekly"' in client.get("/").get_data(as_text=True)
     assert "Monday email →" in client.get("/analytics").get_data(as_text=True)
+
+
+def test_critical_note_reranks_at_once_without_waiting_for_the_plan(client, tmp_path, monkeypatch):
+    from pkmrp import snapshot
+    from pkmrp.db import store
+
+    c, engine = _overbuy_client(tmp_path, monkeypatch, "viewer")
+    snap = snapshot.load_latest()
+    last = snap["buys"][-1]
+    last.update(ss_qty=last["qty"], ss_only=True, critical=False, orders=0, order_value=0,
+                sales_orders=[], protects_orders=3,
+                protects_value=5e6, protects_top=2e6)
+    snapshot.write(snap)
+    page = c.get("/").get_data(as_text=True)
+    assert "Critical part: protects" not in page  # protects only shows for critical parts
+    store.put_setting(engine, "part_notes", {last["part"]: [
+        {"id": "x", "tag": "critical", "text": "", "by": "jared", "at": "2026-11-02T09:11"}]}, "t")
+    page = c.get("/").get_data(as_text=True)
+    first_card = page.split('id="buy-1"')[1].split('id="buy-2"')[0]
+    assert last["part"] in first_card and "Critical part: protects" in first_card

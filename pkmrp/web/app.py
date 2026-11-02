@@ -199,10 +199,18 @@ def create_app():
 
     def without_held(snap):
         """The snapshot as buyers should see it: held parts off the buy lists,
-        the needs-source list and the shelf carts."""
+        the needs-source list and the shelf carts; and the buy list re-ranked
+        by today's critical notes (a note added after the hourly plan counts
+        at once, like a hold)."""
+        from ..core.rank import sort_key
+
+        crit = {p for p, ns in part_notes().items() if any(n["tag"] == "critical" for n in ns)}
+        if any(bool(b.get("critical")) != (b["part"] in crit) for b in snap["buys"]):
+            snap = {**snap, "buys": sorted(
+                ({**b, "critical": b["part"] in crit} for b in snap["buys"]), key=sort_key)}
         hold = held()
         if not hold:
-            return snap, []
+            return {**snap, "buys": [{**b, "rank": i} for i, b in enumerate(snap["buys"], 1)]}, []
         carts = []
         for c in snap.get("shelf_orders") or []:
             items = [it for it in c["items"] if it["part"] not in hold]
@@ -822,6 +830,8 @@ def create_app():
         snap = snapshot.load_latest() or abort(404)
         rows = snap["buys"] + snap.get("needs_source", [])
         b = next((b for b in rows if b["part"] == part), None) or abort(404)
+        crit = any(n["tag"] == "critical" for n in part_notes().get(part, []))
+        b = {**b, "critical": crit}  # today's note, as the list ranks it
         return render_template("_why.html", b=b, today_iso=date.today().isoformat())
 
     def vendor_counts(snap, today, soon):
