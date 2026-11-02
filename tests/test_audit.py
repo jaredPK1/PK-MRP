@@ -81,3 +81,20 @@ def test_sitting_and_trend():
     audit, state = run_audit(snap, prev, _pos([]), TODAY, NOW)
     assert any(f["check"] == "sitting" for f in audit["findings"])
     assert [t["date"] for t in state["trend"]] == ["2026-10-29", "2026-10-30"]
+
+
+def test_safety_stock_top_up_is_not_a_jump():
+    empty = _pos([])
+    # the day safety stock was switched on: 2 for orders became 2 + 10 safety stock
+    prev = {"buys": {"37-0007-01G": {"first_seen": "2026-11-02T08:02", "qty": 2,
+                                     "need_by": "2026-12-04"}}}
+    snap = {"buys": [{"part": "37-0007-01G", "qty": 12, "ss_qty": 10, "need_by": "2026-12-04"}]}
+    audit, state = run_audit(snap, prev, empty, TODAY, NOW)
+    assert "changed" not in snap["buys"][0] and state["buys"]["37-0007-01G"]["ss_qty"] == 10
+    # the part for orders really grew: flagged, saying how much is safety stock
+    prev = {"buys": {"62-2567-01G": {"first_seen": "2026-11-02T08:02", "qty": 214,
+                                     "need_by": "2026-11-23"}}}
+    snap = {"buys": [{"part": "62-2567-01G", "qty": 954, "ss_qty": 250, "need_by": "2026-11-23"}]}
+    run_audit(snap, prev, empty, TODAY, NOW)
+    assert snap["buys"][0]["changed"]["text"] == (
+        "For booked orders, went from 214 to 704 since the last plan (plus 250 safety stock)")

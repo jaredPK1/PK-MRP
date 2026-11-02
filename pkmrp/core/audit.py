@@ -129,6 +129,7 @@ def run_audit(snap, state, open_pos, today, now, shelf=frozenset(), descriptions
             "first_seen": p["first_seen"] if p else now_s,
             "last_seen": now_s,
             "qty": b["qty"],
+            "ss_qty": b.get("ss_qty", 0.0),
             "min_qty": b.get("min_qty", b["qty"]),
             "need_by": need.isoformat() if need else None,
             "days_late": b.get("days_late", 0),
@@ -163,12 +164,17 @@ def run_audit(snap, state, open_pos, today, now, shelf=frozenset(), descriptions
             if prev:  # the first run after a restart has nothing to compare
                 flag = {"kind": "new", "text": "New on the list since the last plan"}
         else:
-            grew = b["qty"] - p["qty"]
-            if grew >= JUMP_MIN_UNITS and grew >= JUMP_RATIO * max(p["qty"], 1):
-                flag = {
-                    "kind": "grew",
-                    "text": f"Went from {p['qty']:g} to {b['qty']:g} since the last plan",
-                }
+            # the part for booked orders only: a safety-stock top-up (or the
+            # day safety stock was switched on) isn't the plan swinging
+            ss_now, ss_before = b.get("ss_qty", 0.0) or 0.0, p.get("ss_qty", 0.0) or 0.0
+            for_orders, before = b["qty"] - ss_now, p["qty"] - ss_before
+            grew = for_orders - before
+            if grew >= JUMP_MIN_UNITS and grew >= JUMP_RATIO * max(before, 1):
+                text = (f"Went from {p['qty']:g} to {b['qty']:g} since the last plan"
+                        if not (ss_now or ss_before) else
+                        f"For booked orders, went from {before:g} to {for_orders:g} since the last plan"
+                        + (f" (plus {ss_now:g} safety stock)" if ss_now else ""))
+                flag = {"kind": "grew", "text": text}
             if need and p.get("need_by"):
                 earlier = (_d(p["need_by"]) - need).days
                 if earlier >= JUMP_EARLIER_DAYS:
