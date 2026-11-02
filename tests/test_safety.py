@@ -103,7 +103,7 @@ def test_critical_keeps_safety_stock_as_set():
     assert held["verdict"] == "ignored"  # a hold still wins
 
 
-def test_critical_safety_stock_buy_ranks_by_its_biggest_order():
+def test_critical_safety_stock_buy_goes_to_the_top():
     parts = {"CUBE": part(), "PLAIN": part("PLAIN"), "LENS": part("LENS", ss=0, cost=1.0)}
     ds = [so("CUBE", date(2027, 2, 12), 2, "SO 1/01"), so("CUBE", date(2027, 3, 1), 1, "SO 2/01"),
           so("LENS", date(2026, 11, 20), 2, "SO 3/01")]
@@ -111,6 +111,9 @@ def test_critical_safety_stock_buy_ranks_by_its_biggest_order():
     stock = {"CUBE": 5, "PLAIN": 0}
     r = plan(parts, {}, ds, stock, [], S, TODAY, usage=use, critical={"CUBE"})
     values = {"1": 500.0, "2": 2000.0, "3": 900.0}
+    buys = buy_list(r.planned, parts, {}, values, {}, TODAY, horizon_workdays=20,
+                    critical={"CUBE"}, demands=r.demands)
+    values["3"] = 9e6  # even above a late order worth far more
     buys = buy_list(r.planned, parts, {}, values, {}, TODAY, horizon_workdays=20,
                     critical={"CUBE"}, demands=r.demands)
     assert [b["part"] for b in buys] == ["CUBE", "LENS", "PLAIN"]

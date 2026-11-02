@@ -14,8 +14,9 @@ A buy that only restores MAX safety stock (no booked order behind it) goes
 after all of those: the top of the list stays "orders slip without these".
 Except on a part noted critical (single source, hard to replace): running
 out would stop every booked order that uses it, so its safety-stock buy
-ranks as if the largest of those orders were waiting on it (`protects_*`;
-shown, never counted as orders waiting -- none is short yet).
+goes to the top of the list (Jared, 2026-11-02: "work the top ten" must
+cover them), biggest protected order first (`protects_*`; shown, never
+counted as orders waiting -- none is short yet).
 
 Pure: plain data in, plain dicts out, deterministic order.
 """
@@ -116,8 +117,12 @@ def buy_list(
                 "protects_top": round(max(protects.values(), default=0.0), 2),
             }
         )
-    out.sort(key=lambda b: (b["ss_only"] and not b["critical"],
-                            -max(b["order_value"], b["protects_top"]),
+    def tier(b):
+        if b["critical"] and b["ss_qty"]:
+            return 0  # critical part below its safety stock: first
+        return 2 if b["ss_only"] else 1
+
+    out.sort(key=lambda b: (tier(b), -max(b["order_value"], b["protects_top"]),
                             -b["days_late"], b["spend"], b["part"]))
     for i, b in enumerate(out, 1):
         b["rank"] = i

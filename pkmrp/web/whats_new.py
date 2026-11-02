@@ -8,7 +8,7 @@ WHATS_NEW = (
     (
         "2026-11-02",
         "Critical parts: safety stock that ranks with the urgent buys",
-        "A new note, Critical — single source / hard to replace (\"+ note\" on any part). A critical part keeps its MAX safety stock exactly as set, and when stock drops below it the buy ranks as if the largest booked order using the part were waiting, so it shows up in the list you work instead of after hundreds of routine top-ups. The card says Critical part: protects N orders, none short yet. Start: the eight 2920 parts Engineering flagged in the NPI review.",
+        "A new note, Critical — single source / hard to replace (\"+ note\" on any part). A critical part keeps its MAX safety stock exactly as set, and when stock drops below it the buy goes to the top of the list, so working the top ten covers it. The card says Critical part: protects N orders, none short yet. Start: the eight 2920 parts Engineering flagged in the NPI review.",
     ),
     (
         "2026-11-02",
