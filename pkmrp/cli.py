@@ -131,6 +131,34 @@ def _replacements():
         return {}
 
 
+def _no_stock(replacements):
+    """{part: why} -- parts PK-MRP won't hold MAX safety stock on: held or
+    noted obsolete (part notes), replaced (replacement rules), or obsolete at
+    the maker (last plan's EOL watch). Whatever can't be read is left out."""
+    from . import snapshot
+    from .db import store
+
+    out = {}
+    eol = (snapshot.load_json("eol.json") or {}).get("items") or []
+    for i in eol:
+        if i.get("kind") in ("obsolete", "eol", "last_time_buy"):
+            out[i["part"]] = "obsolete at its maker (EOL watch)"
+    for old, rule in (replacements or {}).items():
+        out[old] = f"replaced by {rule.get('part', 'another part')}"
+    try:
+        engine = store.ops_engine(DbConfig.from_env())
+        if not store.missing_tables(engine):
+            for part, notes in (store.get_setting(engine, "part_notes", {}) or {}).items():
+                tags = {n.get("tag") for n in notes}
+                if "hold" in tags:
+                    out[part] = "on hold (part note)"
+                elif "obsolete" in tags:
+                    out[part] = "noted obsolete (part note)"
+    except Exception as exc:  # noqa: BLE001 -- judge without the notes
+        click.echo(f"part notes: {exc}", err=True)
+    return out
+
+
 def scheduler_on():
     """True on the one host that writes PK_Ops from the loop (the Decision
     Ledger, Done checks, the weekly email). .70 and .80 share PK_Ops, so only
@@ -143,11 +171,15 @@ def _plan_once(erp):
     from . import snapshot
     from .run import build_plan
 
-    run = build_plan(erp, sku_map=_sku_map(), replacements=_replacements())
+    replacements = _replacements()
+    run = build_plan(erp, sku_map=_sku_map(), replacements=replacements,
+                     no_stock=_no_stock(replacements))
     snap = snapshot.build(run, run["so_lines"])
     snapshot.add_audit(snap, run)
     if run.get("vendor_prices"):
         snapshot.write_vendor_prices(run["vendor_prices"])
+    if run.get("safety_summary"):
+        snapshot.write_safety(run["safety_summary"])
         snap["sourcing"] = snapshot.add_sourcing(run, snap)
     snap["research"] = snapshot.add_research(run, snap)
     if scheduler_on():

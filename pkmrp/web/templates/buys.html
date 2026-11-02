@@ -4,7 +4,7 @@
 {% block title %}All buys · PK-MRP{% endblock %}
 {% block content %}
 <section class="sec-head wide">
-  <h1 class="h1-small">Everything to place this week <span class="muted">· {{ rows|length }}</span></h1>
+  <h1 class="h1-small">Everything to place this week <span class="muted">· {{ rows|length }}</span>{% set ssn = rows|selectattr('ss_only')|list|length %}{% if ssn %} <a class="muted small" href="{{ script_root }}/buys?q=safety+stock" title="Ranked after every buy that protects an order">{{ ssn }} of them safety stock</a>{% endif %}</h1>
   <form method="get" class="filter">
     <label>On it
       <select name="who" onchange="this.form.submit()">
@@ -27,7 +27,7 @@
       <td class="r muted">{{ b.rank }}</td>
       <td class="mono">{{ b.part }} {{ part_note(b.part) }}</td>
       <td class="dcol">{{ b.description|lower|capitalize }}</td>
-      <td class="r">{{ b.qty|qty }}{% if b.sizing and b.sizing.policy == 'economic' %}<br><span class="muted small" title="{{ b.sizing.why }}">thru {{ b.sizing.covers_until|nice_date(False) }}</span>{% endif %}{% if b.changed and b.changed.kind != 'new' %}<br><span class="chip late" title="{{ b.changed.text }}">changed</span>{% endif %}{% if b.packs %}<br><span class="muted small">{{ b.packs }} {{ b.pack_uom or 'pack' }} of {{ b.pack_qty|qty }}</span>{% endif %}</td>
+      <td class="r">{{ b.qty|qty }}{% if b.sizing and b.sizing.policy == 'economic' %}<br><span class="muted small" title="{{ b.sizing.why }}">thru {{ b.sizing.covers_until|nice_date(False) }}</span>{% endif %}{% if b.changed and b.changed.kind != 'new' %}<br><span class="chip late" title="{{ b.changed.text }}">changed</span>{% endif %}{% if b.ss_qty %}<br>{% if b.ss_only %}<span class="chip quiet" title="Nothing booked needs ordering this week: this restores the safety stock in MAX ({{ (b.ss_judge or {}).use|default(b.safety_stock)|qty }})">safety stock</span>{% elif b.ss_qty %}<span class="chip quiet" title="{{ b.ss_qty|qty }} of it restores the safety stock in MAX">+{{ b.ss_qty|qty }} safety stock</span>{% endif %}{% endif %}{% if b.packs %}<br><span class="muted small">{{ b.packs }} {{ b.pack_uom or 'pack' }} of {{ b.pack_qty|qty }}</span>{% endif %}</td>
       <td class="r">{{ b.spend|money if b.spend else '' }}</td>
       <td><span class="chip {{ b.tone }}">{{ b.when }}</span></td>
       <td class="r">{{ b.lead_days|round|int }}d</td>

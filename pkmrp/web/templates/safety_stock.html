@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% from "_notes.html" import part_note with context %}
+{% block title %}Safety stock · PK-MRP{% endblock %}
+{% block content %}
+{% set c = data.counts or {} %}
+<section class="page-intro">
+  <h1 class="h1-small">Safety stock</h1>
+  <p class="lede"><b>The question this page answers: which safety stock numbers in MAX shouldn't we plan to?</b> PK-MRP keeps MAX's safety stock on bought parts as a floor: after every booked order is covered, stock below it is a buy, ranked after the buys that protect an order. But a safety stock is set by hand and rarely revisited, so each one is judged first. <b>Ignored</b>: the part is on hold, replaced, or obsolete at its maker, or nobody used it in the last 12 months and nothing is booked. <b>Capped</b>: it's more than 6 months of real use (the larger of the last 12 months' issues and shipments, and the booked rate), so PK-MRP holds 6 months. The rest are trusted and planned as set.</p>
+  <p class="lede small-gap">Fix the number in MAX (Part Master, Safety Stock) or leave it if it's deliberate — a part stays here until MAX and use agree. <a href="{{ script_root }}/safety-stock.csv">Download every part with safety stock (CSV)</a>.</p>
+</section>
+<section class="tiles" aria-label="Safety stock">
+  <div class="tile"><span class="num small-num">{{ '{:,}'.format(c.trusted or 0) }}</span><span class="lbl">trusted, planned as set</span><span class="sub">{{ (snap.safety_stock or {}).ss_buys if snap else 0 }} need topping up now · {{ ((snap.safety_stock or {}).ss_spend or 0)|money }}</span></div>
+  <div class="tile"><span class="num small-num">{{ c.capped or 0 }}</span><span class="lbl">capped at 6 months of use</span><span class="sub">more than use justifies</span></div>
+  <div class="tile"><span class="num small-num">{{ c.ignored or 0 }}</span><span class="lbl">ignored</span><span class="sub">held, replaced, obsolete or not used</span></div>
+  <div class="tile"><span class="num small-num">{{ (data.value_not_held or 0)|money }}</span><span class="lbl">of MAX safety stock not held</span><span class="sub">of {{ (data.value_set or 0)|money }} set in MAX</span></div>
+</section>
+<div id="list"></div>
+<div class="table-tools"><input type="search" class="table-filter" placeholder="Filter: part, words, ignored, capped" aria-label="Filter"><span class="muted small filter-count"></span></div>
+<div class="table-wrap"><table class="dense">
+  <thead><tr><th>Part</th><th>Verdict</th><th class="r">MAX says</th><th class="r">PK-MRP holds</th><th class="r">Used last 12 mo</th><th class="r">12 mo before</th><th>Last used</th><th class="r">Booked</th><th class="r">Months of use</th><th class="r">$ not held</th></tr></thead>
+  <tbody>{% for r in rows %}
+    <tr>
+      <td><span class="mono">{{ r.part }}</span> {{ part_note(r.part, False) }}<div class="muted small dcol">{{ r.description|lower|capitalize|truncate(46, True, '…') }}</div></td>
+      <td><span class="chip {{ 'late' if r.verdict == 'ignored' else 'today' }}">{{ r.verdict }}</span><div class="small">{{ r.why }}</div></td>
+      <td class="r">{{ r.ss|qty }}</td>
+      <td class="r"><b>{{ r.use|qty }}</b></td>
+      <td class="r">{{ r.used_12m|qty }}</td>
+      <td class="r">{{ r.used_prior_12m|qty }}</td>
+      <td>{{ r.last_used|nice_date(False) if r.last_used else '—' }}</td>
+      <td class="r">{{ r.booked|qty }}</td>
+      <td class="r">{{ r.months if r.months is not none else '—' }}</td>
+      <td class="r">{{ r.value_not_held|money if r.value_not_held else '' }}</td>
+    </tr>
+  {% else %}<tr><td colspan="10" class="muted">Every safety stock in MAX checks out.</td></tr>{% endfor %}</tbody>
+</table></div>
+<p class="foot-note">Make parts' safety stock isn't planned yet. Holds and "obsolete" notes come from the Notes page; replacements from the replacement rules; maker obsolescence from the EOL watch.</p>
+{% endblock %}

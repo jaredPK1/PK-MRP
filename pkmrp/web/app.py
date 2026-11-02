@@ -162,10 +162,17 @@ def create_app():
                 g.buy_status, g.buyer_names = {}, list(DEFAULT_BUYERS)
         return g.buy_status, g.buyer_names
 
+    def latest_once():
+        """The latest plan, read once per request, for per-part helpers on
+        list pages (a 2 MB read per row made All buys take 90 s)."""
+        if "latest_once" not in g:
+            g.latest_once = snapshot.load_latest() or {}
+        return g.latest_once
+
     def buy_view(part):
         from ..core.buy_status import card_state
 
-        snap = snapshot.load_latest() or {}
+        snap = latest_once()
         status, _ = buy_status()
         recent = (snap.get("recent_po_parts") or {}).get(part, [])
         return card_state(status.get(part), snap.get("generated_at", ""), recent)
@@ -247,8 +254,10 @@ def create_app():
 
     def ecn_for(part):
         """{"open": [...], "obsolete": ecn|None} from the latest plan, or None."""
-        snap = snapshot.load_latest() or {}
-        return ((snap.get("ecn") or {}).get("parts") or {}).get(part)
+        if "ecn_parts" not in g:
+            snap = latest_once()
+            g.ecn_parts = (snap.get("ecn") or {}).get("parts") or {}
+        return g.ecn_parts.get(part)
 
     @app.before_request
     def _dev_lock():
@@ -1201,6 +1210,34 @@ def create_app():
         snap = snapshot.load_latest() or abort(404)
         fx = snap.get("fix_max") or {"status": "off"}
         return render_template("fix_max.html", snap=snap, fx=fx)
+
+    @app.get("/safety-stock")
+    def safety_page():
+        data = snapshot.load_json("safety_stock.json") or {"rows": [], "counts": {}}
+        rows = [r for r in data["rows"] if r["verdict"] != "trusted"]
+        return render_template("safety_stock.html", snap=snapshot.load_latest(), data=data, rows=rows)
+
+    @app.get("/safety-stock.csv")
+    def safety_csv():
+        import csv
+        import io
+
+        data = snapshot.load_json("safety_stock.json") or abort(404)
+        buf = io.StringIO()
+        w = csv.writer(buf)
+        w.writerow(["part", "description", "max_safety_stock", "pk_mrp_holds", "verdict", "why",
+                    "used_last_12m", "used_12m_before", "last_used", "booked", "use_per_month",
+                    "months_of_use", "unit_cost", "value_not_held"])
+        for r in data["rows"]:
+            w.writerow([r["part"], r["description"], r["ss"], r["use"], r["verdict"], r["why"],
+                        r["used_12m"], r["used_prior_12m"], r["last_used"] or "", r["booked"],
+                        r["rate"], r["months"] if r["months"] is not None else "", r["unit_cost"],
+                        r["value_not_held"]])
+        name = f"safety-stock-{(snapshot.load_latest() or {}).get('today', date.today())}.csv"
+        return buf.getvalue(), 200, {
+            "Content-Type": "text/csv; charset=utf-8",
+            "Content-Disposition": f'attachment; filename="{name}"',
+        }
 
     @app.get("/fix-max.csv")
     def fix_max_csv():

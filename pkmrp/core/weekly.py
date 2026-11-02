@@ -3,7 +3,7 @@
 Top: "Needs you this week" -- a short list per kind, in a fixed order of
 urgency (buys past their order-by, parts going obsolete with nothing to
 cover them, Done that MAX doesn't show, recent overbuys, price issues, repeat
-POs, buys on ECN-obsoleted parts), each line linking to the page that
+POs, safety stock to restore, buys on ECN-obsoleted parts), each line linking to the page that
 explains it. "New" = not in last Monday's email: the keys every section
 showed are saved with the send (weekly_sent.seen) and compared next time.
 Below: last week in numbers (trend, Done, the ledger) and housekeeping.
@@ -80,7 +80,7 @@ def done_week(log, today):
 
 LABELS = {"buys": "buys to place", "eol": "parts going obsolete", "done_check": "done but not in MAX",
           "overbuys": "recent overbuys", "prices": "price issues", "repeat": "repeat POs",
-          "ecn": "buys on ECN-obsoleted parts"}
+          "ecn": "buys on ECN-obsoleted parts", "safety": "safety stock buys"}
 
 
 def _section(key, title, why, link, rows, seen, total=None):
@@ -120,7 +120,9 @@ def priorities(snap, today, eol_items=(), price_alerts=(), overbuy_rows=(), done
     week_end = (today + timedelta(days=7)).isoformat()
     out = []
 
-    buys = [b for b in snap.get("buys") or [] if (b.get("place_by") or "") <= week_end]
+    all_buys = [b for b in snap.get("buys") or [] if (b.get("place_by") or "") <= week_end]
+    buys = [b for b in all_buys if not b.get("ss_only")]
+    ss_buys = [b for b in all_buys if b.get("ss_only")]
     out.append(_section(
         "buys", "Buys to place", "Order-by date is this week or already past.", "/buys",
         [{"key": b["part"], "part": b["part"], "description": b.get("description", ""),
@@ -131,7 +133,7 @@ def priorities(snap, today, eol_items=(), price_alerts=(), overbuy_rows=(), done
               f"{b.get('orders') or 0} order{'s' if b.get('orders') != 1 else ''}",
           ) if x),
           "link": f"/buys?q={b['part']}"} for b in buys], seen,
-        total=(snap.get("headline") or {}).get("buy_now", len(buys))))
+        total=len(buys)))
 
     words = {"obsolete": "Obsolete", "eol": "End of life", "last_time_buy": "Last-time buy"}
     out.append(_section(
@@ -182,6 +184,17 @@ def priorities(snap, today, eol_items=(), price_alerts=(), overbuy_rows=(), done
         [{"key": f"{f['part']}|{(f.get('pos') or [{}])[-1].get('po', '')}", "part": f["part"],
           "description": f.get("description", ""), "detail": f.get("what", ""), "link": "/check"}
          for f in reps], seen))
+
+    ss_buys.sort(key=lambda b: -(b.get("spend") or 0))
+    out.append(_section(
+        "safety", "Safety stock to restore",
+        "Nothing booked needs these this week; stock is below the safety stock PK-MRP trusts.",
+        "/buys?q=safety+stock",
+        [{"key": b["part"], "part": b["part"], "description": b.get("description", ""),
+          "money": b.get("spend") or 0, "money_label": "to buy",
+          "detail": f"{b.get('qty', 0):g} from {(b.get('vendor') or 'no vendor').title()}"
+                    f" · safety stock {(b.get('ss_judge') or {}).get('use', b.get('safety_stock', 0)):g}",
+          "link": f"/buys?q={b['part']}"} for b in ss_buys], seen))
 
     ecn = snap.get("ecn") or {}
     out.append(_section(

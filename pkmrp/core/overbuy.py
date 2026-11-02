@@ -25,8 +25,11 @@ KINDS = {
 
 
 def overbuys(
-    exceptions, open_pos, demands, stock, parts, segments, vendor_name, today, new_days=30
+    exceptions, open_pos, demands, stock, parts, segments, vendor_name, today, new_days=30,
+    safety_floor=None,
 ):
+    """`safety_floor` {part: qty}: the safety stock PK-MRP holds (as judged);
+    stock up to it isn't extra."""
     seg = {r["part"]: r["segment"] for r in segments}
     lines = {f"PO {r.po}/{r.line}/{r.delivery}": r for r in open_pos.itertuples(index=False)}
 
@@ -66,6 +69,8 @@ def overbuys(
     need = defaultdict(float)
     for p, ds in demands.items():
         need[p] += sum(d.qty for d in ds)
+    for p, q in (safety_floor or {}).items():
+        need[p] += q
     stock_rows = []
     for p, q in stock.items():
         info = parts.get(p)

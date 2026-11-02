@@ -230,6 +230,19 @@ WHERE TYPE_10 = 'MF' AND LINNUM_10 = '00' AND DELNUM_10 = '00' AND CREDTE_10 >= 
 GROUP BY PRTNUM_10
 """
 
+# Real use per part: issues to work orders (I, returns net them) and
+# shipments on sales orders (S), last 12 months and the 12 before. NOT E
+# (cost revaluation -- same volume as I, doubles usage) or K/W.
+USAGE_SQL = """
+SELECT RTRIM(PRTNUM_15) AS part,
+       SUM(CASE WHEN TNXDTE_15 >= ? THEN TNXQTY_15 ELSE 0 END) AS used_12m,
+       SUM(CASE WHEN TNXDTE_15 < ? THEN TNXQTY_15 ELSE 0 END) AS used_prior_12m,
+       CAST(MAX(TNXDTE_15) AS date) AS last_used
+FROM Transaction_History
+WHERE TNXCDE_15 IN ('I', 'S') AND TNXDTE_15 >= ?
+GROUP BY PRTNUM_15
+"""
+
 # Manufacturer part numbers: MAX's MPN file plus the MPN and vendor SKU on
 # each approved-vendor row. What the distributor checks and EOL matching
 # look a part up by.
@@ -431,6 +444,7 @@ ALL_SQL = {
     "make_costs": MAKE_COSTS_SQL,
     "wo_builds": WO_BUILDS_SQL,
     "mpns": MPN_SQL,
+    "usage": USAGE_SQL,
     "open_po_prices": OPEN_PO_PRICES_SQL,
     "consign_moves": CONSIGN_MOVES_SQL,
     "pipeline_lines": PIPELINE_LINES_SQL,
@@ -462,6 +476,7 @@ _DATES = {
     "closed",
     "date",
     "last_built",
+    "last_used",
 }
 _TEXT = {
     "part",
@@ -596,6 +611,21 @@ def make_costs(erp):
 def wo_builds(erp, since):
     """Work orders run per part since `since`, any status."""
     return _run(erp, "wo_builds", [since])
+
+
+def usage(erp, today):
+    """{part: (used last 12 months, used the 12 before, last use date)}."""
+    from datetime import timedelta
+
+    from ..core.calendar import as_date
+
+    year, two = today - timedelta(days=365), today - timedelta(days=730)
+    df = _run(erp, "usage", [year, year, two])
+    return {
+        r.part: (max(float(r.used_12m or 0), 0.0), max(float(r.used_prior_12m or 0), 0.0),
+                 as_date(r.last_used))
+        for r in df.itertuples(index=False)
+    }
 
 
 def mpns(erp):

@@ -95,6 +95,7 @@
           <span class="chip {{ b.tone }}">{{ b.when }}</span>
           {% if b.changed and b.changed.kind != 'new' %}<span class="chip late" title="{{ b.changed.text }} — check Why this buy? before ordering">changed</span>{% endif %}
           {% if b.wo_only %}<span class="chip quiet" title="No sales order pegged directly — needed by open work orders or vendor kits">for open WOs</span>{% endif %}
+          {% if b.ss_only %}<span class="chip quiet" title="Nothing booked needs ordering this week: this restores the safety stock in MAX ({{ (b.ss_judge or {}).use|default(b.safety_stock)|qty }})">safety stock</span>{% elif b.ss_qty %}<span class="chip quiet" title="{{ b.ss_qty|qty }} of it restores the safety stock in MAX">+{{ b.ss_qty|qty }} safety stock</span>{% endif %}
           {{ part_note(b.part) }}
         </div>
         <div class="desc">{{ b.description|lower|capitalize }}</div>
@@ -124,6 +125,7 @@
     {% endfor %}
   </ol>
   {% if more %}<p class="more"><a href="{{ script_root }}/buys">{{ more }} more on the full list →</a></p>{% endif %}
+  {% set ssn = (snap.headline or {}).ss_buys %}{% if ssn %}<p class="more muted small">Plus <a href="{{ script_root }}/buys?q=safety+stock">{{ ssn }} safety-stock buy{{ 's' if ssn != 1 }}</a> after these — nothing booked needs them this week; they top stock back up to the safety stock in MAX that PK-MRP trusts (<a href="{{ script_root }}/safety-stock">which it doesn't</a>).</p>{% endif %}
 </section>
 {% else %}
 <section class="allclear" data-confetti="1">

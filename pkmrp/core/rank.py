@@ -10,6 +10,9 @@ but ranked by what they unblock:
   2. how late the place-by date already is;
   3. spend, smallest first (cheap blockers are quick wins).
 
+A buy that only restores MAX safety stock (no booked order behind it) goes
+after all of those: the top of the list stays "orders slip without these".
+
 Pure: plain data in, plain dicts out, deterministic order.
 """
 
@@ -59,6 +62,7 @@ def buy_list(
                 roots.add(p.root_part)
                 pegs.append(p)
         unit_cost = float(info.unit_cost) if info else 0.0
+        ss_qty = sum(o.qty for o in orders if o.reason == "safety_stock")
         out.append(
             {
                 "part": part,
@@ -89,10 +93,13 @@ def buy_list(
                 "for_parts": sorted(roots),
                 "sales_orders": sorted(orders_hit, key=lambda so: -orders_hit[so]),
                 "planned_lines": len(orders),
-                "wo_only": not orders_hit,  # needed only by open work orders / kits
+                "wo_only": not orders_hit and ss_qty < qty - 1e-9,  # needed only by open WOs / kits
+                "safety_stock": float(info.safety_stock or 0.0) if info else 0.0,
+                "ss_qty": ss_qty,  # of qty, what restores safety stock
+                "ss_only": ss_qty >= qty - 1e-9,  # no booked order behind it
             }
         )
-    out.sort(key=lambda b: (-b["order_value"], -b["days_late"], b["spend"], b["part"]))
+    out.sort(key=lambda b: (b["ss_only"], -b["order_value"], -b["days_late"], b["spend"], b["part"]))
     for i, b in enumerate(out, 1):
         b["rank"] = i
     return out

@@ -7,6 +7,11 @@ Every feature people can see gets a line here in the same change
 WHATS_NEW = (
     (
         "2026-11-02",
+        "Safety stock counts, when it makes sense",
+        "PK-MRP used to plan from booked orders only, so the safety stock Ron set for the 2920 parts didn't move anything. Now MAX's safety stock on bought parts is a floor: after booked orders, stock below it is a buy marked safety stock, ranked after every buy that protects an order, so the top ten doesn't change (SS-only buys are linked under it and get their own section in the Monday email). A PO kept for safety stock also stops showing as an overbuy. Each number is judged first: ignored on held, replaced or maker-obsolete parts and on parts nobody used in 12 months with nothing booked (a $70K sampling head had one), and capped at 6 months of real use (300 of a fiber used about 3 a month becomes 17). The new Safety stock page (Cleanup menu) lists those for fixing in MAX, with a CSV.",
+    ),
+    (
+        "2026-11-02",
         "One email a week, Monday morning",
         "The EOL alert went out every hour over the weekend, and most of it was noise: 166 parts, 139 that nothing booked needs, and several that weren't even our part (a search for an Edmund lens number also finds a Wiha screwdriver). Now PK-MRP sends one email, Mondays at 7 am, instead of the Friday summary and the EOL alerts. On top is Needs you this week, most urgent kind first: buys past their order-by, parts going obsolete with nothing to cover them, Done that MAX doesn't show, recent overbuys, price issues, repeat POs. Up to five lines each, NEW marked if it wasn't in last Monday's email, every part a link to its page. The EOL watch now checks the maker as well as the number, doesn't count \"discontinued at DigiKey\" as obsolete, looks up the other maker part numbers MAX approves for a part, and splits the list into Act, Watch and nothing booked. Only Act goes in the email.",
     ),

@@ -40,10 +40,12 @@ def _sku_proposals(erp, pipeline, parts, today, timed):
 
 
 def build_plan(
-    erp, settings=None, today=None, history_months=24, sku_map=None, replacements=None
+    erp, settings=None, today=None, history_months=24, sku_map=None, replacements=None,
+    no_stock=None,
 ):
     """`sku_map` is the confirmed pipeline_sku_map (mrp_settings), or None;
-    `replacements` the part_replacements rules (old -> new), or None."""
+    `replacements` the part_replacements rules (old -> new), or None;
+    `no_stock` {part: why} parts not to hold MAX safety stock on."""
     settings = settings or PlanSettings()
     today = today or date.today()
     timings = {}
@@ -75,6 +77,7 @@ def build_plan(
     make_cost_df = timed("make_costs", extract.make_costs, erp)
     wo_builds_df = timed("wo_builds", extract.wo_builds, erp, today - timedelta(days=1095))
     mpn_df = timed("mpns", extract.mpns, erp)
+    usage = timed("usage", extract.usage, erp, today) if settings.use_safety_stock else {}
 
     parts = {
         r.part: Part(
@@ -94,6 +97,7 @@ def build_plan(
                 else 0.0
             ),
             pack_uom=r.purchase_uom,
+            safety_stock=float(r.safety_stock or 0.0),
         )
         for r in parts_df.itertuples(index=False)
     }
@@ -210,6 +214,8 @@ def build_plan(
         today,
         lead,
         committed,
+        usage,
+        no_stock,
     )
     timings["netting"] = round(time.time() - t, 2)
     shelf_orders = shelf_mod.shelf_orders(

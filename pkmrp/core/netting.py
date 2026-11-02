@@ -11,6 +11,12 @@ Per part, demands are taken in date order and covered from, in turn:
      after the demand it covers is an `expedite_open_po` exception;
   3. surplus from an earlier planned order rounded up by MAX's min/mult;
   4. a new planned order, need-by = the demand's date.
+A bought part with safety stock in MAX (SAFSTK_01), once core/safety.py
+has judged it a good signal (or capped it), then nets one more
+requirement, the safety stock itself, after all booked demand: what stock and
+receipts don't cover becomes a `safety_stock` buy to place now (need-by one
+lead time out). Receipts it uses aren't excess or cancel candidates, and it
+never raises an expedite or late-to-place -- no order slips on it.
 Receipts left unused are `cancel_candidate`s; receipts first needed long
 after they land are `push_out_open_po`s. A planned buy whose place-by date
 (need-by less lead time) has passed is `late_to_place`.
@@ -27,7 +33,8 @@ from dataclasses import dataclass, field
 from datetime import date
 
 from .bom import low_level_codes, without_edges
-from .calendar import minus_workdays
+from . import safety as safety_mod
+from .calendar import minus_workdays, plus_workdays
 
 MAX_PEGS = 50
 
@@ -46,6 +53,7 @@ class Part:
     yield_pct: float = 0.0  # YIELD_01; 0 = not set
     pack_qty: float = 0.0  # stocking units per purchase unit (PURCNV_01) when > 1
     pack_uom: str = ""  # the purchase unit, e.g. PK, RL
+    safety_stock: float = 0.0  # SAFSTK_01
 
 
 @dataclass(frozen=True)
@@ -89,6 +97,7 @@ class PlannedOrder:
     pegs: tuple
     late: bool = False
     shortfall: float = 0.0  # the uncovered quantity, before min/mult
+    reason: str = "booked"  # "booked" | "safety_stock"
 
 
 @dataclass
@@ -112,6 +121,10 @@ class PlanResult:
     committed: set | None = None
     # every demand netted against each part, kept whole for the why story
     demands: dict = field(default_factory=lambda: defaultdict(list))
+    # MAX safety stock judged per part (core/safety.py), and its inputs
+    safety: dict = field(default_factory=dict)
+    usage: dict = field(default_factory=dict)
+    no_stock: dict = field(default_factory=dict)
 
 
 def _round_order(short, part, use_min_mult):
@@ -141,7 +154,8 @@ def _merge_pegs(pegs_iter):
 
 
 def plan(
-    parts, children, demands, on_hand, receipts, settings, today, lead_times=None, committed=None
+    parts, children, demands, on_hand, receipts, settings, today, lead_times=None, committed=None,
+    usage=None, no_stock=None,
 ):
     """Net everything. Arguments:
 
@@ -151,10 +165,13 @@ def plan(
     on_hand     {part: qty}  nettable stock
     receipts    [Receipt]  open POs and open WOs
     lead_times  {part: (days, source)}  realized; falls back to PURLT_01
+    usage       {part: (used 12 months, used the 12 before, last use)}  for safety stock
+    no_stock    {part: why}  parts not to hold safety stock on (held, replaced, obsolete)
     """
     lead_times = lead_times or {}
     result = PlanResult()
     result.committed = committed
+    result.usage, result.no_stock = usage or {}, no_stock or {}
     levels, dropped = low_level_codes(children)
     kids = without_edges(children, dropped)
     result.levels, result.cycle_edges = levels, dropped
@@ -172,7 +189,14 @@ def plan(
 
     # Lowest level first; components reached only through explosion join the
     # heap as their parents plan. A part is netted once, after every parent.
-    heap = [(levels.get(p, 0), p) for p in set(by_part) | set(rec_by_part)]
+    # bought parts with safety stock are netted (and judged) even with no
+    # demand or receipt: stock below a trusted safety stock is a buy
+    ss_parts = {
+        p for p, i in parts.items()
+        if settings.use_safety_stock and i.safety_stock and i.safety_stock > 0
+        and i.type in settings.buy_types
+    }
+    heap = [(levels.get(p, 0), p) for p in set(by_part) | set(rec_by_part) | ss_parts]
     heapq.heapify(heap)
     done = set()
 
@@ -223,7 +247,8 @@ def _net_part(part, parts, kids, demands, on_hand, receipts, settings, today, le
         return []
 
     demands = sorted(demands, key=lambda d: (d.date, d.source, d.qty))
-    result.demands[part] = demands
+    if demands:
+        result.demands[part] = demands
     recs = sorted(receipts, key=lambda r: (r.date, r.ref))
     left = [r.qty for r in recs]  # unconsumed qty per receipt
     first_use = [None] * len(recs)
@@ -235,7 +260,16 @@ def _net_part(part, parts, kids, demands, on_hand, receipts, settings, today, le
 
     shortages = []  # (demand, short qty)
     expedite = {}  # receipt index -> earliest need, qty needed before it lands
-    for d in demands:
+    todo = list(demands)
+    ss = float(info.safety_stock or 0.0) if settings.use_safety_stock else 0.0
+    if ss > 0 and info.type in settings.buy_types:
+        j = safety_mod.judge(ss, demands, result.usage.get(part), today,
+                             result.no_stock.get(part, ""), settings.safety_stock_max_months)
+        result.safety[part] = j
+        ss = j["use"]
+        if ss > 0:
+            todo.append(Demand(part, today, ss, (), "safety_stock"))  # last: after every booked need
+    for d in todo:
         need = d.qty
         ledger.append((d.date, -d.qty, d.source, ", ".join(p.ref for p in d.pegs[:3])))
         take = min(stock, need)
@@ -251,7 +285,7 @@ def _net_part(part, parts, kids, demands, on_hand, receipts, settings, today, le
             need -= take
             if first_use[i] is None:
                 first_use[i] = d.date
-            if r.date > d.date:
+            if r.date > d.date and d.source != "safety_stock":
                 # One expedite per receipt: the earliest need, the qty pulled in.
                 x = expedite.get(i)
                 if x is None:
@@ -366,21 +400,25 @@ def _net_part(part, parts, kids, demands, on_hand, receipts, settings, today, le
             lead, source = info.mfg_lt, "MFGLT_01"
         else:
             lead, source = lead_times.get(part, (info.purchase_lt, "PURLT_01"))
-        place_by = minus_workdays(d.date, lead)
+        ss_buy = d.source == "safety_stock"
+        need_by = plus_workdays(today, lead) if ss_buy else d.date
+        place_by = today if ss_buy else minus_workdays(d.date, lead)
         order = PlannedOrder(
             part,
             "make" if is_make else "buy",
             qty,
-            d.date,
+            need_by,
             place_by,
             lead,
             source,
             d.pegs,
             late=place_by < today,
             shortfall=short,
+            reason=d.source if ss_buy else "booked",
         )
         result.planned.append(order)
-        ledger.append((d.date, qty, "planned_" + order.kind, f"place by {place_by}"))
+        ledger.append((need_by, qty, "planned_" + order.kind,
+                       f"place by {place_by}" + (f"; restores safety stock {ss:g}" if ss_buy else "")))
         if order.late and not is_make:
             result.exceptions.append(
                 Exception_(

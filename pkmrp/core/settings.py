@@ -34,6 +34,15 @@ class PlanSettings:
     # Printed-on-demand documentation, never bought or built as stock.
     doc_prefixes: tuple = ("90-", "97-")
 
+    # MAX's safety stock (SAFSTK_01) on bought parts is kept as a floor:
+    # netted after every booked demand, like MAX's own MRP, and any shortfall
+    # becomes a "place now" buy ranked after the buys that protect an order.
+    # Make parts' safety stock is not planned yet (it would explode BOMs).
+    use_safety_stock: bool = True
+    # ...judged first (core/safety.py): ignored on held / replaced / maker-
+    # obsolete / dormant parts, capped at this many months of real use.
+    safety_stock_max_months: float = 6.0
+
     # MAX's master-schedule (-FAMILY) entries double-count booked orders.
     include_master_schedule: bool = False
 

@@ -16,6 +16,7 @@ from datetime import date, datetime
 
 import pandas as pd
 
+from .core import safety as safety_mod
 from .core.analytics import breakdown, trend_point
 from .core.order_qty import size_all
 from .core.overbuy import overbuys
@@ -134,6 +135,13 @@ def build(run, so_df):
     for i, b in enumerate(buys, 1):
         b["rank"] = i
     needs_source.sort(key=lambda b: (-b["order_value"], b["need_by"], b["part"]))
+    for b in buys + needs_source:
+        j = res.safety.get(b["part"])
+        if j:
+            b["ss_judge"] = {k: j[k] for k in ("ss", "use", "verdict", "why", "months")}
+    safety_summary = safety_mod.summary(res.safety, parts, buys + needs_source,
+                                        run.get("vendor_name") or {})
+    run["safety_summary"] = safety_summary  # the full list: written by the caller
     unscheduled = run["worklists"]["unscheduled"]
     segments = run.get("segments") or []
     seg_counts = Counter(r["segment"] for r in segments)
@@ -149,7 +157,9 @@ def build(run, so_df):
         "timings": run["timings"],
         "exceptions": dict(by_kind),
         "headline": {
-            "buy_now": len(buys),
+            # order-driven buys; safety-stock-only ones are counted apart
+            "buy_now": sum(1 for b in buys if not b.get("ss_only")),
+            "ss_buys": sum(1 for b in buys if b.get("ss_only")),
             "late": sum(1 for b in buys if b["days_late"] > 0),
             "orders_waiting": len({so for b in buys for so in b["sales_orders"]}),
             "order_value_waiting": round(
@@ -216,9 +226,15 @@ def build(run, so_df):
                 run.get("segments", []),
                 run.get("vendor_name") or {},
                 today,
+                safety_floor={p: j["use"] for p, j in res.safety.items() if j["use"] > 0},
             )
         ),
+        "safety_stock": {k: v for k, v in safety_summary.items() if k != "rows"},
     }
+
+
+def write_safety(data):
+    _write_json("safety_stock.json", data)
 
 
 def _vendor_price_summary(vp):
