@@ -131,12 +131,30 @@ def _replacements():
         return {}
 
 
-def _no_stock(replacements):
+def _part_notes():
+    """{part: [note]} from PK_Ops; {} when they can't be read."""
+    from .db import store
+
+    try:
+        engine = store.ops_engine(DbConfig.from_env())
+        if store.missing_tables(engine):
+            return {}
+        return store.get_setting(engine, "part_notes", {}) or {}
+    except Exception as exc:  # noqa: BLE001 -- plan without the notes
+        click.echo(f"part notes: {exc}", err=True)
+        return {}
+
+
+def _critical(notes):
+    """Parts noted critical (single source, hard to replace)."""
+    return {p for p, ns in notes.items() if any(n.get("tag") == "critical" for n in ns)}
+
+
+def _no_stock(replacements, notes):
     """{part: why} -- parts PK-MRP won't hold MAX safety stock on: held or
     noted obsolete (part notes), replaced (replacement rules), or obsolete at
-    the maker (last plan's EOL watch). Whatever can't be read is left out."""
+    the maker (last plan's EOL watch)."""
     from . import snapshot
-    from .db import store
 
     out = {}
     eol = (snapshot.load_json("eol.json") or {}).get("items") or []
@@ -145,17 +163,12 @@ def _no_stock(replacements):
             out[i["part"]] = "obsolete at its maker (EOL watch)"
     for old, rule in (replacements or {}).items():
         out[old] = f"replaced by {rule.get('part', 'another part')}"
-    try:
-        engine = store.ops_engine(DbConfig.from_env())
-        if not store.missing_tables(engine):
-            for part, notes in (store.get_setting(engine, "part_notes", {}) or {}).items():
-                tags = {n.get("tag") for n in notes}
-                if "hold" in tags:
-                    out[part] = "on hold (part note)"
-                elif "obsolete" in tags:
-                    out[part] = "noted obsolete (part note)"
-    except Exception as exc:  # noqa: BLE001 -- judge without the notes
-        click.echo(f"part notes: {exc}", err=True)
+    for part, ns in notes.items():
+        tags = {n.get("tag") for n in ns}
+        if "hold" in tags:
+            out[part] = "on hold (part note)"
+        elif "obsolete" in tags:
+            out[part] = "noted obsolete (part note)"
     return out
 
 
@@ -171,9 +184,9 @@ def _plan_once(erp):
     from . import snapshot
     from .run import build_plan
 
-    replacements = _replacements()
+    replacements, notes = _replacements(), _part_notes()
     run = build_plan(erp, sku_map=_sku_map(), replacements=replacements,
-                     no_stock=_no_stock(replacements))
+                     no_stock=_no_stock(replacements, notes), critical=_critical(notes))
     snap = snapshot.build(run, run["so_lines"])
     snapshot.add_audit(snap, run)
     if run.get("vendor_prices"):

@@ -16,7 +16,9 @@ including demand exploded down from assemblies, is known by then):
            Real use per month = the larger of the last 12 months' issues to
            work orders + shipments, and the booked rate (booked quantity
            spread from today to its last need, at least 3 months);
-  trusted  everything else, planned as set.
+  trusted  everything else, planned as set -- and always on a part noted
+           critical (single source, hard to replace): someone chose that
+           number on purpose, so it isn't capped or called dormant.
 
 Ignored and capped parts are a worklist for whoever keeps MAX's safety
 stock (the Safety stock page and its CSV). Pure: plain data in, dicts out.
@@ -37,7 +39,7 @@ def booked_rate(demands, today, min_months=3.0):
     return total / months
 
 
-def judge(ss, demands, usage, today, flag="", max_months=6.0):
+def judge(ss, demands, usage, today, flag="", max_months=6.0, critical=False):
     """{ss, use, verdict, why, used_12m, used_prior_12m, last_used, rate, months}.
     `usage` is (used 12 months, used the 12 before, last use) or None; `flag`
     is why the part shouldn't be stocked at all ('' if none)."""
@@ -55,6 +57,8 @@ def judge(ss, demands, usage, today, flag="", max_months=6.0):
     }
     if flag:
         return dict(out, use=0.0, verdict=IGNORED, why=flag)
+    if critical:
+        return dict(out, use=ss, verdict=TRUSTED, why="critical part: kept as set")
     if used <= 0 and booked <= 0:
         why = ("not used in 12 months and nothing booked" if prior > 0
                else "not used in two years and nothing booked")

@@ -110,6 +110,10 @@
           {% if b.order_value %} worth <b>{{ b.order_value|money }}</b>{% endif %}
           {% if b.customers %}<span class="cust">· {{ b.customers[:3]|join(', ') }}{% if b.customers|length > 3 %} +{{ b.customers|length - 3 }}{% endif %}</span>{% endif %}
         </div>
+        {% elif b.protects_orders %}
+        <div class="unblocks">
+          Critical part: protects <b>{{ b.protects_orders }} order{{ '' if b.protects_orders == 1 else 's' }}</b>{% if b.protects_value %} worth <b>{{ b.protects_value|money }}</b>{% endif %} <span class="cust">· none is short yet; this keeps its safety stock</span>
+        </div>
         {% endif %}
         {% if sz.add_to_po %}<div class="add-to-po small">PO {{ sz.add_to_po.po }} for {{ sz.add_to_po.qty|qty }} went in {{ sz.add_to_po.created|nice_date(False) }} — add these to it rather than a new PO, if the vendor will take it.</div>{% endif %}
         {% if b.changed and b.changed.kind != 'new' %}<div class="add-to-po small late-text">{{ b.changed.text }}. Check Why this buy? before ordering — a re-dated order can swing back within hours.</div>{% endif %}

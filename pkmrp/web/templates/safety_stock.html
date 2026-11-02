@@ -33,5 +33,5 @@
     </tr>
   {% else %}<tr><td colspan="10" class="muted">Every safety stock in MAX checks out.</td></tr>{% endfor %}</tbody>
 </table></div>
-<p class="foot-note">Make parts' safety stock isn't planned yet. Holds and "obsolete" notes come from the Notes page; replacements from the replacement rules; maker obsolescence from the EOL watch.</p>
+<p class="foot-note">A part noted <b>critical</b> (single source, hard to replace) is always trusted, and its safety-stock buy ranks with the order-driven buys. Make parts' safety stock isn't planned yet. Holds and "obsolete" notes come from the Notes page; replacements from the replacement rules; maker obsolescence from the EOL watch.</p>
 {% endblock %}

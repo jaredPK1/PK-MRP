@@ -93,3 +93,34 @@ def test_safety_stock_only_buys_rank_after_every_order_buy():
     lens, cube = buys
     assert cube["ss_only"] and cube["ss_qty"] == 7 and not cube["wo_only"]
     assert not lens["ss_only"] and lens["ss_qty"] == 0
+
+
+def test_critical_keeps_safety_stock_as_set():
+    j = judge(300, [], (36, 30, None), TODAY, critical=True)
+    assert j["verdict"] == "trusted" and j["use"] == 300
+    assert judge(1, [], (0, 0, None), TODAY, critical=True)["use"] == 1  # not called dormant
+    held = judge(5, [], (36, 0, None), TODAY, flag="on hold (part note)", critical=True)
+    assert held["verdict"] == "ignored"  # a hold still wins
+
+
+def test_critical_safety_stock_buy_ranks_by_its_biggest_order():
+    parts = {"CUBE": part(), "PLAIN": part("PLAIN"), "LENS": part("LENS", ss=0, cost=1.0)}
+    ds = [so("CUBE", date(2027, 2, 12), 2, "SO 1/01"), so("CUBE", date(2027, 3, 1), 1, "SO 2/01"),
+          so("LENS", date(2026, 11, 20), 2, "SO 3/01")]
+    use = {"CUBE": (60.0, 0, None), "PLAIN": (60.0, 0, None), "LENS": (5, 0, None)}
+    stock = {"CUBE": 5, "PLAIN": 0}
+    r = plan(parts, {}, ds, stock, [], S, TODAY, usage=use, critical={"CUBE"})
+    values = {"1": 500.0, "2": 2000.0, "3": 900.0}
+    buys = buy_list(r.planned, parts, {}, values, {}, TODAY, horizon_workdays=20,
+                    critical={"CUBE"}, demands=r.demands)
+    assert [b["part"] for b in buys] == ["CUBE", "LENS", "PLAIN"]
+    cube = buys[0]
+    assert cube["ss_only"] and cube["critical"] and cube["orders"] == 0  # nothing waiting...
+    assert cube["protects_orders"] == 2 and cube["protects_value"] == 2500 and cube["protects_top"] == 2000
+    assert not buys[2]["critical"] and buys[2]["protects_orders"] == 0
+
+
+def test_critical_is_a_note_tag():
+    from pkmrp.core.notes import TAG_SHORT, TAG_WORDS
+
+    assert "critical" in TAG_WORDS and TAG_SHORT["critical"] == "critical"

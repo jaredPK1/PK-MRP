@@ -87,6 +87,8 @@ def build(run, so_df):
         today,
         vendor_name=run.get("vendor_name"),
         exclude=frozenset(run.get("shelf") or ()),
+        critical=frozenset(run.get("critical") or ()),
+        demands=res.demands,
     )
     by_kind = Counter(e.kind for e in res.exceptions)
     so_meta = so_lines_meta(run["so_lines"], run["settings"])
@@ -158,8 +160,8 @@ def build(run, so_df):
         "exceptions": dict(by_kind),
         "headline": {
             # order-driven buys; safety-stock-only ones are counted apart
-            "buy_now": sum(1 for b in buys if not b.get("ss_only")),
-            "ss_buys": sum(1 for b in buys if b.get("ss_only")),
+            "buy_now": sum(1 for b in buys if not b.get("ss_only") or b.get("critical")),
+            "ss_buys": sum(1 for b in buys if b.get("ss_only") and not b.get("critical")),
             "late": sum(1 for b in buys if b["days_late"] > 0),
             "orders_waiting": len({so for b in buys for so in b["sales_orders"]}),
             "order_value_waiting": round(

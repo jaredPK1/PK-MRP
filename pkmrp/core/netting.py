@@ -125,6 +125,7 @@ class PlanResult:
     safety: dict = field(default_factory=dict)
     usage: dict = field(default_factory=dict)
     no_stock: dict = field(default_factory=dict)
+    critical: set = field(default_factory=set)
 
 
 def _round_order(short, part, use_min_mult):
@@ -155,7 +156,7 @@ def _merge_pegs(pegs_iter):
 
 def plan(
     parts, children, demands, on_hand, receipts, settings, today, lead_times=None, committed=None,
-    usage=None, no_stock=None,
+    usage=None, no_stock=None, critical=None,
 ):
     """Net everything. Arguments:
 
@@ -167,11 +168,13 @@ def plan(
     lead_times  {part: (days, source)}  realized; falls back to PURLT_01
     usage       {part: (used 12 months, used the 12 before, last use)}  for safety stock
     no_stock    {part: why}  parts not to hold safety stock on (held, replaced, obsolete)
+    critical    {part}  noted critical: safety stock kept as set
     """
     lead_times = lead_times or {}
     result = PlanResult()
     result.committed = committed
     result.usage, result.no_stock = usage or {}, no_stock or {}
+    result.critical = set(critical or ())
     levels, dropped = low_level_codes(children)
     kids = without_edges(children, dropped)
     result.levels, result.cycle_edges = levels, dropped
@@ -264,7 +267,8 @@ def _net_part(part, parts, kids, demands, on_hand, receipts, settings, today, le
     ss = float(info.safety_stock or 0.0) if settings.use_safety_stock else 0.0
     if ss > 0 and info.type in settings.buy_types:
         j = safety_mod.judge(ss, demands, result.usage.get(part), today,
-                             result.no_stock.get(part, ""), settings.safety_stock_max_months)
+                             result.no_stock.get(part, ""), settings.safety_stock_max_months,
+                             critical=part in result.critical)
         result.safety[part] = j
         ss = j["use"]
         if ss > 0:

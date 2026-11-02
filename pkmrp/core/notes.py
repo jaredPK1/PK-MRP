@@ -2,9 +2,11 @@
 
 "Engineering is working on a replacement", "obsolete", "ECN being created" --
 said once, kept on the part, and shown wherever the part appears, so nobody
-has to flag it again next plan. A note stays until someone removes it. Only
-"hold" changes what buyers see: a held part comes off every buy list (the
-plan itself is untouched).
+has to flag it again next plan. A note stays until someone removes it. Two
+change what buyers see: a held part comes off every buy list (the plan
+itself is untouched), and a critical part (single source, hard to replace)
+keeps its MAX safety stock as set and its safety-stock buy ranks by the
+booked orders that use it (core/safety.py, core/rank.py).
 
 Stored as one PK_Ops setting, {part: [note, ...]}, newest last. Pure.
 """
@@ -17,6 +19,7 @@ TAGS = (
     ("obsolete", "Obsolete / end of life"),
     ("ecn", "ECN being created"),
     ("hold", "Hold — don't buy yet"),
+    ("critical", "Critical — single source / hard to replace"),
     ("supplier", "Supplier problem"),
     ("other", "Note"),
 )
@@ -27,6 +30,7 @@ TAG_SHORT = {
     "obsolete": "obsolete",
     "ecn": "ECN coming",
     "hold": "on hold",
+    "critical": "critical",
     "supplier": "supplier problem",
     "other": "note",
 }

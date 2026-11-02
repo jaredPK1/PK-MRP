@@ -41,11 +41,12 @@ def _sku_proposals(erp, pipeline, parts, today, timed):
 
 def build_plan(
     erp, settings=None, today=None, history_months=24, sku_map=None, replacements=None,
-    no_stock=None,
+    no_stock=None, critical=None,
 ):
     """`sku_map` is the confirmed pipeline_sku_map (mrp_settings), or None;
     `replacements` the part_replacements rules (old -> new), or None;
-    `no_stock` {part: why} parts not to hold MAX safety stock on."""
+    `no_stock` {part: why} parts not to hold MAX safety stock on;
+    `critical` {part} noted critical (safety stock kept, ranked by orders)."""
     settings = settings or PlanSettings()
     today = today or date.today()
     timings = {}
@@ -216,6 +217,7 @@ def build_plan(
         committed,
         usage,
         no_stock,
+        critical,
     )
     timings["netting"] = round(time.time() - t, 2)
     shelf_orders = shelf_mod.shelf_orders(
@@ -333,6 +335,7 @@ def build_plan(
         "make_costs": make_cost_df,
         "wo_builds": wo_builds_df,
         "mpns": mpn_df,
+        "critical": set(critical or ()),
         "vendor_prices": vendor_price.build(
             price_df,
             open_price_df,

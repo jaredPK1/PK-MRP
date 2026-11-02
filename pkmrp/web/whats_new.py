@@ -7,6 +7,11 @@ Every feature people can see gets a line here in the same change
 WHATS_NEW = (
     (
         "2026-11-02",
+        "Critical parts: safety stock that ranks with the urgent buys",
+        "A new note, Critical — single source / hard to replace (\"+ note\" on any part). A critical part keeps its MAX safety stock exactly as set, and when stock drops below it the buy ranks as if the largest booked order using the part were waiting, so it shows up in the list you work instead of after hundreds of routine top-ups. The card says Critical part: protects N orders, none short yet. Start: the eight 2920 parts Engineering flagged in the NPI review.",
+    ),
+    (
+        "2026-11-02",
         "Safety stock counts, when it makes sense",
         "PK-MRP used to plan from booked orders only, so the safety stock Ron set for the 2920 parts didn't move anything. Now MAX's safety stock on bought parts is a floor: after booked orders, stock below it is a buy marked safety stock, ranked after every buy that protects an order, so the top ten doesn't change (SS-only buys are linked under it and get their own section in the Monday email). A PO kept for safety stock also stops showing as an overbuy. Each number is judged first: ignored on held, replaced or maker-obsolete parts and on parts nobody used in 12 months with nothing booked (a $70K sampling head had one), and capped at 6 months of real use (300 of a fiber used about 3 a month becomes 17). The new Safety stock page (Cleanup menu) lists those for fixing in MAX, with a CSV.",
     ),

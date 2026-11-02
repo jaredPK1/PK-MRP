@@ -12,6 +12,10 @@ but ranked by what they unblock:
 
 A buy that only restores MAX safety stock (no booked order behind it) goes
 after all of those: the top of the list stays "orders slip without these".
+Except on a part noted critical (single source, hard to replace): running
+out would stop every booked order that uses it, so its safety-stock buy
+ranks as if the largest of those orders were waiting on it (`protects_*`;
+shown, never counted as orders waiting -- none is short yet).
 
 Pure: plain data in, plain dicts out, deterministic order.
 """
@@ -38,6 +42,8 @@ def buy_list(
     horizon_workdays=5,
     vendor_name=None,
     exclude=frozenset(),
+    critical=frozenset(),
+    demands=None,
 ):
     """[{part, ...}] for every part with a buy to place by the horizon, ranked."""
     horizon = plus_workdays(today, horizon_workdays)
@@ -63,6 +69,13 @@ def buy_list(
                 pegs.append(p)
         unit_cost = float(info.unit_cost) if info else 0.0
         ss_qty = sum(o.qty for o in orders if o.reason == "safety_stock")
+        protects = {}
+        if part in critical and ss_qty:
+            for d in (demands or {}).get(part, []):
+                for p in d.pegs:
+                    so = _so_of(p.ref)
+                    if so:
+                        protects[so] = so_values.get(so, 0.0)
         out.append(
             {
                 "part": part,
@@ -97,9 +110,15 @@ def buy_list(
                 "safety_stock": float(info.safety_stock or 0.0) if info else 0.0,
                 "ss_qty": ss_qty,  # of qty, what restores safety stock
                 "ss_only": ss_qty >= qty - 1e-9,  # no booked order behind it
+                "critical": part in critical,
+                "protects_orders": len(protects),
+                "protects_value": round(sum(protects.values()), 2),
+                "protects_top": round(max(protects.values(), default=0.0), 2),
             }
         )
-    out.sort(key=lambda b: (b["ss_only"], -b["order_value"], -b["days_late"], b["spend"], b["part"]))
+    out.sort(key=lambda b: (b["ss_only"] and not b["critical"],
+                            -max(b["order_value"], b["protects_top"]),
+                            -b["days_late"], b["spend"], b["part"]))
     for i, b in enumerate(out, 1):
         b["rank"] = i
     return out
