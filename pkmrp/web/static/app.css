@@ -147,7 +147,7 @@ footer { max-width: 1600px; margin: 0 auto; padding: 18px 20px 30px; color: var(
 .steps-h { font-size: 14px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin: 20px 0 8px; }
 .dense tr.bind td { background: var(--late-soft); font-weight: 600; }
 .cp-row td { padding: 0; border-bottom: 0; } .cp-cell:empty { display: none; }
-.cp-detail { padding: 10px 16px 14px; background: var(--bg); } .late-text { color: var(--late); font-weight: 600; }
+.cp-detail { padding: 10px 16px 14px; background: var(--bg); } .late-text { color: var(--late); font-weight: 600; } .soon-text { color: var(--soon); font-weight: 600; }
 .filters label select { font: inherit; padding: 5px 8px; border-radius: 8px; border: 1px solid var(--line);
                         background: var(--surface); color: var(--ink); margin-left: 6px; }
 

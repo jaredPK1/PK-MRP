@@ -8,7 +8,8 @@
   <tbody>{% for i in rows %}{% set k = kw.get(i.kind, kw.other) %}
     <tr>
       <td><span class="mono">{{ i.part }}</span> {{ part_note(i.part, False) }}<div class="muted small">{{ i.description|lower|capitalize|truncate(40, True, '…') }}</div>{% if i.systems %}<div class="muted small">in {{ i.systems[:3]|join(', ') }}{% if i.systems|length > 3 %} +{{ i.systems|length - 3 }}{% endif %}{% if i.orders %} · {{ i.orders }} order{{ 's' if i.orders != 1 }}{% endif %}</div>{% endif %}</td>
-      <td><span class="chip {{ k[1] }}">{{ k[0] }}</span>{% if i.replacements %}<div class="small">use {{ i.replacements[:2]|join(' / ') }}</div>{% endif %}</td>
+      <td><span class="chip {{ k[1] }}">{{ k[0] }}</span>{% if i.replacements %}<div class="small">use {{ i.replacements[:2]|join(' / ') }}</div>{% endif %}
+        {% for a in (i.alternates or [])[:3] %}<div class="small {{ 'soon-text' if a.status == 'active' else ('late-text' if a.status == 'bad' else 'muted') }}">alt {{ a.mpn }}{% if a.maker %} ({{ a.maker|title }}){% endif %}: {{ {'active': 'active', 'bad': 'also obsolete', 'unknown': 'status unknown', 'unchecked': 'not checked yet'}[a.status] }}</div>{% endfor %}</td>
       <td>{% if i.last_order %}{{ i.last_order|nice_date(False) }}<div class="small {{ 'late-text' if i.days_left is not none and i.days_left < 60 else 'muted' }}">{{ ('in ' ~ i.days_left ~ ' days') if i.days_left >= 0 else ('passed ' ~ (-i.days_left) ~ ' days ago') }}</div>{% else %}<span class="muted">not stated</span>{% endif %}</td>
       <td class="small">{% for s in i.signals[:3] %}<div>{{ s.source }}{% if s.where %} · {{ s.where }}{% endif %}{% if s.date %} · {{ s.date[:10] }}{% endif %}: {{ s.detail|truncate(140) }}{% if s.link %} <a href="{{ s.link }}" target="_blank" rel="noopener">open</a>{% endif %}</div>{% endfor %}{% if i.signals|length > 3 %}<div class="muted">+{{ i.signals|length - 3 }} more</div>{% endif %}</td>
       <td class="r">{{ i.booked|qty }}<div class="muted small">{{ i.yearly|qty }}/yr</div></td>
@@ -27,7 +28,7 @@
 {% block content %}
 <section class="page-intro">
   <h1 class="h1-small">EOL watch</h1>
-  <p class="lede"><b>The question this page answers: which parts are makers ending, and what should we buy before they go?</b> From three places: DigiKey / Mouser / Octopart lifecycle status, PCN and end-of-life notices in the purchasing mailbox (read by Claude), and a weekly web search of the makers behind our most-booked parts. Each part number is matched to ours through MAX's manufacturer part numbers. <b>Last-time buy</b> = booked orders plus two years at the yearly rate, less stock and open POs — a starting point for the conversation with Engineering, not an order.</p>
+  <p class="lede"><b>The question this page answers: which parts are makers ending, and what should we buy before they go?</b> From three places: DigiKey / Mouser / Octopart lifecycle status, PCN and end-of-life notices in the purchasing mailbox (read by Claude), and a weekly web search of the makers behind our most-booked parts. Each part number is matched to ours through MAX's manufacturer part numbers, and a distributor answer only counts when the maker matches too. When MAX approves more than one maker part number, the others are looked up as well: if one is still active, the part moves to Watch — switch, don't stockpile. <b>Last-time buy</b> = booked orders plus two years at the yearly rate, less stock and open POs — a starting point for the conversation with Engineering, not an order.</p>
   {% if error %}<p class="lede small-gap late-text">Couldn't read the Reviewed list from PK_Ops: {{ error }}</p>{% endif %}
   {% if saved %}<p class="lede small-gap">{{ 'Marked reviewed.' if saved == 'review' else 'Put back on the list.' }}</p>{% endif %}
 </section>
@@ -38,19 +39,16 @@
   <div class="tile"><span class="num small-num">{% if n.state == 'ok' %}{{ n.batches or 0 }}{% else %}—{% endif %}</span><span class="lbl">maker news searches</span><span class="sub">{% if r.status != 'on' %}off on this copy{% elif n.state == 'no_ai_key' %}waiting on a Claude API key{% else %}weekly{% if r.last and r.last.news_at %} · last {{ r.last.news_at[5:10] }}{% endif %}{% endif %}</span></div>
 </section>
 <div id="list"></div>
+{% set act = items|selectattr('tier', 'equalto', 'act')|list %}{% set watch = items|selectattr('tier', 'equalto', 'watch')|list %}{% set fyi = items|rejectattr('tier', 'in', ['act', 'watch'])|list %}
 <div class="table-tools"><input type="search" class="table-filter" placeholder="Filter: part, maker, words" aria-label="Filter"><span class="muted small filter-count"></span></div>
-{{ eol_table(items) }}
+<div>
+<h3 class="steps-h">Act · {{ act|length }} <span class="muted small">booked orders need it, stock and POs don't cover them, no approved alternate is active</span></h3>
+{{ eol_table(act) }}
+<h3 class="steps-h">Watch · {{ watch|length }} <span class="muted small">used, but covered by stock, an approved alternate is active, or a softer notice</span></h3>
+{{ eol_table(watch) }}
+<details class="small-gap"><summary class="muted">Nothing booked needs these · {{ fyi|length }}</summary>{{ eol_table(fyi) }}</details>
 {% if done %}<details class="small-gap"><summary class="muted">Reviewed · {{ done|length }}</summary>{{ eol_table(done) }}</details>{% endif %}
-{% set al = r.eol_alert or {} %}
-<section class="weekly-controls" id="alerts">
-  <h3 class="steps-h">Who gets the alerts</h3>
-  <p class="muted small">When a part newly shows up obsolete, end of life, last-time buy or not recommended for new designs, PK-MRP emails it once to this list (production only).{% if al.state == 'error' %} <span class="late-text">The last alert failed: {{ al.error }}</span>{% elif al.sent %} Last run emailed {{ al.sent }} part{{ 's' if al.sent != 1 }}.{% endif %}</p>
-  {% if editable %}
-  <form method="post" action="{{ script_root }}/eol/recipients" class="note-form">
-    <textarea name="emails" rows="3" cols="70" aria-label="EOL alert recipients">{{ alert_to|join(', ') }}</textarea>
-    <button class="btn">Save</button> <span class="muted small">PK emails, separated by commas or new lines.</span>
-  </form>
-  {% else %}<p>{{ alert_to|join(', ') }} <span class="muted small">— an admin can change the list.</span></p>{% endif %}
-</section>
+</div>
+<p class="foot-note">The <b>Act</b> list goes in the <a href="{{ script_root }}/weekly">Monday email</a>; nothing on this page emails on its own.</p>
 <p class="foot-note">Parts Engineering has already obsoleted by ECN are on <a href="{{ script_root }}/fix-max">Fix in MAX</a>; this page is about makers ending what we buy.</p>
 {% endblock %}

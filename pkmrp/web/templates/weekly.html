@@ -1,9 +1,9 @@
 {% extends "base.html" %}
-{% block title %}Weekly email · PK-MRP{% endblock %}
+{% block title %}Monday email · PK-MRP{% endblock %}
 {% block content %}
 <section class="page-intro">
-  <h1 class="h1-small">The weekly email</h1>
-  <p class="lede">Goes out <b>Fridays at 3 pm Pacific</b> through pk-notify: how the plan moved this week, what got placed (and whether MAX confirmed it), whether buying followed PK-MRP's advice, the top of next week's list, and the Fix in MAX / obsolete-part counts. Below is exactly what it looks like with today's numbers.</p>
+  <h1 class="h1-small">The Monday email</h1>
+  <p class="lede"><b>PK-MRP's one email.</b> Goes out <b>Mondays at 7 am Pacific</b> through pk-notify. On top is <b>Needs you this week</b>, most urgent kind first: buys past their order-by, parts going obsolete with nothing to cover them, Done that MAX doesn't show, recent overbuys, price issues, repeat POs. Up to five lines each, <b>NEW</b> marked (not in last Monday's email), and every part links to the page that explains it. Last week's numbers come after. Nothing else in PK-MRP sends email. Below is exactly what it looks like with today's numbers.</p>
   {% if not scheduler %}<p class="lede small-gap muted">This copy doesn't send it — only production does (SCHEDULER_ENABLED). A test from here still sends to you.</p>{% endif %}
   {% if last.week_of %}<p class="lede small-gap">Last sent {{ last.at[:16]|replace('T', ' ') }} for the week of {{ last.week_of|nice_date(False) }} to {{ last.to|length }} people.</p>{% endif %}
   {% if sent %}<p class="lede small-gap"><span class="chip soon">Sent</span> Test sent to {{ sent }}.</p>{% elif error %}<p class="lede small-gap promise-error">Test not sent: {{ error }}</p>{% endif %}
@@ -18,5 +18,5 @@
   </form>
   {% else %}<p>{{ to|join(', ') }} <span class="muted small">— an admin can change the list.</span></p>{% endif %}
 </section>
-<iframe class="weekly-frame" src="{{ script_root }}/weekly/email" title="The weekly email"></iframe>
+<iframe class="weekly-frame" src="{{ script_root }}/weekly/email" title="The Monday email"></iframe>
 {% endblock %}

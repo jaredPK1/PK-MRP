@@ -110,6 +110,9 @@
       });
       count.textContent = q ? shown + ' of ' + rows.length : '';
     });
+    // ?q= in the link (the Monday email) fills the box
+    const q0 = new URLSearchParams(location.search).get('q');
+    if (q0) { box.value = q0; box.dispatchEvent(new Event('input')); }
   });
 
   // Part picker with descriptions (Promise)

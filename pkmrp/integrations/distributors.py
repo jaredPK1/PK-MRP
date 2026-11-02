@@ -6,7 +6,9 @@ and returns offers in one shape:
     {"source", "mpn", "maker", "sku", "stock", "lifecycle", "breaks": [[qty, unit price]],
      "url"}
 
-`lifecycle` is normalised to: active | nrnd | last_time_buy | obsolete | unknown.
+`lifecycle` is normalised to: active | nrnd | last_time_buy | obsolete |
+dist_dropped | unknown. "Discontinued at DigiKey" is dist_dropped: the
+distributor stopped stocking it, not the maker making it.
 
 Untested against the live services until the keys are in place (see
 deploy/RESEARCH_SETUP.md); parsing is defensive so a changed field gives an
@@ -25,7 +27,9 @@ LIFECYCLE_WORDS = (
     ("last time buy", "last_time_buy"),
     ("last-time buy", "last_time_buy"),
     ("ltb", "last_time_buy"),
+    ("discontinued at", "dist_dropped"),
     ("not recommended", "nrnd"),
+    ("not for new design", "nrnd"),
     ("nrnd", "nrnd"),
     ("end of life", "obsolete"),
     ("eol", "obsolete"),

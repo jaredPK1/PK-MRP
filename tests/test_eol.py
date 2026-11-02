@@ -83,3 +83,77 @@ def test_non_notice_email_is_ignored():
         TODAY,
     )
     assert out["items"] == []
+
+
+def _dist(part, asked, *offers):
+    return {part: {"checked": "2026-11-01T10:00", "mpn": asked, "offers": list(offers)}}
+
+
+def _offer(mpn, maker, life, src="mouser", sku=""):
+    return {"source": src, "mpn": mpn, "maker": maker, "sku": sku, "lifecycle": life,
+            "lifecycle_text": life.title()}
+
+
+def _one(dist, rows, booked=10, stock=0, part="P"):
+    parts = {part: Part(part, "B", "THING", unit_cost=2.0)}
+    demands = {part: [Demand(part, TODAY + timedelta(days=30), booked, (), "so")]} if booked else {}
+    return build(dist, [], [], rows, parts, demands, {part: stock}, {}, {part: booked}, TODAY)["items"]
+
+
+def test_maker_must_match_what_max_has_on_file():
+    # a Mouser search for Edmund's 45-803 also finds a Wiha screwdriver
+    rows = [("46-0126-00G", "45-803", "EDMUND OPTICS", "mpn_file")]
+    wiha = _dist("46-0126-00G", "45-803", _offer("45803", "Wiha", "obsolete"))
+    assert _one(wiha, rows, part="46-0126-00G") == []
+    edmund = _dist("46-0126-00G", "45-803", _offer("45-803", "Edmund Optics Inc", "obsolete"))
+    assert _one(edmund, rows, part="46-0126-00G")[0]["kind"] == "obsolete"
+
+
+def test_number_must_match_exactly_and_short_numbers_need_a_maker():
+    rows = [("93-0057-00G", "5763", "", "vendor_sku")]
+    longer = _dist("93-0057-00G", "5763", _offer("57634 SL002", "Alpha Wire", "obsolete"))
+    assert _one(longer, rows, part="93-0057-00G") == []
+    bare = _dist("93-0057-00G", "5763", _offer("5763", "Festo", "obsolete"))
+    assert _one(bare, rows, part="93-0057-00G") == []  # all digits, no maker on file
+
+
+def test_asked_by_distributor_sku_is_one_product():
+    rows = [("38-3001-00G", "926-1206-ND", "", "vendor_sku")]
+    dk = _dist("38-3001-00G", "926-1206-ND",
+               _offer("430278-507", "Tark Thermal Solutions", "obsolete", "digikey", "926-1206-ND"))
+    assert _one(dk, rows, part="38-3001-00G")[0]["tier"] == "act"
+
+
+def test_maker_names_alias_and_noise():
+    from pkmrp.core.eol import maker_match
+
+    assert maker_match("Same Sky (Formerly CUI Devices)", "CUI")
+    assert maker_match("Amphenol ICC (FCI)", "AMPHENOL FCI")
+    assert maker_match("Texas Instruments", "TI") and maker_match("onsemi", "ON SEMICONDUCTOR")
+    assert not maker_match("Pulse Electronics", "PIC DESIGN")
+    assert not maker_match("Thorlabs Optics", "EDMUND OPTICS")
+
+
+def test_discontinued_at_distributor_is_not_obsolete():
+    from pkmrp.integrations.distributors import normalize_lifecycle
+
+    assert normalize_lifecycle("Discontinued at DigiKey") == "dist_dropped"
+    assert normalize_lifecycle("Not For New Designs") == "nrnd"
+    assert normalize_lifecycle("Discontinued") == "obsolete"
+
+
+def test_tiers_and_an_active_alternate_means_switch_not_stockpile():
+    rows = [("34-2579-00G", "68683-305LF", "AMPHENOL FCI", "mpn_file"),
+            ("34-2579-00G", "76342-305LF", "AMPHENOL FCI", "mpn_file"),
+            ("34-2579-00G", "SEE PART NOTES", "X", "mpn_file")]
+    dist = _dist("34-2579-00G", "68683-305LF", _offer("68683-305LF", "Amphenol ICC (FCI)", "obsolete"))
+    it = _one(dist, rows, part="34-2579-00G")[0]
+    assert it["tier"] == "act" and [a["mpn"] for a in it["alternates"]] == ["76342-305LF"]
+    assert it["alternates"][0]["status"] == "unchecked"
+    dist["34-2579-00G"]["alts"] = {"76342-305LF": {"checked": "2026-11-01T11:00", "offers": [
+        _offer("76342-305LF", "Amphenol ICC (FCI)", "active")]}}
+    it = _one(dist, rows, part="34-2579-00G")[0]
+    assert it["alt_active"] and it["tier"] == "watch"
+    assert _one(dist, rows, booked=0, part="34-2579-00G")[0]["tier"] == "fyi"
+    covered = _dist("34-2579-00G", "68683-305LF", _offer("68683-305LF", "Amphenol FCI", "obsolete"))
+    assert _one(covered, rows, stock=500, part="34-2579-00G")[0]["tier"] == "watch"

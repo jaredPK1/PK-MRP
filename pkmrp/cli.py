@@ -168,14 +168,29 @@ DEFAULT_RECIPIENTS = ["jared.green@pkinetics.com"]
 
 
 def _weekly_due(now, day=None, hour=None):
-    """Friday 3 pm Pacific by default (WEEKLY_DAY 0=Mon..6=Sun, WEEKLY_HOUR)."""
-    day = int(os.environ.get("WEEKLY_DAY", "4")) if day is None else day
-    hour = int(os.environ.get("WEEKLY_HOUR", "15")) if hour is None else hour
+    """Monday 7 am Pacific by default (WEEKLY_DAY 0=Mon..6=Sun, WEEKLY_HOUR)."""
+    day = int(os.environ.get("WEEKLY_DAY", "0")) if day is None else day
+    hour = int(os.environ.get("WEEKLY_HOUR", "7")) if hour is None else hour
     return now.weekday() == day and now.hour >= hour
 
 
+def weekly_title(wk):
+    """Subject line: the week and what's in it, biggest first."""
+    from datetime import date
+
+    week = date.fromisoformat(wk["week_of"]).strftime("%b %-d")
+    bits = [f"{s['total']} {s.get('label') or s['title'].lower()}" for s in wk["sections"][:3]]
+    head = f"PK-MRP, week of {week}"
+    if not bits:
+        return f"{head}: nothing needs you"
+    new = f" ({wk['new_total']} new)" if wk.get("new_total") else ""
+    return f"{head}: {', '.join(bits)}{new}"
+
+
 def send_weekly(recipients, record=True):
-    """Render the weekly email with live data and send it. (sent, error)."""
+    """Render the Monday digest with live data and send it. (sent, error).
+    A recorded send saves what each section showed, so next week's digest
+    can mark what's new."""
     from datetime import datetime
     from zoneinfo import ZoneInfo
 
@@ -187,16 +202,16 @@ def send_weekly(recipients, record=True):
     app = create_app()
     with app.test_request_context(base_url=base or "http://localhost"):
         html, wk = app.config["WEEKLY_HTML"](base)
-    title = f"PK-MRP — the week of {wk['week_of']}"
-    summary = (f"{wk['done']['marked']} buys marked done this week, "
-               f"{wk['done']['confirmed']} confirmed in MAX.")
+    title = weekly_title(wk)
+    summary = "; ".join(f"{s['title']}: {s['total']}" + (f" ({s['new']} new)" if s["new"] else "")
+                        for s in wk["sections"]) or "Nothing needs you this week."
     sent, err = notify.fire("weekly_summary", title, recipients, summary=summary,
                             html_body=html, detail_url=f"{base}/analytics" if base else None,
                             metadata={"group_by": f"week:{wk['week_of']}"})
     if sent and record:
         engine = store.ops_engine(DbConfig.from_env())
         store.put_setting(engine, WEEKLY_KEY, {
-            "week_of": wk["week_of"], "to": sent,
+            "week_of": wk["week_of"], "to": sent, "seen": wk["seen"],
             "at": datetime.now(ZoneInfo("America/Los_Angeles")).isoformat(timespec="minutes"),
         }, "pk-mrp weekly")
     return sent, err
@@ -250,7 +265,7 @@ def _reconcile_done(snap):
 @click.option("--to", "to", multiple=True, help="Send only to these emails (a test).")
 @click.option("--record/--no-record", default=False, help="Record as this week's send.")
 def weekly_cmd(to, record):
-    """Send the end-of-week summary now (defaults to the saved recipients)."""
+    """Send the Monday digest now (defaults to the saved recipients)."""
     from .db import store
 
     if not to:

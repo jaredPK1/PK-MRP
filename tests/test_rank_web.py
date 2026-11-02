@@ -554,12 +554,33 @@ def test_no_max_buyer_codes_and_all_buys_filters_by_who_is_on_it(client, tmp_pat
 def test_weekly_email_preview_renders(client, tmp_path, monkeypatch):
     c, _ = _overbuy_client(tmp_path, monkeypatch, "viewer")
     html = c.get("/weekly/email").get_data(as_text=True)
-    assert "The week in buying" in html and "Placed this week" in html and "Open PK-MRP" in html
+    assert "this week" in html and "Last week in numbers" in html and "Open PK-MRP" in html
     page = c.get("/weekly").get_data(as_text=True)
-    assert "Fridays at 3 pm" in page and "Send me a test" in page and "an admin can change" in page
+    assert "Mondays at 7 am" in page and "Send me a test" in page and "an admin can change" in page
     assert c.post("/weekly/recipients", data={"emails": "x@pkinetics.com"}).status_code == 403
     c.application.config["DEFAULT_ROLE"] = None
     assert c.get("/weekly").status_code == 403
+
+
+def test_monday_email_marks_new_and_leaves_out_cleared(client, tmp_path, monkeypatch):
+    from pkmrp import snapshot
+    from pkmrp.db import store
+
+    c, engine = _overbuy_client(tmp_path, monkeypatch, "viewer")
+    snap = snapshot.load_latest()
+    snap["overbuys"]["po"][0]["new"] = True
+    snap["overbuys"]["po"][1]["new"] = True
+    snapshot.write(snap)
+    html = c.get("/weekly/email").get_data(as_text=True)
+    assert "Recent overbuys" in html and "/overbuys?new=1&amp;q=P0" in html
+    assert ">NEW</span>" not in html  # first email: nothing to compare with
+    store.put_setting(engine, "weekly_sent", {"week_of": "2026-10-26", "seen": {"overbuys": ["PO|P1|PO 70110001/01/01"]}}, "t")
+    html = c.get("/weekly/email").get_data(as_text=True)
+    assert html.count(">NEW</span>") == 1 and "(1 new)" in html
+    c.post("/overbuys/clear", data={"key": "PO|P0|PO 70110000/01/01", "action": "clear",
+                                    "reason": "spares"})
+    html = c.get("/weekly/email").get_data(as_text=True)
+    assert "q=P0" not in html and "q=P1" in html
 
 
 def test_weekly_recipients_admin_only_pk_addresses(client, tmp_path, monkeypatch):
@@ -586,8 +607,8 @@ def test_weekly_due_and_scheduler_gate(monkeypatch):
 
     from pkmrp import cli
 
-    assert cli._weekly_due(datetime(2026, 10, 30, 15, 5)) and not cli._weekly_due(datetime(2026, 10, 30, 14, 59))
-    assert not cli._weekly_due(datetime(2026, 10, 29, 16, 0))
+    assert cli._weekly_due(datetime(2026, 11, 2, 7, 5)) and not cli._weekly_due(datetime(2026, 11, 2, 6, 59))
+    assert not cli._weekly_due(datetime(2026, 10, 30, 15, 0))  # no more Friday email
     monkeypatch.delenv("SCHEDULER_ENABLED", raising=False)
     assert not cli.scheduler_on()
     monkeypatch.setenv("SCHEDULER_ENABLED", "1")
@@ -615,4 +636,4 @@ def test_weekly_email_leaves_held_parts_out(client, tmp_path, monkeypatch):
 
 def test_weekly_email_is_linked_from_analytics_and_every_footer(client):
     assert 'href="/weekly"' in client.get("/").get_data(as_text=True)
-    assert "Weekly email →" in client.get("/analytics").get_data(as_text=True)
+    assert "Monday email →" in client.get("/analytics").get_data(as_text=True)

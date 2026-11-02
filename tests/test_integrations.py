@@ -221,3 +221,36 @@ def test_a_new_distributor_checks_parts_already_checked_by_another(tmp_path, mon
     e = cache["30-0699-00SG"]
     assert {o["source"] for o in e["offers"]} == {"digikey", "mouser"}
     assert e["sources"] == ["digikey", "mouser"] and e["checked"] == "2026-10-30T12:00"
+
+
+def test_obsolete_parts_get_their_approved_alternates_looked_up_first(tmp_path, monkeypatch):
+    import json as _json
+    from datetime import datetime
+
+    from pkmrp.integrations import research
+
+    asked = []
+
+    class DigiKey:
+        name = "digikey"
+
+        def lookup(self, mpn):
+            asked.append(mpn)
+            return [{"source": "digikey", "mpn": mpn, "maker": "Amphenol ICC (FCI)",
+                     "lifecycle": "active", "lifecycle_text": "Active", "breaks": []}]
+
+    (tmp_path / "distributor_cache.json").write_text(_json.dumps({"34-2579-00G": {
+        "checked": "2026-11-01T12:00", "mpn": "68683-305LF", "sources": ["digikey"],
+        "offers": [{"source": "digikey", "mpn": "68683-305LF", "maker": "Amphenol ICC (FCI)",
+                    "lifecycle": "obsolete", "lifecycle_text": "Obsolete", "breaks": []}]}}))
+    monkeypatch.setattr(research.distributors, "clients", lambda: [DigiKey()])
+    run = _run_for([("34-2579-00G", "68683-305LF", "AMPHENOL FCI", "", "mpn_file"),
+                    ("34-2579-00G", "76342-305LF", "AMPHENOL FCI", "", "mpn_file")],
+                   [("34-2579-00G", "B", 1.0)], {})
+    cache, st = research.run_distributors(run, {"34-2579-00G": 10}, str(tmp_path), {},
+                                          datetime(2026, 11, 2, 9))
+    assert asked == ["76342-305LF"] and st["alternates"] == 1
+    assert cache["34-2579-00G"]["alts"]["76342-305LF"]["offers"][0]["lifecycle"] == "active"
+    # checked once: not asked again inside a week
+    research.run_distributors(run, {"34-2579-00G": 10}, str(tmp_path), {}, datetime(2026, 11, 2, 11))
+    assert asked == ["76342-305LF"]

@@ -12,6 +12,12 @@ only when RESEARCH_ENABLED=1 and its keys are set, and only when it's due:
   news          weekly: the makers behind the most booked parts, one web
                 search each.
 
+A part that comes back obsolete gets its other approved maker numbers (MAX's
+MPN file) looked up too, within the same budget, so the EOL watch can tell
+"going away" from "switch to the alternate".
+
+Nothing here sends email: new EOL items go in the Monday digest (cli.py).
+
 Results are cached in the data volume (distributor_cache.json,
 eol_notices.json, eol_news.json); the EOL watch (eol.json) and catalog
 price ideas (distributor_ideas.json) are rebuilt from the caches on every
@@ -25,13 +31,14 @@ from collections import defaultdict
 from datetime import datetime, timedelta
 
 from ..core import eol
-from . import ai, distributors, eol_alert
+from . import ai, distributors
 from .http import HttpError
 from .mailbox import Mailbox, looks_like_notice
 
 DIST_EVERY = timedelta(hours=1)
 DIST_STALE = timedelta(days=7)
 DIST_PER_TICK = {"digikey": 40, "mouser": 25, "nexar": 10}
+ALTS_PER_PART = 3  # approved alternates looked up for a part that comes back obsolete
 NEXAR_PER_WEEK = 200
 MAIL_EVERY = timedelta(hours=1)
 MAIL_FIRST_DAYS = 90
@@ -120,8 +127,69 @@ def candidates(run, annual):
     return [(p, m) for _r, _v, p, m in out]
 
 
-def run_distributors(run, annual, data_dir, state, now):
-    cache = _load(data_dir, "distributor_cache.json", {})
+def mpn_rows(run):
+    """[(part, mpn, maker, source)] for EOL matching. A blank maker on an
+    approved-vendor MPN takes the vendor's name when the vendor isn't a
+    distributor (Edmund sells Edmund lenses; Digi-Key sells everyone's)."""
+    mpns = run.get("mpns")
+    if mpns is None or not len(mpns):
+        return []
+    names = run.get("vendor_names_by_id") or {}
+    out = []
+    for r in mpns.itertuples(index=False):
+        maker = (r.maker or "").strip()
+        if not maker and r.source == "vendor_mpn":
+            vname = names.get(r.vendor_id, "")
+            if vname and not any(d in vname.upper() for d in DISTRIBUTOR_NAMES):
+                maker = vname
+        out.append((r.part, r.mpn or "", maker, r.source))
+    return out
+
+
+def renormalize(cache):
+    """Re-read lifecycle words on cached offers, so a change to
+    distributors.LIFECYCLE_WORDS applies without fetching again."""
+    for c in cache.values():
+        for o in c.get("offers") or []:
+            if o.get("lifecycle_text"):
+                o["lifecycle"] = distributors.normalize_lifecycle(o["lifecycle_text"])
+        for a in (c.get("alts") or {}).values():
+            for o in a.get("offers") or []:
+                if o.get("lifecycle_text"):
+                    o["lifecycle"] = distributors.normalize_lifecycle(o["lifecycle_text"])
+    return cache
+
+
+def _lookup_all(cls, mpn, left, refused, used, week, status):
+    """Ask every client with budget. (offers, asked, failed)."""
+    offers, failed, asked = [], False, set()
+    for cl in cls:
+        if cl.name in refused or left.get(cl.name, 0) <= 0:
+            continue
+        left[cl.name] -= 1
+        if cl.name == "nexar":
+            used[week] = used.get(week, 0) + 1
+        try:
+            offers += cl.lookup(mpn)
+            asked.add(cl.name)
+        except HttpError as exc:
+            if exc.status == 404:
+                asked.add(cl.name)
+                continue  # not carried: a real answer
+            failed = True
+            if exc.status in (401, 403):
+                refused.add(cl.name)
+                status["errors"].append(f"{cl.name}: keys refused ({exc.status}) - {str(exc)[:160]}")
+            else:
+                status["errors"].append(f"{cl.name} {mpn}: {str(exc)[:120]}")
+        except Exception as exc:  # noqa: BLE001 -- one bad lookup doesn't stop the rest
+            failed = True
+            status["errors"].append(f"{cl.name} {mpn}: {str(exc)[:120]}")
+    return offers, asked, failed
+
+
+def run_distributors(run, annual, data_dir, state, now, rows=None):
+    cache = renormalize(_load(data_dir, "distributor_cache.json", {}))
     cls = distributors.clients()
     status = {"state": "no_keys" if not cls else "ok", "checked": 0, "errors": []}
     if not cls or not _due(state, "dist_at", DIST_EVERY, now):
@@ -132,6 +200,9 @@ def run_distributors(run, annual, data_dir, state, now):
     if "nexar" in left:
         left["nexar"] = min(left["nexar"], max(NEXAR_PER_WEEK - used.get(week, 0), 0))
     refused = set()  # clients whose keys were refused this run
+    # alternates of parts already found obsolete first: few, and they decide act vs switch
+    status["alternates"] = _check_alternates(cache, rows if rows is not None else mpn_rows(run),
+                                             cls, left, refused, used, week, status, now)
     for part, mpn in candidates(run, annual):
         if not any(v > 0 for k, v in left.items() if k not in refused):
             break
@@ -141,29 +212,7 @@ def run_distributors(run, annual, data_dir, state, now):
         had = set(c.get("sources") or {o["source"].split(":")[0] for o in c.get("offers") or []})
         if fresh and {cl.name for cl in cls} <= had:
             continue
-        offers, failed, asked = [], False, set()
-        for cl in cls:
-            if cl.name in refused or left.get(cl.name, 0) <= 0:
-                continue
-            left[cl.name] -= 1
-            if cl.name == "nexar":
-                used[week] = used.get(week, 0) + 1
-            try:
-                offers += cl.lookup(mpn)
-                asked.add(cl.name)
-            except HttpError as exc:
-                if exc.status == 404:
-                    asked.add(cl.name)
-                    continue  # not carried: a real answer
-                failed = True
-                if exc.status in (401, 403):
-                    refused.add(cl.name)
-                    status["errors"].append(f"{cl.name}: keys refused ({exc.status}) - {str(exc)[:160]}")
-                else:
-                    status["errors"].append(f"{cl.name} {mpn}: {str(exc)[:120]}")
-            except Exception as exc:  # noqa: BLE001 -- one bad lookup doesn't stop the rest
-                failed = True
-                status["errors"].append(f"{cl.name} {mpn}: {str(exc)[:120]}")
+        offers, asked, failed = _lookup_all(cls, mpn, left, refused, used, week, status)
         if failed and not offers:
             continue  # try again next run rather than call it checked
         if fresh:  # only a new distributor was asked: add to what's there
@@ -180,6 +229,33 @@ def run_distributors(run, annual, data_dir, state, now):
     status["errors"] = status["errors"][:10]
     _save(data_dir, "distributor_cache.json", cache)
     return cache, status
+
+
+def _check_alternates(cache, rows, cls, left, refused, used, week, status, now):
+    """Look up the approved alternates of parts that came back obsolete
+    (unchecked ones, or ones older than DIST_STALE). Returns how many."""
+    approved = eol.approved_numbers(rows)
+    n = 0
+    for part, c in cache.items():
+        known = approved.get(part) or {}
+        if len(known) < 2:
+            continue
+        mine = [o for o in c.get("offers") or [] if eol.same_part(o, c.get("mpn"), known)]
+        if not eol.worst(mine):
+            continue
+        alts = c.setdefault("alts", {})
+        todo = [a for a in eol.alternates(part, c, known) if a["status"] == "unchecked"
+                or now - datetime.fromisoformat(alts[a["mpn"]]["checked"]) >= DIST_STALE]
+        for a in todo[:ALTS_PER_PART]:
+            if not any(v > 0 for k, v in left.items() if k not in refused):
+                return n
+            offers, asked, failed = _lookup_all(cls, a["mpn"], left, refused, used, week, status)
+            if failed and not offers:
+                continue
+            alts[a["mpn"]] = {"checked": now.isoformat(timespec="minutes"), "offers": offers,
+                              "sources": sorted(asked)}
+            n += 1
+    return n
 
 
 def run_mailbox(data_dir, state, now):
@@ -336,13 +412,14 @@ def tick(run, snap, data_dir):
     state = _load(data_dir, "research_state.json", {})
     annual = _annual(run)
     on = enabled()
+    rows = mpn_rows(run)
     if on:
-        cache, dist = run_distributors(run, annual, data_dir, state, now)
+        cache, dist = run_distributors(run, annual, data_dir, state, now, rows)
         notices, mail = run_mailbox(data_dir, state, now)
         news, news_st = run_news(run, annual, data_dir, state, now)
         _save(data_dir, "research_state.json", state)
     else:
-        cache = _load(data_dir, "distributor_cache.json", {})
+        cache = renormalize(_load(data_dir, "distributor_cache.json", {}))
         notices = _load(data_dir, "eol_notices.json", [])
         news = _load(data_dir, "eol_news.json", [])
         dist = mail = news_st = {"state": "off"}
@@ -350,14 +427,11 @@ def tick(run, snap, data_dir):
     on_order = defaultdict(float)
     for r in run["receipts"]:
         on_order[r.part] += r.qty
-    mpn_rows = []
-    if run.get("mpns") is not None:
-        mpn_rows = [(r.part, r.mpn) for r in run["mpns"].itertuples(index=False)]
     watch = eol.build(
         cache,
         notices,
         news,
-        mpn_rows,
+        rows,
         run["parts"],
         run["result"].demands,
         run["stock"],
@@ -368,7 +442,6 @@ def tick(run, snap, data_dir):
     _save(data_dir, "eol.json", _iso(watch))
     ideas = catalog_ideas(cache, run, annual)
     _save(data_dir, "distributor_ideas.json", _iso(ideas))
-    alert = alert_new(watch["items"], state, data_dir)
     return {
         "status": "on" if on else "off",
         "distributors": dist
@@ -378,39 +451,11 @@ def tick(run, snap, data_dir):
         "news": news_st | {"batches": len(news)},
         "eol_items": len(watch["items"]),
         "eol_counts": watch["counts"],
+        "eol_tiers": watch["tiers"],
         "catalog_ideas": len(ideas),
-        "eol_alert": alert,
         "ai_key": ai.available(),
         "last": {k: state.get(k) for k in ("dist_at", "mail_at", "news_at")},
     }
-
-
-def alert_new(items, state, data_dir):
-    """Email newly obsolete parts (production only); remember who was told."""
-    if os.environ.get("SCHEDULER_ENABLED", "0").strip() != "1":
-        return {"state": "off"}
-    alerted = state.setdefault("eol_alerted", {})
-    fresh = eol_alert.new_items(items, alerted)
-    if not fresh:
-        return {"state": "ok", "sent": 0}
-    recipients = eol_alert.DEFAULT_RECIPIENTS
-    try:
-        from ..config import DbConfig
-        from ..db import store
-
-        engine = store.ops_engine(DbConfig.from_env())
-        recipients = store.get_setting(engine, eol_alert.RECIPIENTS_KEY, recipients) or recipients
-    except Exception:  # noqa: BLE001 -- fall back to the default list
-        pass
-    sent, err = eol_alert.send(_iso(fresh), recipients,
-                               os.environ.get("APP_BASE_URL", "").rstrip("/"))
-    if sent:
-        today = datetime.now().date().isoformat()
-        for i in fresh:
-            alerted[eol_alert.key(i)] = today
-        _save(data_dir, "research_state.json", state)
-    return {"state": "ok" if sent else "error", "sent": len(fresh) if sent else 0,
-            "to": sent, "error": err}
 
 
 def _iso(v):

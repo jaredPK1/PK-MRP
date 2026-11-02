@@ -574,36 +574,11 @@ def create_app():
         items = [i for i in data["items"] if eol_key(i) not in reviewed]
         done = [dict(i, review=reviewed[eol_key(i)]) for i in data["items"] if eol_key(i) in reviewed]
         snap = snapshot.load_latest()
-        from ..db import store
-        from ..integrations.eol_alert import DEFAULT_RECIPIENTS, RECIPIENTS_KEY
-
-        try:
-            alert_to = store.get_setting(ops_engine(), RECIPIENTS_KEY, DEFAULT_RECIPIENTS)
-        except Exception:  # noqa: BLE001 -- show the default the alert would fall back to
-            alert_to = DEFAULT_RECIPIENTS
         return render_template(
             "eol.html", snap=snap, items=items, done=done, research=(snap or {}).get("research") or {},
             key_of=eol_key, reviewable=signed_in() and error is None, error=error,
-            saved=request.args.get("saved"), alert_to=alert_to or [], editable=can_edit(),
+            saved=request.args.get("saved"),
         )
-
-    @app.post("/eol/recipients")
-    def eol_recipients():
-        from ..db import store
-        from ..integrations.eol_alert import RECIPIENTS_KEY
-
-        if not can_edit():
-            abort(403)
-        emails = sorted({
-            e.strip().lower() for e in re.split(r"[\s,;]+", request.form.get("emails", ""))
-            if e.strip()
-        })
-        bad = [e for e in emails if not e.endswith(("@pkinetics.com", "@photonkinetics.com"))]
-        if bad:
-            abort(400, f"Only PK addresses: {', '.join(bad)}")
-        who = request.headers.get("X-Auth-Request-Email", "") or "unknown"
-        store.put_setting(ops_engine(), RECIPIENTS_KEY, emails, who)
-        return redirect(url_for("eol_page") + "#alerts")
 
     @app.post("/review/<name>")
     def review_save(name):
@@ -930,19 +905,35 @@ def create_app():
         )
 
     def weekly_html(base_url):
-        """The end-of-week email, rendered with live data (also /weekly)."""
+        """The Monday digest, rendered with live data (also /weekly)."""
+        from ..cli import WEEKLY_KEY
         from ..core import weekly
+        from ..core.overbuy import apply_cleared, clear_key
         from ..db import store
 
         # held parts are off the buy lists here too (same view as Today)
         snap, _ = without_held(snapshot.load_latest() or abort(404))
         today = date.fromisoformat(snap["today"])
+        # the same filters as each page: cleared overbuys, reviewed alerts
         try:
-            log = store.get_setting(ops_engine(), LOG_KEY, [])
-        except Exception:  # noqa: BLE001 -- send without the Done section
-            log = []
+            engine = ops_engine()
+            log = store.get_setting(engine, LOG_KEY, [])
+            cleared = store.get_setting(engine, CLEARED_KEY, {})
+            price_rev = store.get_setting(engine, PRICE_REVIEWED_KEY, {})
+            eol_rev = store.get_setting(engine, REVIEW_LISTS["eol"], {})
+            seen = (store.get_setting(engine, WEEKLY_KEY, {}) or {}).get("seen")
+        except Exception:  # noqa: BLE001 -- send without those filters
+            log, cleared, price_rev, eol_rev, seen = [], {}, {}, {}, None
+        eol_items = [i for i in (snapshot.load_json("eol.json") or {}).get("items", [])
+                     if eol_key(i) not in eol_rev]
+        alerts = [a for a in (snapshot.load_vendor_prices() or {}).get("alerts", [])
+                  if alert_key(a) not in price_rev]
+        ob = apply_cleared(snap.get("overbuys") or {}, cleared)
+        sections = weekly.priorities(
+            snap, today, eol_items, alerts, ob.get("po") or [], weekly.done_week(log, today),
+            seen, price_key=alert_key, overbuy_key=clear_key)
         imp, _ = ledger_impact(today, snap.get("so_values") or {})
-        wk = weekly.build(snap, snapshot.load_trend(), log, imp, today)
+        wk = weekly.build(snap, snapshot.load_trend(), log, imp, today, sections)
         return render_template("email_weekly.html", wk=wk, base_url=base_url.rstrip("/")), wk
 
     app.config["WEEKLY_HTML"] = weekly_html
