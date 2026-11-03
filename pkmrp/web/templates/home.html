@@ -28,14 +28,14 @@
   {% if progress %}
   <div class="tile win {% if progress.cleared %}lit{% endif %}" data-cleared="{{ progress.cleared }}">
     <span class="num">{% if progress.cleared %}✓ {{ progress.cleared }}{% else %}0{% endif %}</span>
-    <span class="lbl">came off the list since {{ progress.since[5:] }}</span>
-    <span class="sub">{% if progress.cleared %}{{ progress.cleared_value|money }} of orders unblocked. Nice.{% else %}{{ progress.new }} new since then{% endif %}</span>
+    <span class="lbl">bought since {{ progress.since[5:] }} (a PO went into MAX)</span>
+    <span class="sub">{% if progress.cleared %}{{ progress.cleared_value|money }} of orders unblocked. Nice.{% else %}{{ progress.new }} new since then{% endif %}{% if progress.moved %} · {{ progress.moved }} more left the list because the plan changed, not credited{% endif %}</span>
   </div>
   {% else %}
   <div class="tile win">
     <span class="num">Day 1</span>
     <span class="lbl">of shadow mode</span>
-    <span class="sub">Tomorrow this shows what came off the list.</span>
+    <span class="sub">Tomorrow this shows what was bought.</span>
   </div>
   {% endif %}
 </section>

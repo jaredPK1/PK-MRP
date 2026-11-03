@@ -1,5 +1,5 @@
 // PK-MRP: keyboard moves through the top buys, and a small celebration when
-// buys came off the list since the last run (once a day per browser).
+// buys had a PO go in since the last run (once a day per browser).
 (function () {
   const cards = Array.from(document.querySelectorAll('.card'));
   let at = -1;

@@ -2,7 +2,7 @@
 
 `pkmrp run` writes data/latest.json and data/history/<date>.json; pages read
 them, so a page never waits on MAX. History is what makes progress visible
-("6 buys came off the list since yesterday").
+("6 buys had a PO go in since yesterday").
 
 Interim: these files live in the app's data volume until the mrp_* tables
 exist in PK_Ops (DBA script), at which point the Decision Ledger takes over.
@@ -493,18 +493,36 @@ def load_previous(today_iso):
 
 
 def progress(latest, previous):
-    """What changed since the previous run -- the 'feel it' numbers."""
+    """What changed since the previous run -- the 'feel it' numbers.
+
+    Only a buy that left the list because a PO for it went into MAX since the
+    previous run is credited. A buy can also leave because the plan changed
+    (orders re-dated, Load Plan slotting, settings, stock found) -- nobody did
+    that work, so it is counted apart and never praised. Jared (2026-11-03):
+    "I don't want it to give anyone credit for tweaks I am making". Order value
+    counts each order once, not once per buy it feeds.
+    """
     if not latest or not previous:
         return None
     now = {b["part"] for b in latest["buys"]}
     before = {b["part"]: b for b in previous["buys"]}
-    cleared = [before[p] for p in before if p not in now]
+    gone = [before[p] for p in before if p not in now]
+    since = previous["today"]
+    recent = latest.get("recent_po_parts") or {}
+
+    def new_po(part):
+        return any(str(x[1])[:10] >= since for x in recent.get(part, ()))
+
+    cleared = [b for b in gone if new_po(b["part"])]
     cleared.sort(key=lambda b: -b.get("order_value", 0))
+    values = previous.get("so_values") or {}
+    sos = {so for b in cleared for so in b.get("sales_orders", ())}
     return {
-        "since": previous["today"],
+        "since": since,
         "cleared": len(cleared),
-        "cleared_value": round(sum(b.get("order_value", 0) for b in cleared), 2),
+        "cleared_value": round(sum(values.get(so, 0.0) for so in sos), 2),
         "cleared_parts": [b["part"] for b in cleared[:8]],
+        "moved": len(gone) - len(cleared),
         "new": len(now - set(before)),
     }
 

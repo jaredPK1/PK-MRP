@@ -131,6 +131,7 @@ def client(tmp_path, monkeypatch):
             story=dict(snap["buys"][0]["story"], vendor=""),
         )
     ]
+    snap["recent_po_parts"] = {"53-4104-00G": [["70110999", "2026-10-27", 5.0]]}
     snapshot.write(snap)
     prev = dict(
         snap,
@@ -148,7 +149,7 @@ def test_home_greets_ranks_and_celebrates(client):
         as_text=True
     )
     assert "Rob" in html and "46-0020-01G" in html and "Today's top 1" in html
-    assert "came off the list since 10-27" in html and "✓ 1" in html
+    assert "bought since 10-27" in html and "✓ 1" in html
     assert "Shadow mode" in html
 
 

@@ -7,6 +7,11 @@ Every feature people can see gets a line here in the same change
 WHATS_NEW = (
     (
         "2026-11-03",
+        "Today's win tile only credits real buys",
+        "The tile on Today counted every buy that left the list, whatever the reason, and added order value once per buy, so an order feeding ten buys counted ten times. On 11-03 it read 72 and $97M — but none had a PO; the Load Plan change had moved their orders into 2027. Now it counts only buys that left because a PO for the part went into MAX since the last plan, with each order's value counted once. Buys that left because the plan changed are listed beside it, not credited.",
+    ),
+    (
+        "2026-11-03",
         "Excess stock, for the inventory reserve",
         "A new Excess stock page (Cleanup menu) lists every part, made or bought, with more on hand than the plan needs — the starting list for the excess & obsolete reserve, which Tim has been building from MAX's MRP. Made parts and finished goods count only what their parents still need after their own stock. Long-lead parts, bought a year ahead on purpose, are measured against 12 months of requirement plus buffer, not just booked orders. MAX's -FAMILY forecast entries don't count. Valued per each (MAX's cost ÷ its cost-unit conversion — reels and packs would otherwise read up to 5,000× high). Each part gets a tier: dead, idle, slow or over, by demand and last use. CSV of every part.",
     ),

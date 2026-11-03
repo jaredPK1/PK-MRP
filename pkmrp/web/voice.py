@@ -93,7 +93,7 @@ WITH_NUMBERS = (
     ("{orders} booked orders are waiting on this list. No pressure.", ("orders",)),
     ("{top_part} is holding up {top_value}. Start there.", ("top_part", "top_value")),
     ("Every one of these {buys} is somebody's shipment.", ("buys",)),
-    ("{cleared} came off the list since last time. Look at you.", ("cleared",)),
+    ("{cleared} bought since last time. Look at you.", ("cleared",)),
 )
 
 
