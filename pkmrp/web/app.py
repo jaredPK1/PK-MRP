@@ -1249,6 +1249,40 @@ def create_app():
             "Content-Disposition": f'attachment; filename="{name}"',
         }
 
+    @app.get("/excess")
+    def excess_page():
+        from ..core.excess import TIERS
+
+        data = snapshot.load_json("excess.json") or {"rows": [], "totals": {}}
+        return render_template("excess.html", snap=snapshot.load_latest(), data=data,
+                               rows=data["rows"][:500], tiers=TIERS)
+
+    @app.get("/excess.csv")
+    def excess_csv():
+        import csv
+        import io
+
+        from ..core.excess import TIERS
+
+        data = snapshot.load_json("excess.json") or abort(404)
+        buf = io.StringIO()
+        w = csv.writer(buf)
+        w.writerow(["part", "description", "made_or_bought", "measured_against", "long_lead",
+                    "on_hand", "booked_demand", "needed", "extra", "unit_cost_each",
+                    "extra_value", "on_hand_value", "tier", "tier_means", "used_last_12m",
+                    "used_12m_before", "last_used", "months_of_use_in_extra"])
+        for r in data["rows"]:
+            w.writerow([r["part"], r["description"], r["kind"], r["basis"],
+                        "yes" if r["long_lead"] else "", r["on_hand"], r["booked"], r["needed"],
+                        r["extra"], r["unit_cost"], r["value"], r["on_hand_value"], r["tier"],
+                        TIERS[r["tier"]], r["used_12m"], r["used_prior_12m"], r["last_used"] or "",
+                        r["months_of_use"] if r["months_of_use"] is not None else ""])
+        name = f"excess-stock-{(snapshot.load_latest() or {}).get('today', date.today())}.csv"
+        return buf.getvalue(), 200, {
+            "Content-Type": "text/csv; charset=utf-8",
+            "Content-Disposition": f'attachment; filename="{name}"',
+        }
+
     @app.get("/fix-max.csv")
     def fix_max_csv():
         import csv

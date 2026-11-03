@@ -191,6 +191,8 @@ def _plan_once(erp):
     snapshot.add_audit(snap, run)
     if run.get("vendor_prices"):
         snapshot.write_vendor_prices(run["vendor_prices"])
+    if run.get("excess"):
+        snapshot.write_excess(run["excess"])
     if run.get("safety_summary"):
         snapshot.write_safety(run["safety_summary"])
         snap["sourcing"] = snapshot.add_sourcing(run, snap)

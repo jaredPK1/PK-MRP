@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% from "_notes.html" import part_note with context %}
+{% block title %}Excess stock · PK-MRP{% endblock %}
+{% block content %}
+{% set t = data.totals or {} %}
+{% set kind = t.by_kind or {} %}
+{% set tier = t.by_tier or {} %}
+<section class="page-intro">
+  <h1 class="h1-small">Excess stock</h1>
+  <p class="lede"><b>The question this page answers: what stock does the plan not need, and how stale is it?</b> It's the starting list for the excess &amp; obsolete reserve. Every part PK makes or buys is measured against what PK-MRP plans for it: everyday parts against every booked order and open work order (a subassembly only counts the demand its parents pass down after their own stock) plus the safety stock PK-MRP holds; long-lead parts, bought a year ahead on purpose, against their 12-month requirement plus buffer. MAX's -FAMILY forecast entries don't count. Valued per each at MAX cost (cost ÷ the cost-unit conversion, so reels and packs aren't 1,000× high).</p>
+  <p class="lede small-gap">Bulk (floor stock) parts aren't planned, so they aren't here. <a href="{{ script_root }}/excess.csv">Download every part (CSV)</a> — the tiers are for Finance to put percentages on.</p>
+</section>
+<section class="tiles" aria-label="Excess stock">
+  <div class="tile"><span class="num small-num">{{ (t.value or 0)|money }}</span><span class="lbl">beyond the plan</span><span class="sub">{{ '{:,}'.format(t.parts or 0) }} parts</span></div>
+  <div class="tile"><span class="num small-num">{{ (kind.bought or 0)|money }}</span><span class="lbl">bought parts</span><span class="sub">{{ (kind.made or 0)|money }} made parts &amp; finished goods</span></div>
+  <div class="tile"><span class="num small-num">{{ ((tier.dead or 0) + (tier.idle or 0))|money }}</span><span class="lbl">no demand, not used in a year</span><span class="sub">{{ (tier.dead or 0)|money }} not used in 2 years</span></div>
+  <div class="tile"><span class="num small-num">{{ ((t.by_basis or {})['12-month plan'] or 0)|money }}</span><span class="lbl">long-lead, beyond 12 months</span><span class="sub">past the year's requirement + buffer</span></div>
+</section>
+<section class="small-print">
+  <h3>Tiers</h3>
+  <ul>{% for k, words in tiers.items() %}<li><b>{{ k }}</b> — {{ words }}: {{ (tier[k] or 0)|money }}</li>{% endfor %}</ul>
+</section>
+<div class="table-tools"><input type="search" class="table-filter" placeholder="Filter: part, words, made, dead, idle" aria-label="Filter"><span class="muted small filter-count"></span></div>
+<div class="table-wrap"><table class="dense">
+  <thead><tr><th>Part</th><th>Kind</th><th>Tier</th><th class="r">On hand</th><th class="r">Plan needs</th><th class="r">Extra</th><th class="r">Used last 12 mo</th><th>Last used</th><th class="r">Extra $</th></tr></thead>
+  <tbody>{% for r in rows %}
+    <tr>
+      <td><span class="mono">{{ r.part }}</span> {{ part_note(r.part, False) }}<div class="muted small dcol">{{ r.description|lower|capitalize|truncate(46, True, '…') }}</div></td>
+      <td>{{ r.kind }}{% if r.long_lead %}<div class="small muted">long-lead · {{ r.basis }}</div>{% endif %}</td>
+      <td><span class="chip {{ 'late' if r.tier in ('dead', 'idle') else 'today' }}">{{ r.tier }}</span></td>
+      <td class="r">{{ r.on_hand|qty }}</td>
+      <td class="r">{{ r.needed|qty if r.needed else '—' }}</td>
+      <td class="r">{{ r.extra|qty }}</td>
+      <td class="r">{{ r.used_12m|qty if r.used_12m else '—' }}</td>
+      <td>{{ r.last_used|nice_date(False) if r.last_used else '—' }}</td>
+      <td class="r"><b>{{ r.value|money }}</b></td>
+    </tr>
+  {% else %}<tr><td colspan="9" class="muted">No stock beyond the plan.</td></tr>{% endfor %}</tbody>
+</table></div>
+<p class="foot-note">The biggest 500 are listed; the CSV has every part. "Used" is issues to work orders and shipments over the last 24 months — usage before that isn't read, so "dead" means no use in at least two years. Some of this is legitimate (service spares, resale accessories sold on lines that don't explode, minimum buys); a <b>hold</b> or <b>obsolete</b> note on the Notes page shows beside the part.</p>
+{% endblock %}

@@ -19,6 +19,7 @@ import pandas as pd
 from .core import safety as safety_mod
 from .core.analytics import breakdown, trend_point
 from .core.order_qty import size_all
+from .core.excess import excess
 from .core.overbuy import overbuys
 from .core.params import purlt_proposals
 from .core.rank import buy_list
@@ -144,6 +145,11 @@ def build(run, so_df):
     safety_summary = safety_mod.summary(res.safety, parts, buys + needs_source,
                                         run.get("vendor_name") or {})
     run["safety_summary"] = safety_summary  # the full list: written by the caller
+    run["excess"] = excess(
+        res.demands, run["stock"], run["parts"], run.get("segments") or [],
+        run.get("committed_plans") or [], res.usage, run["settings"],
+        safety_floor={p: j["use"] for p, j in res.safety.items() if j["use"] > 0},
+    )  # rows written by the caller, like safety stock
     unscheduled = run["worklists"]["unscheduled"]
     segments = run.get("segments") or []
     seg_counts = Counter(r["segment"] for r in segments)
@@ -234,11 +240,16 @@ def build(run, so_df):
             )
         ),
         "safety_stock": {k: v for k, v in safety_summary.items() if k != "rows"},
+        "excess": run["excess"]["totals"],
     }
 
 
 def write_safety(data):
     _write_json("safety_stock.json", data)
+
+
+def write_excess(data):
+    _write_json("excess.json", data)
 
 
 def _vendor_price_summary(vp):
