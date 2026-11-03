@@ -6,6 +6,11 @@ Every feature people can see gets a line here in the same change
 
 WHATS_NEW = (
     (
+        "2026-11-03",
+        "Parked orders planned where the Load Plan has room",
+        "Orders parked on 2032-34 dates in MAX ($14M, mostly booked in the last six months) were being planned on the customer's date, so their parts read as due now. Now each one is planned into the first month with room under Control Tower's Load Plan caps — $5M of revenue a month and the unit caps per model — oldest order first, never before the customer's month. An order too big for one month is spread line by line. Parts for those orders move to when the order can really ship; long-lead parts still see the demand. MAX keeps the placeholder date, so the line still needs a real one from Order Admin.",
+    ),
+    (
         "2026-11-02",
         "Critical parts: safety stock that ranks with the urgent buys",
         "A new note, Critical — single source / hard to replace (\"+ note\" on any part). A critical part keeps its MAX safety stock exactly as set, and when stock drops below it the buy goes to the top of the list, so working the top ten covers it. The card says Critical part: protects N orders, none short yet. Start: the eight 2920 parts Engineering flagged in the NPI review.",

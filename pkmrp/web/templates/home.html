@@ -194,7 +194,8 @@
 <section class="small-print">
   <h3>Kept off the plan, on purpose</h3>
   <ul>
-    <li><b>{{ h.unscheduled_lines }}</b> backlog lines parked on placeholder dates (2030+) — they go on a worklist, not into buys.</li>
+    {% if h.load_slotted %}<li><b>{{ h.load_slotted }}</b> orders parked on 2030+ dates in MAX are planned into the first month with room under Control Tower's Load Plan caps, not on the customer's date.</li>{% endif %}
+    <li><b>{{ h.unscheduled_lines }}</b> backlog lines still parked with no date to plan on — they go on a worklist, not into buys.</li>
     <li><b>{{ h.unplannable_lines }}</b> lines for parts with no BOM and no stock — can't be planned until engineering adds a BOM.</li>
     <li><b>{{ h.beyond_backlog }}</b> long-lead POs covering demand past the booked backlog — bought ahead on purpose, not cancel candidates.</li>
     <li><b>{{ h.consigned_pairs }}</b> parts PK supplies to the vendors that build its boards, learned from what was actually sent.</li>

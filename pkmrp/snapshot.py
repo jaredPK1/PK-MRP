@@ -174,6 +174,7 @@ def build(run, so_df):
             "beyond_backlog": by_kind.get("beyond_backlog", 0),
             "unscheduled_lines": len(unscheduled),
             "unplannable_lines": len(run["worklists"]["unplannable"]),
+            "load_slotted": len((run.get("load_slots") or {}).get("placed", [])),
             "consigned_pairs": run["counts"].get("consigned_pairs", 0),
             "committed": seg_counts.get("committed", 0),
             "unproven_long": seg_counts.get("unproven_long", 0),
@@ -215,6 +216,7 @@ def build(run, so_df):
         "ecn": _ecn(run, buys, needs_source),
         "replaced": _iso_deep(run.get("replaced") or {}),
         "fix_max": _iso_deep(run.get("fix_max") or {"status": "off"}),
+        "load_slots": _iso_deep(run.get("load_slots") or {}),
         # open POs placed in the last 60 days, by part: lets a Done's PO
         # number be matched to MAX
         "recent_po_parts": _recent_po_parts(run["open_pos"], today),

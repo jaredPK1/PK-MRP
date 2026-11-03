@@ -20,6 +20,13 @@ class PlanSettings:
     # put on a worklist. Same rule as Control Tower's Orders page.
     unscheduled_from_year: int = 2030
 
+    # Lines parked that way (CURDUE 2030+) are planned into the first month
+    # with room under Control Tower's Load Plan caps (core/load_plan.py)
+    # instead of on CUSDUE, which still holds the customer's ask.
+    load_plan_slotting: bool = True
+    load_revenue_cap: float = 5_000_000.0  # Load Plan default; unit caps in load_plan.MODEL_CAPS
+    load_horizon_months: int = 36
+
     # Product_Structure.TYPCDE_02 codes that are real components. OPEN: 'N'
     # is 432K rows and what existing code uses; 'E' (20K), 'P', 'R' and blank
     # are unexplained, so they are left out and counted on the worklist.

@@ -9,6 +9,7 @@ import pandas as pd
 from .core import analytics, consign, leadtime, segment, skumap, supersede, supply, vendor_price
 from .core import committed as committed_mod
 from .core import fix_max as fix_max_mod
+from .core import load_plan
 from .core import demand as demand_mod
 from .core import pipeline as pipeline_mod
 from .core import shelf as shelf_mod
@@ -60,6 +61,12 @@ def build_plan(
     parts_df = timed("parts", extract.parts, erp)
     bom_df = timed("bom", extract.bom, erp)
     so_df = timed("open_so_lines", extract.open_so_lines, erp)
+    # Orders parked on 2030+ dates plan into Load Plan months with room;
+    # Fix in MAX still reads the lines as MAX has them.
+    so_max = so_df
+    load_slots = None
+    if settings.load_plan_slotting:
+        so_df, load_slots = load_plan.slot(so_df, settings, today)
     vendors_df = timed("vendors", extract.vendors, erp)
     pv_df = timed("part_vendors", extract.part_vendors, erp)
     stock_df = timed("stock", extract.stock, erp)
@@ -269,7 +276,7 @@ def build_plan(
         fix_max = fix_max_mod.worklist(
             ecn["rows"],
             ecn["releases"],
-            so_df,
+            so_max,
             req_df,
             timed("ms_requirements", extract.ms_requirements, erp),
             children,
@@ -323,6 +330,7 @@ def build_plan(
         "lead_times": lt_stats,
         "result": result,
         "worklists": worklists,
+        "load_slots": load_slots,
         "so_lines": so_df,
         "po_history": hist_df,
         "open_pos": po_df,

@@ -69,6 +69,7 @@ SELECT RTRIM(d.ORDNUM_28) AS so, RTRIM(d.LINNUM_28) AS line,
        d.PRICE_28 AS unit_price, RTRIM(ISNULL(sm.CURR_27, '')) AS currency,
        RTRIM(sm.CUSTID_27) AS customer_id,
        RTRIM(ISNULL(cm.NAME_23, '')) AS customer,
+       RTRIM(ISNULL(cm.CUSTYP_23, '')) AS customer_type,
        sm.ORDDTE_27 AS order_date
 FROM SO_Detail d
 JOIN SO_Master sm ON sm.ORDNUM_27 = d.ORDNUM_28
@@ -497,6 +498,7 @@ _TEXT = {
     "currency",
     "customer_id",
     "customer",
+    "customer_type",
     "po",
     "vendor_id",
     "wo",
