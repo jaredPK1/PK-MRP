@@ -49,6 +49,15 @@ def _when(place_by, today):
     return f"By {d:%a %-d %b}", "soon"
 
 
+def _buy_when(b, today):
+    """The place-by chip for a buy. A critical part's safety-stock-only buy is
+    dated today, but no order is waiting on it: "Place today" read as an
+    emergency next to the orders it protects."""
+    if b.get("critical") and b.get("ss_only"):
+        return "Restore safety stock", "soon"
+    return _when(b["place_by"], today)
+
+
 def _money2(v):
     """A unit price: cents, or four places under a dollar."""
     v = float(v or 0)
@@ -298,7 +307,7 @@ def create_app():
         snap, on_hold = without_held(snap)
         buys = snap["buys"]
         for b in buys:
-            b["when"], b["tone"] = _when(b["place_by"], today)
+            b["when"], b["tone"] = _buy_when(b, today)
         email = request.headers.get("X-Auth-Request-Email", "")
         name = _first_name(email)
         h = snap["headline"]
@@ -341,7 +350,7 @@ def create_app():
             if not who or (who == "-" and not owner(b["part"])) or owner(b["part"]) == who
         ]
         for b in rows:
-            b["when"], b["tone"] = _when(b["place_by"], today)
+            b["when"], b["tone"] = _buy_when(b, today)
         return render_template(
             "buys.html",
             snap=snap,

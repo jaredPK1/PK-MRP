@@ -652,9 +652,9 @@ def test_critical_note_reranks_at_once_without_waiting_for_the_plan(client, tmp_
                 protects_value=5e6, protects_top=2e6)
     snapshot.write(snap)
     page = c.get("/").get_data(as_text=True)
-    assert "Critical part: protects" not in page  # protects only shows for critical parts
+    assert "rely on it" not in page  # protects only shows for critical parts
     store.put_setting(engine, "part_notes", {last["part"]: [
         {"id": "x", "tag": "critical", "text": "", "by": "jared", "at": "2026-11-02T09:11"}]}, "t")
     page = c.get("/").get_data(as_text=True)
     first_card = page.split('id="buy-1"')[1].split('id="buy-2"')[0]
-    assert last["part"] in first_card and "Critical part: protects" in first_card
+    assert last["part"] in first_card and "rely on it" in first_card

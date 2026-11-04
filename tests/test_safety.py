@@ -103,24 +103,26 @@ def test_critical_keeps_safety_stock_as_set():
     assert held["verdict"] == "ignored"  # a hold still wins
 
 
-def test_critical_safety_stock_buy_goes_to_the_top():
-    parts = {"CUBE": part(), "PLAIN": part("PLAIN"), "LENS": part("LENS", ss=0, cost=1.0)}
+def test_critical_safety_stock_buy_ranks_after_late_orders_ahead_of_the_rest():
+    parts = {"CUBE": part(), "PLAIN": part("PLAIN"), "LENS": part("LENS", ss=0, cost=1.0),
+             "MOTOR": part("MOTOR", ss=0, cost=1.0)}
     ds = [so("CUBE", date(2027, 2, 12), 2, "SO 1/01"), so("CUBE", date(2027, 3, 1), 1, "SO 2/01"),
-          so("LENS", date(2026, 11, 20), 2, "SO 3/01")]
-    use = {"CUBE": (60.0, 0, None), "PLAIN": (60.0, 0, None), "LENS": (5, 0, None)}
+          so("LENS", date(2026, 11, 20), 2, "SO 3/01"), so("MOTOR", date(2026, 12, 22), 2, "SO 4/01")]
+    use = {"CUBE": (60.0, 0, None), "PLAIN": (60.0, 0, None), "LENS": (5, 0, None),
+           "MOTOR": (5, 0, None)}
     stock = {"CUBE": 5, "PLAIN": 0}
     r = plan(parts, {}, ds, stock, [], S, TODAY, usage=use, critical={"CUBE"})
-    values = {"1": 500.0, "2": 2000.0, "3": 900.0}
+    values = {"1": 500.0, "2": 2000.0, "3": 900.0, "4": 9e6}
     buys = buy_list(r.planned, parts, {}, values, {}, TODAY, horizon_workdays=20,
                     critical={"CUBE"}, demands=r.demands)
-    values["3"] = 9e6  # even above a late order worth far more
-    buys = buy_list(r.planned, parts, {}, values, {}, TODAY, horizon_workdays=20,
-                    critical={"CUBE"}, demands=r.demands)
-    assert [b["part"] for b in buys] == ["CUBE", "LENS", "PLAIN"]
-    cube = buys[0]
+    # a late order first; the critical top-up above an order buy not yet late,
+    # even one worth far more; plain safety stock last
+    assert [b["part"] for b in buys] == ["LENS", "CUBE", "MOTOR", "PLAIN"]
+    assert buys[0]["days_late"] > 0 and buys[2]["days_late"] == 0
+    cube = buys[1]
     assert cube["ss_only"] and cube["critical"] and cube["orders"] == 0  # nothing waiting...
     assert cube["protects_orders"] == 2 and cube["protects_value"] == 2500 and cube["protects_top"] == 2000
-    assert not buys[2]["critical"] and buys[2]["protects_orders"] == 0
+    assert not buys[3]["critical"] and buys[3]["protects_orders"] == 0
 
 
 def test_critical_is_a_note_tag():

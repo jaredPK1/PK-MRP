@@ -14,9 +14,11 @@ A buy that only restores MAX safety stock (no booked order behind it) goes
 after all of those: the top of the list stays "orders slip without these".
 Except on a part noted critical (single source, hard to replace): running
 out would stop every booked order that uses it, so its safety-stock buy
-goes to the top of the list (Jared, 2026-11-02: "work the top ten" must
-cover them), biggest protected order first (`protects_*`; shown, never
-counted as orders waiting -- none is short yet).
+ranks right after the late buys orders are already waiting on and ahead of
+every other buy (Jared, 2026-11-02: "work the top ten" must cover them;
+2026-11-04: but not above a late order -- three of them took slots 1-3
+while 48 order buys were late), biggest protected order first
+(`protects_*`; shown, never counted as orders waiting -- none is short yet).
 
 Pure: plain data in, plain dicts out, deterministic order.
 """
@@ -34,13 +36,16 @@ def _so_of(ref):
 
 
 def sort_key(b):
-    """Critical parts below safety stock first, then order-driven buys by the
-    orders they unblock, then safety-stock top-ups. Also used by the web
-    layer to re-rank when a critical note is added between plans."""
-    if b.get("critical") and b.get("ss_qty"):
+    """Late order-driven buys first, then critical parts below safety stock,
+    then the other order-driven buys, then safety-stock top-ups; each by the
+    orders they unblock. Also used by the web layer to re-rank when a
+    critical note is added between plans."""
+    if not b.get("ss_only") and (b.get("days_late") or 0) > 0:
         tier = 0
+    elif b.get("critical") and b.get("ss_qty"):
+        tier = 1
     else:
-        tier = 2 if b.get("ss_only") else 1
+        tier = 3 if b.get("ss_only") else 2
     return (tier, -max(b.get("order_value") or 0, b.get("protects_top") or 0),
             -(b.get("days_late") or 0), b.get("spend") or 0, b["part"])
 

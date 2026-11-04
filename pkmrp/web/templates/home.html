@@ -95,7 +95,7 @@
           <span class="chip {{ b.tone }}">{{ b.when }}</span>
           {% if b.changed and b.changed.kind != 'new' %}<span class="chip late" title="{{ b.changed.text }} — check Why this buy? before ordering">changed</span>{% endif %}
           {% if b.wo_only %}<span class="chip quiet" title="No sales order pegged directly — needed by open work orders or vendor kits">for open WOs</span>{% endif %}
-          {% if b.ss_only %}<span class="chip quiet" title="Nothing booked needs ordering this week: this restores the safety stock in MAX ({{ (b.ss_judge or {}).use|default(b.safety_stock)|qty }})">safety stock</span>{% elif b.ss_qty %}<span class="chip quiet" title="{{ b.ss_qty|qty }} of it restores the safety stock in MAX">+{{ b.ss_qty|qty }} safety stock</span>{% endif %}
+          {% if b.ss_only and b.critical %}{% elif b.ss_only %}<span class="chip quiet" title="Nothing booked needs ordering this week: this restores the safety stock in MAX ({{ (b.ss_judge or {}).use|default(b.safety_stock)|qty }})">safety stock</span>{% elif b.ss_qty %}<span class="chip quiet" title="{{ b.ss_qty|qty }} of it restores the safety stock in MAX">+{{ b.ss_qty|qty }} safety stock</span>{% endif %}
           {{ part_note(b.part) }}
         </div>
         <div class="desc">{{ b.description|lower|capitalize }}</div>
@@ -112,7 +112,7 @@
         </div>
         {% elif b.critical and b.protects_orders %}
         <div class="unblocks">
-          Critical part: protects <b>{{ b.protects_orders }} order{{ '' if b.protects_orders == 1 else 's' }}</b>{% if b.protects_value %} worth <b>{{ b.protects_value|money }}</b>{% endif %} <span class="cust">· none is short yet; this keeps its safety stock</span>
+          Critical part: <b>{{ b.protects_orders }} order{{ '' if b.protects_orders == 1 else 's' }}</b>{% if b.protects_value %} worth <b>{{ b.protects_value|money }}</b>{% endif %} rely on it <span class="cust">· none is short; this restores its safety stock</span>
         </div>
         {% endif %}
         {% if sz.add_to_po %}<div class="add-to-po small">PO {{ sz.add_to_po.po }} for {{ sz.add_to_po.qty|qty }} went in {{ sz.add_to_po.created|nice_date(False) }} — add these to it rather than a new PO, if the vendor will take it.</div>{% endif %}

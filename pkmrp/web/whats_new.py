@@ -7,6 +7,11 @@ Every feature people can see gets a line here in the same change
 WHATS_NEW = (
     (
         "2026-11-04",
+        "Critical safety stock ranks after late order buys",
+        "A critical part's safety-stock buy went to the very top of the list, so on 11-04 three of them held slots 1-3 with \"Place today\" and \"protects $13.1M\" while 48 buys that orders are already waiting on were late. They looked like emergencies, and nothing was short. Now they rank right after the late order buys and ahead of every other buy, the chip says Restore safety stock instead of a place-by date, and the card reads \"9 orders worth $13.1M rely on it · none is short\".",
+    ),
+    (
+        "2026-11-04",
         "Decision check: safety stock after a PO isn't a short PO",
         "Since safety stock was switched on (11-02), \"More wanted right after a PO\" went from 3 parts to 32 and told buyers each PO \"was smaller than booked orders need\" — but 28 of the 32 POs covered every booked order; what was left was safety stock, plus the sizer's extra weeks of cover. Now that list only shows parts booked orders still need, and says how many. A PO that covered the orders and left only safety stock goes in a new list, Safety stock after a PO: nothing to do unless adding it to that PO reaches a price break.",
     ),
