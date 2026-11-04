@@ -98,3 +98,24 @@ def test_safety_stock_top_up_is_not_a_jump():
     run_audit(snap, prev, empty, TODAY, NOW)
     assert snap["buys"][0]["changed"]["text"] == (
         "For booked orders, went from 214 to 704 since the last plan (plus 250 safety stock)")
+
+
+def test_rebuy_counts_only_booked_orders_short_of_the_po():
+    pos = _pos([("70111350", "37-0105-00G", TODAY - timedelta(days=1), 9.0, "AC"),
+                ("70111310", "37-0083-01G", TODAY - timedelta(days=1), 12.0, "AC"),
+                ("70111315", "62-0145-01G", TODAY - timedelta(days=1), 5.0, "AC")])
+    snap = {"buys": [
+        # the PO covered the orders; all that's left is safety stock
+        {"part": "37-0105-00G", "qty": 8, "min_qty": 8, "ss_qty": 8, "need_by": "2027-02-11"},
+        # 6 short for orders, 5 safety stock on top
+        {"part": "37-0083-01G", "qty": 11, "min_qty": 11, "ss_qty": 5, "need_by": "2027-03-30"},
+        # safety stock 2, sized up to 26 weeks of cover: still not a short PO
+        {"part": "62-0145-01G", "qty": 43, "min_qty": 2, "ss_qty": 2, "need_by": "2026-12-24"},
+    ]}
+    audit, _ = run_audit(snap, {}, pos, TODAY, NOW)
+    by = {f["part"]: f for f in audit["findings"] if f["check"] in ("rebuy", "rebuy_ss")}
+    assert by["37-0083-01G"]["check"] == "rebuy" and by["37-0083-01G"]["want"] == 6
+    assert by["37-0083-01G"]["what"].endswith("booked orders need 6 more (plus 5 safety stock)")
+    assert by["37-0105-00G"]["check"] == "rebuy_ss" and by["37-0105-00G"]["want"] == 8
+    assert by["62-0145-01G"]["check"] == "rebuy_ss" and by["62-0145-01G"]["want"] == 2
+    assert audit["counts"] == {"rebuy": 1, "rebuy_ss": 2}

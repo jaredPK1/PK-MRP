@@ -6,6 +6,11 @@ Every feature people can see gets a line here in the same change
 
 WHATS_NEW = (
     (
+        "2026-11-04",
+        "Decision check: safety stock after a PO isn't a short PO",
+        "Since safety stock was switched on (11-02), \"More wanted right after a PO\" went from 3 parts to 32 and told buyers each PO \"was smaller than booked orders need\" — but 28 of the 32 POs covered every booked order; what was left was safety stock, plus the sizer's extra weeks of cover. Now that list only shows parts booked orders still need, and says how many. A PO that covered the orders and left only safety stock goes in a new list, Safety stock after a PO: nothing to do unless adding it to that PO reaches a price break.",
+    ),
+    (
         "2026-11-03",
         "Today's win tile only credits real buys",
         "The tile on Today counted every buy that left the list, whatever the reason, and added order value once per buy, so an order feeding ten buys counted ten times. On 11-03 it read 72 and $97M — but none had a PO; the Load Plan change had moved their orders into 2027. Now it counts only buys that left because a PO for the part went into MAX since the last plan, with each order's value counted once. Buys that left because the plan changed are listed beside it, not credited.",

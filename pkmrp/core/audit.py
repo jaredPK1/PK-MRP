@@ -6,9 +6,11 @@ can see things a single plan can't:
   * repeat_po   -- the same part on two or more POs placed within two weeks
                    of each other in the last 30 days. Wasted work: one PO
                    would have done.
-  * rebuy       -- the plan wants more of a part that got a PO in the last
-                   two weeks. Either the PO was short of the need or demand
-                   moved after it; the card says add to that PO.
+  * rebuy       -- booked orders want more of a part that got a PO in the
+                   last two weeks. Either the PO was short of the need or
+                   demand moved after it; the card says add to that PO.
+  * rebuy_ss    -- the same, but the PO covered booked orders and only safety
+                   stock is left: worth adding only for a price break.
   * jumped      -- a buy that appeared or grew sharply since the last run, or
                    whose need moved two weeks or more earlier. Buyers see a
                    "changed" chip before they act on it.
@@ -135,28 +137,48 @@ def run_audit(snap, state, open_pos, today, now, shelf=frozenset(), descriptions
             "days_late": b.get("days_late", 0),
         }
 
-        # rebuy: more wanted soon after a PO
+        # rebuy: more wanted soon after a PO. Only this week's minimum less
+        # its safety-stock top-up is booked orders short of the PO; the rest
+        # (safety stock, the sizer's extra weeks) is no sign the PO was short
         fresh = [x for x in po_lines.get(part, ()) if (today - x[1]).days <= REBUY_DAYS]
         if fresh:
             po, created, qty, buyer = fresh[-1]
-            moved = p and p.get("need_by") and need and need < _d(p["need_by"])
-            findings.append(
-                {
-                    "check": "rebuy",
-                    "part": part,
-                    "description": b.get("description", ""),
-                    "po": po,
-                    "po_created": created,
-                    "po_qty": qty,
-                    "buyer": buyer,
-                    "want": b["qty"],
-                    "what": f"PO {po} for {qty:g} placed {created.isoformat()}; the plan wants {b['qty']:g} more",
-                    "cause": "demand moved earlier since the last run"
-                    if moved
-                    else "the PO was smaller than booked orders need",
-                    "do": f"Add {b['qty']:g} to PO {po} rather than cutting a new PO, if the vendor will take it.",
-                }
-            )
+            ss_qty = b.get("ss_qty", 0.0) or 0.0
+            short = b.get("min_qty", b["qty"]) - ss_qty
+            placed = f"PO {po} for {qty:g} placed {created.isoformat()}"
+            base = {
+                "part": part,
+                "description": b.get("description", ""),
+                "po": po,
+                "po_created": created,
+                "po_qty": qty,
+                "buyer": buyer,
+            }
+            if short > 1e-9:
+                moved = p and p.get("need_by") and need and need < _d(p["need_by"])
+                findings.append(
+                    dict(
+                        base,
+                        check="rebuy",
+                        want=short,
+                        what=f"{placed}; booked orders need {short:g} more"
+                        + (f" (plus {ss_qty:g} safety stock)" if ss_qty else ""),
+                        cause="demand moved earlier since the last run"
+                        if moved
+                        else "the PO was smaller than booked orders need",
+                        do=f"Add {short:g} to PO {po} rather than cutting a new PO, if the vendor will take it.",
+                    )
+                )
+            elif ss_qty:
+                findings.append(
+                    dict(
+                        base,
+                        check="rebuy_ss",
+                        want=ss_qty,
+                        what=f"{placed} covers booked orders; {ss_qty:g} more would restore safety stock",
+                        do=f"Nothing needed for orders. Add {ss_qty:g} to PO {po} only if it reaches a price break or the vendor will take it at no cost; otherwise leave it.",
+                    )
+                )
 
         # jumped: new, grew sharply, or need moved much earlier since last run
         flag = None
