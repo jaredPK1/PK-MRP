@@ -45,9 +45,12 @@ def test_a_vendor_order_gathers_due_now_and_coming_up():
     soon = plus_workdays(TODAY, 5)
     two = window(p["XOMETRY"], TODAY, plus_workdays(TODAY, 10), soon)
     assert [(r["part"], r["status"]) for r in two] == [("A", "late"), ("B", "now")]
+    assert [r["speed"] for r in two] == ["rush", "now"]
+    assert two[0]["behind"] > 0 and two[1]["behind"] == 0 and two[0]["lead_days"] >= 0
     four = window(p["XOMETRY"], TODAY, plus_workdays(TODAY, 20), soon)
     c = next(r for r in four if r["part"] == "C")
     assert c["status"] == "upcoming" and c["qty"] == 150 and c["packs"] == 2
+    assert c["speed"] == "later"
     twelve = window(p["XOMETRY"], TODAY, plus_workdays(TODAY, 60), soon)
     c = next(r for r in twelve if r["part"] == "C")
     assert c["qty"] == 200 and c["spend"] == 20.0
@@ -80,5 +83,6 @@ def test_vendor_pages(client):  # noqa: F811
     assert "Xometry" in page and "Thorlabs" in page
     page = client.get("/vendor?v=XOMETRY&weeks=4&part=B").get_data(as_text=True)
     assert 'data-part="A"' in page and 'data-part="C"' in page and 'class="focus"' in page
-    assert "coming up" in page and "XO-A" in page
+    assert "can wait" in page and "rush · " in page and "XO-A" in page
+    assert "Tick rush lines only" in page and 'data-speed="rush"' in page
     assert client.get("/vendor?v=NOBODY").status_code == 404

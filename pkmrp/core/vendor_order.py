@@ -88,7 +88,15 @@ def recent_open_pos(open_pos, vendor_names_by_id, today, days=45):
 def window(lines, today, horizon, soon):
     """The vendor's lines whose planned buys fall by `horizon` (a date): qty,
     packs, spend and how urgent, newest-need last. `soon` is the date a buy
-    counts as due now (rank.buy_list's 5-working-day horizon)."""
+    counts as due now (rank.buy_list's 5-working-day horizon).
+
+    speed says what the line needs from the vendor: "rush" when the order-by
+    date has passed (the usual lead time no longer makes the need-by, so it
+    needs their expedited option), "now" when the usual lead still makes it
+    if placed this week, "later" otherwise. A buyer quoting one PO otherwise
+    pays the rush rate on every line: on 11-05 a Xometry quote for the two
+    top-ten 2920 parts carried three more that could wait, at 3.9x the
+    vendor's own past prices."""
     out = []
     for ln in lines:
         rows = [r for r in ln["orders"] if _d(r[0]) <= horizon]
@@ -99,6 +107,8 @@ def window(lines, today, horizon, soon):
         need_by = min(_d(r[1]) for r in rows)
         pack = ln["pack_qty"] or 0
         sos = sorted({s for r in rows for s in r[3]}, key=lambda s: -ln["order_values"].get(s, 0))
+        first = min(rows, key=lambda r: _d(r[0]))
+        status = "late" if place_by < today else "now" if place_by <= soon else "upcoming"
         out.append(
             dict(
                 ln,
@@ -107,7 +117,10 @@ def window(lines, today, horizon, soon):
                 spend=round(qty * ln["unit_cost"], 2),
                 place_by=place_by,
                 need_by=need_by,
-                status="late" if place_by < today else "now" if place_by <= soon else "upcoming",
+                status=status,
+                speed={"late": "rush", "now": "now"}.get(status, "later"),
+                behind=(today - place_by).days if status == "late" else 0,
+                lead_days=(_d(first[1]) - _d(first[0])).days,
                 sales_orders=sos,
                 order_value=round(sum(ln["order_values"].get(s, 0) for s in sos), 2),
             )

@@ -392,3 +392,5 @@ footer a { color: var(--leaf); }
 .up-text { color: var(--today); font-weight: 600; } .down-text { color: var(--soon); font-weight: 600; }
 tr.muted-row td { background: var(--bg); }
 form.inline { display: inline; }
+.rush-note { background: var(--late-soft); border: 1px solid var(--late); border-radius: 12px; padding: 10px 16px; margin: 14px 0; }
+.rush-note p { margin: 6px 0; }

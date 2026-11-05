@@ -185,7 +185,13 @@ document.querySelectorAll('table.vendor-order').forEach(function (table) {
   }
   rows.forEach(r => r.querySelector('.pick').addEventListener('change', sum));
   all.addEventListener('change', () => { rows.forEach(r => r.querySelector('.pick').checked = all.checked); sum(); });
-  const cells = r => [r.dataset.part, r.dataset.vpart, r.dataset.qty, r.dataset.unit, r.dataset.need];
+  const speedWord = r => ({ rush: 'RUSH', now: 'usual lead', later: 'can wait' })[r.dataset.speed] || '';
+  const tickWhere = test => { rows.forEach(r => r.querySelector('.pick').checked = test(r)); sum(); };
+  const rushBtn = document.querySelector('.pick-rush');
+  if (rushBtn) rushBtn.addEventListener('click', () => tickWhere(r => r.dataset.speed === 'rush'));
+  const restBtn = document.querySelector('.pick-rest');
+  if (restBtn) restBtn.addEventListener('click', () => tickWhere(r => r.dataset.speed !== 'rush'));
+  const cells = r => [r.dataset.part, r.dataset.vpart, r.dataset.qty, r.dataset.unit, r.dataset.need, speedWord(r)];
   document.querySelector('.copy-po').addEventListener('click', function () {
     const btn = this;
     const text = picked().map(r => cells(r).join('\t')).join('\n');
@@ -195,9 +201,9 @@ document.querySelectorAll('table.vendor-order').forEach(function (table) {
   });
   document.querySelector('.csv-po').addEventListener('click', function () {
     const q = s => '"' + String(s == null ? '' : s).replace(/"/g, '""') + '"';
-    const head = ['Our part', 'Their part', 'Description', 'Qty', 'Unit cost', 'Extended', 'Need by'];
+    const head = ['Our part', 'Their part', 'Description', 'Qty', 'Unit cost', 'Extended', 'Need by', 'Speed'];
     const body = picked().map(r => [r.dataset.part, r.dataset.vpart, r.dataset.desc, r.dataset.qty,
-      r.dataset.unit, r.dataset.spend, r.dataset.need].map(q).join(','));
+      r.dataset.unit, r.dataset.spend, r.dataset.need, speedWord(r)].map(q).join(','));
     const blob = new Blob([[head.map(q).join(',')].concat(body).join('\r\n')], { type: 'text/csv' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);

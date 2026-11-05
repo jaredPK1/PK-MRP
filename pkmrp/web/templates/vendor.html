@@ -19,14 +19,21 @@
 {% if not lines %}
 <p class="lede">Nothing from {{ vendor|title }} comes due in the next {{ weeks }} week{{ 's' if weeks != 1 }}. Try a longer window.</p>
 {% else %}
+{% set rush = lines|selectattr('speed', 'equalto', 'rush')|list %}
+{% if rush and rush|length < lines|length %}
+<div class="rush-note">
+  <p><b>{{ rush|length }} line{{ 's' if rush|length != 1 }} need{{ 's' if rush|length == 1 }} {{ vendor|title }}'s fast option</b> — the order-by date has passed, so the usual lead time won't make the need-by. The other {{ lines|length - rush|length }} arrive in time at the usual lead. <b>Quote them separately</b>: on one quote every line pays the rush rate.</p>
+  <p><button type="button" class="btn primary pick-rush">Tick rush lines only</button> <button type="button" class="btn pick-rest">Tick the rest</button></p>
+</div>
+{% endif %}
 <div class="table-wrap">
 <table class="dense vendor-order" data-vendor="{{ vendor }}">
-  <thead><tr><th><input type="checkbox" class="all" checked aria-label="Tick all"></th><th>When</th><th>Our part</th><th>Their part</th><th>Description</th><th class="r">Qty</th><th class="r">Unit</th><th class="r">Extended</th><th>Order by</th><th>Need by</th><th>For</th></tr></thead>
+  <thead><tr><th><input type="checkbox" class="all" checked aria-label="Tick all"></th><th>Speed</th><th>Our part</th><th>Their part</th><th>Description</th><th class="r">Qty</th><th class="r">Unit</th><th class="r">Extended</th><th>Order by</th><th>Need by</th><th>For</th></tr></thead>
   <tbody>
   {% for ln in lines %}
-    <tr class="{% if ln.part == focus %}focus{% endif %}" data-part="{{ ln.part }}" data-vpart="{{ ln.vendor_part }}" data-qty="{{ ln.qty }}" data-unit="{{ ln.unit_cost }}" data-spend="{{ ln.spend }}" data-need="{{ ln.need_by }}" data-desc="{{ ln.description }}">
+    <tr class="{% if ln.part == focus %}focus{% endif %}" data-part="{{ ln.part }}" data-vpart="{{ ln.vendor_part }}" data-qty="{{ ln.qty }}" data-unit="{{ ln.unit_cost }}" data-spend="{{ ln.spend }}" data-need="{{ ln.need_by }}" data-desc="{{ ln.description }}" data-speed="{{ ln.speed }}">
       <td><input type="checkbox" class="pick" checked aria-label="Include {{ ln.part }}"></td>
-      <td>{% if ln.status == 'late' %}<span class="chip late">late</span>{% elif ln.status == 'now' %}<span class="chip today">due now</span>{% else %}<span class="chip soon">coming up</span>{% endif %}</td>
+      <td>{% if ln.speed == 'rush' %}<span class="chip late" title="Order-by was {{ ln.place_by|nice_date }}: the usual {{ ln.lead_days }}-day lead now arrives {{ ln.behind }} days after the need-by. Needs the vendor's expedited option.">rush · {{ ln.behind }}d behind</span>{% elif ln.speed == 'now' %}<span class="chip today" title="Placed this week, the usual {{ ln.lead_days }}-day lead still makes the need-by. Check the quote's arrival date against it.">order now · usual lead</span>{% else %}<span class="chip soon" title="Not due to order yet; rides along to save a PO and a freight charge. Never worth a rush rate.">can wait</span>{% endif %}{% if not ln.sales_orders %}<div class="muted small">no orders waiting</div>{% endif %}</td>
       <td class="mono">{{ ln.part }} {{ part_note(ln.part) }}</td>
       <td class="mono">{{ ln.vendor_part or '—' }}</td>
       <td class="dcol">{{ ln.description|lower|capitalize }}{% if ln.release %}<div class="muted small" title="This part is on a 12-month blanket plan (Committed). The qty here is what booked orders need; the blanket release covers the same need, so it isn't added on top.">on a blanket plan — next release {{ ln.release.qty|qty }} by {{ ln.release.order_by|nice_date }}</div>{% endif %}</td>
@@ -47,6 +54,6 @@
   <button type="button" class="btn copy-po">Copy for the PO</button>
   <button type="button" class="btn csv-po">Download CSV</button>
 </p>
-<p class="foot-note">Qty is in the unit MAX stocks; where MAX buys in packs the pack count is shown under it. Order by = last day to place it and still arrive in time ({{ vendor|title }}'s lead time from PK's own POs where there's history). "Coming up" lines aren't late yet — they ride along to save a PO and a freight charge. Copy gives tab-separated lines (our part, their part, qty, unit cost, need by) that paste into Excel or an email.</p>
+<p class="foot-note">Qty is in the unit MAX stocks; where MAX buys in packs the pack count is shown under it. Order by = last day to place it and still arrive in time ({{ vendor|title }}'s lead time from PK's own POs where there's history). <b>Rush</b> lines are past their order-by: only the vendor's expedited option makes the need-by. <b>Order now</b> lines make it at the usual lead if placed this week — check the quote's arrival date. <b>Can wait</b> lines aren't due yet; they ride along to save a PO and a freight charge, and are never worth a rush rate. Copy gives tab-separated lines (our part, their part, qty, unit cost, need by, speed) that paste into Excel or an email.</p>
 {% endif %}
 {% endblock %}

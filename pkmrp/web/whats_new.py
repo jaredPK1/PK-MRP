@@ -7,6 +7,11 @@ Every feature people can see gets a line here in the same change
 WHATS_NEW = (
     (
         "2026-11-05",
+        "Vendor orders say which lines need a rush",
+        "A vendor order gathered everything due from that vendor, all ticked, so a quote for the urgent lines carried the rest at the same speed. On 11-05 a Xometry quote for two top-ten 2920 parts also carried three that could wait — one already on a Duyck PO — at the fastest tier, 3.9x Xometry's own past prices. Each line now says rush (past its order-by: only the vendor's expedited option makes the need-by), order now (the usual lead still makes it) or can wait, and whether any order is waiting on it. When rush lines are mixed with others, a note says to quote them separately, with Tick rush lines only / Tick the rest. Copy and CSV carry the speed.",
+    ),
+    (
+        "2026-11-05",
         "No-vendor parts holding up an order come to the top",
         "Parts nobody has bought before have no vendor in MAX, so they sat in the closed Needs a source box: off the ranked list, out of the late count, out of the Monday email. On 11-05, 12 of them were past their order-by date with a sales order waiting — including two optical switches (53-4130-00G and 53-4131-00G, the 1x96 at $23K each) that SO 20048126 is due with on 11-17, 142 days late to order. Now any no-vendor part a sales order waits on, late or due this week, is in a red box at the top of Today, the late tile says how many more there are, and the Monday email has a No vendor, orders waiting section right after Buys to place.",
     ),
