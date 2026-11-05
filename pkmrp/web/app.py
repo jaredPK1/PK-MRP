@@ -298,6 +298,8 @@ def create_app():
 
     @app.get("/")
     def home():
+        from ..core import weekly
+
         snap = snapshot.load_latest()
         now = datetime.now()
         today = date.today()
@@ -333,6 +335,7 @@ def create_app():
             now=now,
             vendor_n=vendor_n(snap),
             on_hold=on_hold,
+            src_now=weekly.source_now(snap.get("needs_source") or [], today),
         )
 
     @app.get("/buys")

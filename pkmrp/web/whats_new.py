@@ -6,6 +6,11 @@ Every feature people can see gets a line here in the same change
 
 WHATS_NEW = (
     (
+        "2026-11-05",
+        "No-vendor parts holding up an order come to the top",
+        "Parts nobody has bought before have no vendor in MAX, so they sat in the closed Needs a source box: off the ranked list, out of the late count, out of the Monday email. On 11-05, 12 of them were past their order-by date with a sales order waiting — including two optical switches (53-4130-00G and 53-4131-00G, the 1x96 at $23K each) that SO 20048126 is due with on 11-17, 142 days late to order. Now any no-vendor part a sales order waits on, late or due this week, is in a red box at the top of Today, the late tile says how many more there are, and the Monday email has a No vendor, orders waiting section right after Buys to place.",
+    ),
+    (
         "2026-11-04",
         "Critical safety stock ranks after late order buys",
         "A critical part's safety-stock buy went to the very top of the list, so on 11-04 three of them held slots 1-3 with \"Place today\" and \"protects $13.1M\" while 48 buys that orders are already waiting on were late. They looked like emergencies, and nothing was short. Now they rank right after the late order buys and ahead of every other buy, the chip says Restore safety stock instead of a place-by date, and the card reads \"9 orders worth $13.1M rely on it · none is short\".",

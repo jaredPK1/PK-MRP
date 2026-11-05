@@ -71,3 +71,28 @@ def test_title_names_the_biggest_sections():
         {"total": 5, "title": "Parts going obsolete", "label": "parts going obsolete"}]}
     assert weekly_title(wk) == "PK-MRP, week of Nov 2: 12 buys to place, 5 parts going obsolete (3 new)"
     assert weekly_title({"week_of": "2026-11-02", "sections": []}).endswith("nothing needs you")
+
+
+def test_no_vendor_parts_an_order_waits_on_get_their_own_section():
+    snap = {
+        "buys": [],
+        "needs_source": [
+            {"part": "SW8", "description": "switch", "qty": 3, "days_late": 142, "orders": 1,
+             "order_value": 304775, "place_by": "2026-06-16", "sales_orders": ["20048126"],
+             "unit_cost": 4080},
+            {"part": "SOON", "qty": 1, "days_late": 0, "orders": 1, "order_value": 10,
+             "place_by": "2026-11-06", "sales_orders": ["1", "2", "3", "4"], "unit_cost": 0},
+            {"part": "WO_ONLY", "qty": 1, "days_late": 30, "orders": 0, "order_value": 0,
+             "place_by": "2026-10-01", "sales_orders": []},
+            {"part": "LATER", "qty": 1, "days_late": 0, "orders": 1, "order_value": 99,
+             "place_by": "2026-12-20", "sales_orders": ["9"]},
+        ],
+    }
+    today = date(2026, 11, 5)
+    assert [b["part"] for b in weekly.source_now(snap["needs_source"], today)] == ["SW8", "SOON"]
+    secs = weekly.priorities(snap, today)
+    assert [s["key"] for s in secs] == ["source"]
+    rows = secs[0]["items"]
+    assert "142d late" in rows[0]["detail"] and "SO 20048126" in rows[0]["detail"]
+    assert "due this week" in rows[1]["detail"] and "SO 1, 2, 3 +" in rows[1]["detail"]
+    assert "no cost in MAX" in rows[1]["detail"] and "no cost" not in rows[0]["detail"]

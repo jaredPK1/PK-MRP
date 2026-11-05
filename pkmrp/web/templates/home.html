@@ -13,7 +13,7 @@
   <div class="tile">
     <span class="num">{{ h.buy_now }}</span>
     <span class="lbl">buys to place this week</span>
-    <span class="sub">{% if h.late %}{{ h.late }} already past their order-by date{% else %}none late{% endif %}</span>
+    <span class="sub">{% if h.late %}{{ h.late }} already past their order-by date{% else %}none late{% endif %}{% set sl = src_now|selectattr('days_late')|list|length %}{% if sl %} · <a class="late-text" href="#src-now-h">{{ sl }} more with no vendor</a>{% endif %}</span>
   </div>
   <div class="tile">
     <span class="num">{{ h.orders_waiting }}</span>
@@ -40,6 +40,19 @@
   {% endif %}
 </section>
 
+{% if src_now %}
+<section class="ecn-alert" aria-labelledby="src-now-h">
+  <h2 id="src-now-h">Orders waiting on parts nobody can order yet <span class="muted">· {{ src_now|length }}</span></h2>
+  <p class="muted small">A booked order needs each of these and the order-by date has passed or is this week, but the part has never been bought and MAX has no vendor — so it isn't in the buy list or its late count. Get a quote, set up the vendor in MAX, place the PO.</p>
+  <ul>
+  {% for b in src_now %}
+    <li><b class="mono">{{ b.part }}</b> {{ b.description|lower|capitalize }} — {{ b.qty|qty }} to buy{% if b.days_late %}, <span class="late-text">{{ b.days_late }}d late</span>{% else %}, order by {{ b.place_by|nice_date }}{% endif %}.
+      SO {{ b.sales_orders[:3]|join(', ') }}{% if b.sales_orders|length > 3 %} +{{ b.sales_orders|length - 3 }}{% endif %}{% if b.order_value %} worth {{ b.order_value|money }}{% endif %}{% if not b.unit_cost %} <span class="muted small">· no cost in MAX</span>{% endif %}
+    </li>
+  {% endfor %}
+  </ul>
+</section>
+{% endif %}
 {% set ob = (snap.ecn or {}).get('obsolete_buys') or [] %}
 {% if ob %}
 <section class="ecn-alert" aria-labelledby="ecn-h">
@@ -151,7 +164,7 @@
       <tbody>
       {% for b in snap.needs_source %}
         <tr><td class="mono">{{ b.part }} {{ part_note(b.part) }}</td><td class="dcol">{{ b.description|lower|capitalize }}</td><td class="r">{{ b.qty|qty }}</td>
-            <td>{{ b.need_by|nice_date }}</td><td class="r">{{ b.orders or 'WO' }}</td><td class="r">{{ b.order_value|money if b.order_value else '' }}</td>
+            <td>{{ b.need_by|nice_date }}{% if b.days_late %} <span class="chip late">{{ b.days_late }}d late</span>{% endif %}</td><td class="r">{{ b.orders or 'WO' }}</td><td class="r">{{ b.order_value|money if b.order_value else '' }}</td>
             <td><button class="why-btn" data-why="{{ script_root }}/why/{{ b.part }}" data-target="#src-why-{{ loop.index }}" aria-expanded="false">Why?</button></td></tr>
         <tr class="cp-row"><td colspan="7" id="src-why-{{ loop.index }}" class="cp-cell why-cell" hidden></td></tr>
       {% endfor %}

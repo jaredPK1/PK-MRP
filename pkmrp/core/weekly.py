@@ -1,7 +1,7 @@
 """The Monday digest: everything that needs someone this week, in one email.
 
 Top: "Needs you this week" -- a short list per kind, in a fixed order of
-urgency (buys past their order-by, parts going obsolete with nothing to
+urgency (buys past their order-by, parts with no vendor an order waits on, parts going obsolete with nothing to
 cover them, Done that MAX doesn't show, recent overbuys, price issues, repeat
 POs, safety stock to restore, buys on ECN-obsoleted parts), each line linking to the page that
 explains it. "New" = not in last Monday's email: the keys every section
@@ -78,7 +78,19 @@ def done_week(log, today):
             "flagged": flagged[:8]}
 
 
-LABELS = {"buys": "buys to place", "eol": "parts going obsolete", "done_check": "done but not in MAX",
+def source_now(needs_source, today):
+    """Parts with no vendor that a booked sales order is waiting on and whose
+    order-by date is past or within the week, latest first. They never reach
+    the ranked list, so without this they sit unread under Needs a source
+    (53-4130-00G: 142 days late on a $305K order, 2026-11-05)."""
+    week_end = (today + timedelta(days=7)).isoformat()
+    rows = [b for b in needs_source
+            if b.get("sales_orders") and (b.get("place_by") or "") <= week_end]
+    return sorted(rows, key=lambda b: (b.get("place_by") or "", -(b.get("order_value") or 0)))
+
+
+LABELS = {"buys": "buys to place", "source": "parts with no vendor holding up orders",
+          "eol": "parts going obsolete", "done_check": "done but not in MAX",
           "overbuys": "recent overbuys", "prices": "price issues", "repeat": "repeat POs",
           "ecn": "buys on ECN-obsoleted parts", "safety": "safety stock buys"}
 
@@ -138,7 +150,22 @@ def priorities(snap, today, eol_items=(), price_alerts=(), overbuy_rows=(), done
           "link": f"/buys?q={b['part']}"} for b in buys], seen,
         total=len(buys)))
 
-    words = {"obsolete": "Obsolete", "eol": "End of life", "last_time_buy": "Last-time buy"}
+    out.append(_section(
+        "source", "No vendor, orders waiting",
+        "Booked orders need these and the order-by date is past or this week, but nobody has bought "
+        "them before and MAX has no vendor. Get a quote, set up the vendor, place the PO.",
+        "/#src-h",
+        [{"key": b["part"], "part": b["part"], "description": b.get("description", ""),
+          "money": b.get("order_value") or 0, "money_label": "orders waiting",
+          "detail": " · ".join(x for x in (
+              f"{b.get('qty', 0):g} to buy",
+              f"{b['days_late']}d late" if b.get("days_late") else "due this week",
+              "SO " + ", ".join(b["sales_orders"][:3]) + (" +" if len(b["sales_orders"]) > 3 else ""),
+              "" if b.get("unit_cost") else "no cost in MAX",
+          ) if x),
+          "link": "/#src-h"} for b in source_now(snap.get("needs_source") or [], today)], seen))
+
+    words ={"obsolete": "Obsolete", "eol": "End of life", "last_time_buy": "Last-time buy"}
     out.append(_section(
         "eol", "Parts going obsolete", "Booked orders need them and stock doesn't cover them.", "/eol",
         [{"key": f"{i['part']}|{i['kind']}", "part": i["part"], "description": i.get("description", ""),
