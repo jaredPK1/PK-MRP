@@ -395,3 +395,12 @@ tr.muted-row td { background: var(--bg); }
 form.inline { display: inline; }
 .rush-note { background: var(--late-soft); border: 1px solid var(--late); border-radius: 12px; padding: 10px 16px; margin: 14px 0; }
 .rush-note p { margin: 6px 0; }
+/* Part lookup */
+.part-head { margin: 18px 0 4px; } .part-head h2 { margin: 0; font-size: 22px; }
+.part-head .desc { color: var(--ink-2); margin: 2px 0 6px; }
+.part-tiles { margin: 14px 0 18px; }
+.part-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+@media (max-width: 860px) { .part-cols { grid-template-columns: 1fr; } }
+.part-detail { margin: 14px 0; } .part-detail summary { cursor: pointer; font-weight: 600; color: var(--ink-2); padding: 6px 0; }
+.lede-small { color: var(--ink-2); max-width: 60em; margin: 4px 0 8px; }
+.promise-form select { font: inherit; font-size: 15px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface); color: var(--ink); }

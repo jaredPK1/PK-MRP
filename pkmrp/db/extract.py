@@ -430,6 +430,38 @@ JOIN pk_ecn.dbo.ecn e ON e.ecn_no = z.ecn_no
 WHERE RTRIM(ISNULL(z.new_rev, '')) = 'ZZ' AND e.status = 'Closed' AND z.part_number IS NOT NULL
 """
 
+# MAX's own MRP, for the part lookup's side-by-side -- never planned from.
+# Its planned orders (TYPE_10 'PL', STATUS_10 1; ORDNUM 49xxxxxx) are MAX's
+# "buy/make this" quantities.
+MAX_PLANNED_SQL = """
+SELECT RTRIM(ORDNUM_10) AS ord, RTRIM(PRTNUM_10) AS part, DUEQTY_10 AS qty,
+       CURDUE_10 AS due, RTRIM(ISNULL(ORDREF_10, '')) AS reference
+FROM Order_Master
+WHERE TYPE_10 = 'PL' AND STATUS_10 = '1' AND DUEQTY_10 > 0
+"""
+
+# Every open requirement MAX nets against a part, with what it comes from:
+# CU = a sales-order line, MF = an open WO, PL = one of MAX's own planned
+# orders for the parent (for a PCA, 96% of MAX's demand on 11-06), MS = a
+# master-schedule (forecast) entry. Joined on ORDER_11 like WO_REQ_SQL.
+MAX_DEMAND_SQL = """
+SELECT RTRIM(rd.PRTNUM_11) AS part, rd.CURDUE_11 AS due, rd.CURQTY_11 - rd.ISSQTY_11 AS qty,
+       RTRIM(o.TYPE_10) AS source, RTRIM(o.ORDNUM_10) AS ord, RTRIM(o.PRTNUM_10) AS parent,
+       RTRIM(ISNULL(o.ORDREF_10, '')) AS reference
+FROM Requirement_Detail rd
+JOIN Order_Master o ON o.ORDER_10 = rd.ORDER_11
+WHERE rd.CURQTY_11 > rd.ISSQTY_11 AND o.STATUS_10 IN ('1', '3')
+"""
+
+# MAX's action messages from its last MRP run (Less than Leadtime, Couldn't
+# Pull In, ...). MAX keeps dated copies; MRP_Explosion is the current one.
+MAX_ACTIONS_SQL = """
+SELECT RTRIM(PRTNUM_20) AS part, CURDUE_20 AS due, RESDTE_20 AS resched,
+       RTRIM(EXCDSC_20) AS message, RTRIM(ORDER_20) AS ord, RTRIM(TYPE_20) AS order_type,
+       DUEQTY_20 AS qty, MRPDTE_20 AS run_date
+FROM MRP_Explosion
+"""
+
 ALL_SQL = {
     "parts": PARTS_SQL,
     "bom": BOM_SQL,
@@ -459,6 +491,9 @@ ALL_SQL = {
     "ecn_parts": ECN_PARTS_SQL,
     "ecn_releases": ECN_RELEASES_SQL,
     "ms_requirements": MS_REQ_SQL,
+    "max_planned": MAX_PLANNED_SQL,
+    "max_demand": MAX_DEMAND_SQL,
+    "max_actions": MAX_ACTIONS_SQL,
 }
 
 _DATES = {
@@ -478,6 +513,8 @@ _DATES = {
     "date",
     "last_built",
     "last_used",
+    "resched",
+    "run_date",
 }
 _TEXT = {
     "part",
@@ -528,6 +565,8 @@ _TEXT = {
     "mpn",
     "maker",
     "source",
+    "ord",
+    "message",
 }
 
 
@@ -593,6 +632,15 @@ def receipt_prices(erp, since):
 def open_po_prices(erp):
     """The price on each open PO line, per stocking unit, with standard cost."""
     return _run(erp, "open_po_prices")
+
+
+def max_mrp(erp):
+    """MAX's own MRP output: planned orders, demand by source, action messages."""
+    return {
+        "planned": _run(erp, "max_planned"),
+        "demand": _run(erp, "max_demand"),
+        "actions": _run(erp, "max_actions"),
+    }
 
 
 def dmrs(erp, since):

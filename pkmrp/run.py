@@ -317,6 +317,13 @@ def build_plan(
         cp["pipeline_12m"] = round(sum(pipe_months.get(p, {}).values()) * settings.growth_bias, 2)
         committed_plans.append(cp)
 
+    # MAX's own MRP, for the part lookup only -- a failure here mustn't stop the plan
+    try:
+        max_mrp = timed("max_mrp", extract.max_mrp, erp)
+    except Exception as exc:  # noqa: BLE001
+        max_mrp = None
+        timings["max_mrp_error"] = str(exc)[:200]
+
     delivery = analytics.vendor_delivery(
         deep_df, {p: v.purchase_lt for p, v in parts.items()}, names, today
     )
@@ -361,6 +368,7 @@ def build_plan(
         "ecn": ecn,
         "replaced": replaced,
         "fix_max": fix_max,
+        "max_mrp": max_mrp,
         "consigned": consigned,
         "consign_evidence": consign_evidence,
         "bom_codes_skipped": skipped_codes,

@@ -1,0 +1,165 @@
+{% extends "base.html" %}
+{% from "_notes.html" import part_note with context %}
+{% block title %}{% if entry %}{{ part }} · {% endif %}Part lookup · PK-MRP{% endblock %}
+{% set pk_kind = {'so': 'Sales order', 'wo_req': 'WO needs it', 'planned_make': 'Parent build (planned)',
+                  'planned_kit': 'Subcontract kit (planned)', 'po_kit': 'Kit on a PO', 'sub_req': 'Subcontract need',
+                  'safety_stock': 'Safety stock', 'po': 'PO arrives', 'wo': 'WO finishes'} %}
+{% set mx_src = {'CU': 'Sales order', 'MF': 'Open WO', 'PL': 'MAX planned order (parent)', 'MS': 'Master schedule (forecast)', 'SO': 'Subcontract'} %}
+{% block content %}
+<section class="page-intro">
+  <h1 class="h1-small">Part lookup</h1>
+  <p class="lede">One part: what PK-MRP says to buy next to what MAX MRP says, and where their demand differs. Both start from the same stock and open POs; they differ in what counts as demand.</p>
+</section>
+<form class="promise-form" method="get">
+  <label class="picker">Part — number or description
+    <input name="part" value="{{ part }}" placeholder="02-2229-11G · main board · 8000 pca" autofocus autocomplete="off" required
+           data-suggest="{{ script_root }}/api/parts" role="combobox" aria-expanded="false" aria-autocomplete="list">
+    <ul class="suggest" role="listbox" hidden></ul>
+  </label>
+  <label>Looking ahead
+    <select name="h">
+      {% for h in horizons %}<option value="{{ h }}" {{ 'selected' if h == horizon }}>{{ 'Everything' if h == 'all' else h ~ ' months' }}</option>{% endfor %}
+    </select>
+  </label>
+  <button class="btn primary" type="submit">Look up</button>
+</form>
+{% if error %}<p class="promise-error">{{ error }}</p>{% endif %}
+{% if not data %}<p class="muted">The part data isn't built yet — it comes with the next hourly planning run.</p>
+{% elif data.max_status != 'ok' %}<p class="promise-error">MAX's MRP couldn't be read on the last run, so only PK-MRP's side is shown.</p>{% endif %}
+
+{% if view %}
+{% set i = entry.info %}
+<section class="part-head">
+  <h2 class="mono">{{ part }} {{ part_note(part) }}</h2>
+  <div class="desc">{{ i.description|lower|capitalize }}</div>
+  <div class="facts">
+    <span><b>{{ view.on_hand|qty }}</b> on hand</span>
+    <span><b>{{ view.on_po|qty }}</b> on open POs</span>
+    {% if view.on_wo %}<span><b>{{ view.on_wo|qty }}</b> on open WOs</span>{% endif %}
+    {% if i.vendor %}<span>vendor <a href="{{ script_root }}/vendor?v={{ i.vendor|urlencode }}&part={{ part|urlencode }}">{{ i.vendor }}</a></span>{% endif %}
+    {% if i.lead_days %}<span>{{ i.lead_days|round|int }}-day lead</span>{% endif %}
+    {% if i.buyer %}<span>buyer {{ i.buyer }}</span>{% endif %}
+    {% if i.unit_cost %}<span>{{ i.unit_cost|money2 }} each</span>{% endif %}
+  </div>
+</section>
+
+<div class="tiles part-tiles">
+  <div class="tile">
+    <div class="lbl">PK-MRP says</div>
+    {% if on_list %}
+      <div class="num">{{ on_list.qty|qty }}</div>
+      <div class="sub">to buy now, by {{ on_list.place_by|nice_date }} — it's on <a href="{{ script_root }}/buys">this week's list</a>{% if (on_list.sizing or {}).add_to_po %}; add to PO {{ on_list.sizing.add_to_po.po }}{% endif %}</div>
+    {% elif view.pk_buy_qty %}
+      <div class="num">{{ view.pk_buy_qty|qty }}</div>
+      <div class="sub">to buy over the window, first by {{ view.pk_buys[0][0]|nice_date }}</div>
+    {% else %}
+      <div class="num">0</div>
+      <div class="sub">nothing to buy {{ 'in this window' if view.until else '' }} — stock and open orders cover booked demand</div>
+    {% endif %}
+  </div>
+  <div class="tile">
+    <div class="lbl">MAX MRP says</div>
+    <div class="num">{{ view.max_buy_qty|qty }}</div>
+    <div class="sub">{% if view.max_buys %}on {{ view.max_buys|length }} planned order{{ '' if view.max_buys|length == 1 else 's' }}, first due {{ view.max_buys[0][0]|nice_date }}{% else %}no planned orders {{ 'in this window' if view.until else '' }}{% endif %}</div>
+  </div>
+  <div class="tile">
+    <div class="lbl">Demand, PK-MRP</div>
+    <div class="num">{{ view.pk_demand|qty }}</div>
+    <div class="sub">{{ 'through ' ~ view.until|nice_date(False) if view.until else 'everything booked' }}</div>
+  </div>
+  <div class="tile">
+    <div class="lbl">Demand, MAX</div>
+    <div class="num">{{ view.max_demand|qty }}</div>
+    <div class="sub">{% if view.gap > 0 %}{{ view.gap|qty }} more than PK-MRP{% elif view.gap < 0 %}{{ (-view.gap)|qty }} less than PK-MRP{% else %}the same{% endif %}</div>
+  </div>
+</div>
+
+<h3 class="steps-h">Where the demand differs</h3>
+{% if view.biggest_gap %}{% set g = view.biggest_gap %}
+<p class="lede-small">Most of the gap is <b>{{ g[1]|lower }}</b>:
+  {% if g[0] == 'parents' %}MAX plans the parent assemblies from its own planned orders — which carry master-schedule forecast, MAX's safety stock and its order quantities down the bill. PK-MRP plans parents only for booked orders and open WOs.
+  {% elif g[0] == 'forecast' %}master-schedule entries are forecast, not orders; PK-MRP plans from the backlog only.
+  {% elif g[0] == 'safety' %}MAX tops stock up to its safety stock ({{ entry.info.max_ss|qty }}); PK-MRP {% if entry.info.pk_ss is not none %}uses {{ entry.info.pk_ss|qty }}{% else %}doesn't plan to it{% endif %} — see <a href="{{ script_root }}/safety-stock">Safety stock</a>.
+  {% else %}the two count this differently over the window; the detail is below.{% endif %}
+</p>
+{% endif %}
+<div class="table-wrap">
+<table class="dense">
+  <thead><tr><th>Demand from</th><th class="r">PK-MRP</th><th class="r">MAX</th><th class="r">MAX − PK-MRP</th></tr></thead>
+  <tbody>
+  {% for b in view.buckets %}
+    <tr><td>{{ b.label }}</td><td class="r">{{ b.pk|qty }}</td><td class="r">{{ b.max|qty }}</td><td class="r {{ 'up-text' if b.max - b.pk > 0 else '' }}">{{ (b.max - b.pk)|qty }}</td></tr>
+  {% else %}<tr><td colspan="4" class="muted">No demand on either side in this window.</td></tr>
+  {% endfor %}
+  </tbody>
+  <tfoot><tr><td><b>Total</b></td><td class="r"><b>{{ view.pk_demand|qty }}</b></td><td class="r"><b>{{ view.max_demand|qty }}</b></td><td class="r"><b>{{ view.gap|qty }}</b></td></tr></tfoot>
+</table>
+</div>
+
+<div class="part-cols">
+  <section>
+    <h3 class="steps-h">PK-MRP planned buys</h3>
+    <div class="table-wrap"><table class="dense">
+      <thead><tr><th>Order by</th><th>Need by</th><th class="r">Qty</th><th>For</th></tr></thead>
+      <tbody>
+      {% for b in view.pk_buys %}
+        <tr><td>{% if b[5] %}<span class="chip late">late</span> {% endif %}{{ b[0]|nice_date(False) }}</td><td>{{ b[1]|nice_date(False) }}</td><td class="r">{{ b[2]|qty }}{% if b[3] == 'make' %} <span class="muted small">build</span>{% endif %}</td>
+            <td class="small">{% if b[4] == 'safety_stock' %}safety stock{% else %}{{ b[6]|join(', ') }}{% endif %}</td></tr>
+      {% else %}<tr><td colspan="4" class="muted">None in this window.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table></div>
+  </section>
+  <section>
+    <h3 class="steps-h">MAX planned orders</h3>
+    <div class="table-wrap"><table class="dense">
+      <thead><tr><th>Due</th><th class="r">Qty</th><th>Order</th><th>Reference</th></tr></thead>
+      <tbody>
+      {% for b in view.max_buys %}
+        <tr><td>{{ b[0]|nice_date(False) }}</td><td class="r">{{ b[1]|qty }}</td><td class="mono small">{{ b[2] }}</td><td class="small">{{ b[3] }}</td></tr>
+      {% else %}<tr><td colspan="4" class="muted">None in this window.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table></div>
+  </section>
+</div>
+
+{% if entry.max_act %}
+<h3 class="steps-h">MAX action messages <span class="muted small">(MRP run {{ data.max_run|nice_date(False) }})</span></h3>
+<div class="table-wrap"><table class="dense">
+  <thead><tr><th>Message</th><th>Order</th><th class="r">Qty</th><th>Due</th><th>MAX wants it</th></tr></thead>
+  <tbody>
+  {% for a in entry.max_act %}
+    <tr><td>{{ a[2] }}</td><td class="mono small">{{ a[3] }} <span class="muted">{{ a[4] }}</span></td><td class="r">{{ a[5]|qty }}</td><td>{{ a[0]|nice_date(False) }}</td><td>{{ a[1]|nice_date(False) }}</td></tr>
+  {% endfor %}
+  </tbody>
+</table></div>
+{% endif %}
+
+<details class="part-detail">
+  <summary>PK-MRP: stock, open orders and booked demand, in date order</summary>
+  <div class="table-wrap"><table class="dense">
+    <thead><tr><th>Date</th><th>What</th><th>Ref</th><th class="r">Qty</th><th class="r">Balance</th></tr></thead>
+    <tbody>
+      <tr><td></td><td>On hand</td><td></td><td class="r">{{ view.on_hand|qty }}</td><td class="r">{{ view.on_hand|qty }}</td></tr>
+    {% for t in view.timeline %}
+      <tr class="{{ 'late-text' if t.balance < 0 else '' }}"><td>{{ t.date|nice_date(False) if t.date else '' }}</td><td>{{ pk_kind.get(t.kind, t.kind) }}</td><td class="small">{{ t.ref }}</td><td class="r">{{ t.qty|qty }}</td><td class="r">{{ t.balance|qty }}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+  {% if view.short_on %}<p class="small late-text">Goes short {{ view.short_on|nice_date }} without new buys.</p>{% endif %}
+</details>
+
+<details class="part-detail">
+  <summary>MAX: every requirement it nets against this part ({{ entry.max_dem|length }})</summary>
+  <div class="table-wrap"><table class="dense">
+    <thead><tr><th>Due</th><th class="r">Qty</th><th>From</th><th>Order</th><th>Parent</th><th>Reference</th></tr></thead>
+    <tbody>
+    {% for d in entry.max_dem %}
+      <tr><td>{{ d[0]|nice_date(False) }}</td><td class="r">{{ d[1]|qty }}</td><td>{{ mx_src.get(d[2], d[2]) }}</td><td class="mono small">{{ d[3] }}</td><td class="mono small">{{ d[4] }}</td><td class="small">{{ d[5] }}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+</details>
+{% endif %}
+{% endblock %}

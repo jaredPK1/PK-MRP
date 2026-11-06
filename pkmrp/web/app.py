@@ -778,6 +778,53 @@ def create_app():
             )
         return {"parts": out}
 
+    @app.get("/part")
+    def part_page():
+        """One part: what PK-MRP says to buy next to what MAX MRP says, and
+        where their demand differs."""
+        from ..core import part_view
+        from ..core.search import find
+
+        data = snapshot.load_part_plans()
+        part = (request.args.get("part") or "").strip().upper()
+        horizon = request.args.get("h") or "6"
+        if horizon not in part_view.HORIZONS:
+            horizon = "6"
+        view, entry, error = None, None, None
+        if part and data:
+            plans = data["parts"]
+            if part not in plans:
+                hits = find(
+                    part,
+                    ((p, e["info"]["description"], e["info"]["type"], bool(e["pk"] or e["max_dem"]))
+                     for p, e in plans.items()),
+                    1,
+                )
+                if hits:
+                    part = hits[0][0]
+            if part in plans:
+                entry = plans[part]
+                view = part_view.compare(entry, date.fromisoformat(data["today"]), horizon)
+            else:
+                error = (
+                    f"Nothing planned for “{part}” on either side — no stock, open orders "
+                    "or demand in PK-MRP or MAX. Try part of the number or a word from the description."
+                )
+        snap = snapshot.load_latest() or {}
+        on_list = next((b for b in snap.get("buys", []) if b["part"] == part), None)
+        return render_template(
+            "part.html",
+            data=data,
+            part=part,
+            horizon=horizon,
+            horizons=list(part_view.HORIZONS),
+            entry=entry,
+            view=view,
+            on_list=on_list,
+            error=error,
+            snap=snap,
+        )
+
     @app.get("/promise")
     def promise_page():
         from ..core import atp

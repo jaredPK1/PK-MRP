@@ -579,6 +579,104 @@ def build_atp(run):
     }
 
 
+def _day(v):
+    """A pandas date (Timestamp or NaT) as 'YYYY-MM-DD', or None."""
+    try:
+        return v.date().isoformat() if v == v and v is not None else None
+    except (AttributeError, ValueError):
+        return _iso(v)
+
+
+def build_part_plans(run):
+    """{today, parts: {part: rows}} for the part lookup: PK-MRP's ledger and
+    planned orders and MAX's own MRP (planned orders, demand by source,
+    action messages), for every part either side has anything on."""
+    res = run["result"]
+    parts = run["parts"]
+    lead = run["lead_times"]
+    vendor = run.get("vendor_name") or {}
+    out = {}
+
+    def row(p):
+        if p not in out:
+            v = parts.get(p)
+            j = res.safety.get(p) or {}
+            out[p] = {
+                "info": {
+                    "description": v.description if v else "",
+                    "type": v.type if v else "",
+                    "buyer": v.buyer if v else "",
+                    "vendor": vendor.get(p, ""),
+                    "lead_days": (lead.get(p) or {}).get("median") or (v.purchase_lt if v else 0),
+                    "unit_cost": float(v.unit_cost) if v else 0.0,
+                    "max_ss": float(v.safety_stock) if v else 0.0,
+                    "pk_ss": j.get("use"),
+                    "min_qty": v.min_qty if v else 0.0,
+                    "mult_qty": v.mult_qty if v else 0.0,
+                },
+                "pk": [],
+                "pk_buys": [],
+                "max_pl": [],
+                "max_dem": [],
+                "max_act": [],
+            }
+        return out[p]
+
+    for p, entries in res.ledger.items():
+        row(p)["pk"] = [[_iso(d), round(q, 4), k, r] for d, q, k, r in entries]
+    for o in res.planned:
+        row(o.part)["pk_buys"].append(
+            [_iso(o.place_by), _iso(o.need_by), round(o.qty, 4), o.kind, o.reason, bool(o.late),
+             [pg.ref for pg in o.pegs[:4]]]
+        )
+    mx = run.get("max_mrp") or {}
+    if mx.get("planned") is not None:
+        for r in mx["planned"].itertuples(index=False):
+            row(r.part)["max_pl"].append([_day(r.due), r.qty, r.ord, r.reference])
+    if mx.get("demand") is not None:
+        for r in mx["demand"].itertuples(index=False):
+            row(r.part)["max_dem"].append([_day(r.due), r.qty, r.source, r.ord, r.parent, r.reference])
+    if mx.get("actions") is not None:
+        for r in mx["actions"].itertuples(index=False):
+            row(r.part)["max_act"].append([_day(r.due), _day(r.resched), r.message, r.ord, r.order_type, r.qty])
+    for e in out.values():
+        for k in ("max_pl", "max_dem", "max_act"):
+            e[k].sort(key=lambda x: x[0] or "")
+    return {
+        "today": run["today"].isoformat(),
+        "max_status": "ok" if mx else "unavailable",
+        "max_run": next(
+            (_day(r.run_date) for r in mx["actions"].head(1).itertuples(index=False)), None
+        ) if mx.get("actions") is not None and len(mx["actions"]) else None,
+        "parts": out,
+    }
+
+
+def write_part_plans(data):
+    os.makedirs(DATA_DIR, exist_ok=True)
+    path = os.path.join(DATA_DIR, "part_plans.json")
+    fd, tmp = tempfile.mkstemp(dir=DATA_DIR, prefix=".part-plans-")
+    with os.fdopen(fd, "w", encoding="utf-8") as fh:
+        json.dump(data, fh, separators=(",", ":"), default=str)
+    os.replace(tmp, path)
+
+
+_part_plans_cache = {"mtime": None, "data": None}
+
+
+def load_part_plans():
+    """The part lookup data, re-read only when the file changes."""
+    path = os.path.join(DATA_DIR, "part_plans.json")
+    try:
+        mtime = os.path.getmtime(path)
+    except OSError:
+        return None
+    if _part_plans_cache["mtime"] != mtime:
+        with open(path, encoding="utf-8") as fh:
+            _part_plans_cache.update(mtime=mtime, data=json.load(fh))
+    return _part_plans_cache["data"]
+
+
 def write_atp(data):
     os.makedirs(DATA_DIR, exist_ok=True)
     path = os.path.join(DATA_DIR, "atp.json")

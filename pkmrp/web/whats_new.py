@@ -7,6 +7,11 @@ Every feature people can see gets a line here in the same change
 WHATS_NEW = (
     (
         "2026-11-06",
+        "Part lookup: PK-MRP next to MAX MRP for any part",
+        "Chad's ask: with PCAs changing vendors he'll buy a little ahead, and PK-MRP's demand for a PCA isn't MAX's. Planning → Part lookup takes any part number or description and shows what each says to buy over 3, 6 or 12 months, both demands split by where they come from — sales orders, open WOs, builds of parent assemblies, master-schedule forecast, safety stock — and which bucket makes the gap. For PCAs it's almost all one bucket: on 11-06, 96% of MAX's PCA demand came from its own planned orders for the parent assemblies, which carry forecast and MAX's safety stock down the bill; PK-MRP plans parents only for booked orders. Also lists MAX's planned orders and action messages, and every requirement MAX nets against the part. Why this buy? links to it.",
+    ),
+    (
+        "2026-11-06",
         "Long-lead parts: one order for a quarter, rounded to the price break",
         "Long-lead parts were left to their blanket plan, so Today asked only for what couldn't wait — but no blanket is placed in MAX, so the same part came back every few days. Haydon Kerk motors went on three POs in eight days (70111310, 70111350, 70111387), each small enough to land in a smaller price break: 37-0007-01G cost $163.35 for 10 against $143.58 for 30 the same week. Now a long-lead buy covers about 13 weeks of booked orders, and any buy rounds up to the vendor's next quoted break (Part_Vendor) when booked orders inside 26 weeks use the extra and it stays within the spend cap. A PO for the part from the last two weeks is now the first thing on the card: Add to PO …, and a chip on All buys.",
     ),

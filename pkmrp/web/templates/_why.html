@@ -29,6 +29,7 @@
     {% elif j.verdict == 'ignored' %}<div class="muted small"><span class="lbl">Safety</span> MAX has a safety stock of {{ j.ss|qty }}; PK-MRP doesn't plan to it: {{ j.why }}.</div>{% endif %}
     {% if sz.add_to_po %}<div class="add-to-po strong"><span class="lbl">PO</span> <b>Add to PO {{ sz.add_to_po.po }}</b> ({{ sz.add_to_po.qty|qty }}, went in {{ sz.add_to_po.created|nice_date }}) rather than cutting a second PO — the vendor prices the whole quantity, so two small POs can each land in a smaller price break.</div>{% endif %}
     {% if b.changed and b.changed.kind != 'new' %}<div class="warn"><span class="lbl">Changed</span> {{ b.changed.text }}. Check who's waiting below before ordering.</div>{% endif %}
+    <div class="muted small"><a href="{{ script_root }}/part?part={{ b.part|urlencode }}">Compare with MAX MRP →</a></div>
     <div><span class="lbl">Lands</span> around <b>{{ s.arrives_if_ordered_today|nice_date }}</b> if placed today — {{ s.lead_days|round|int }} working days, {{ s.lead_source|lead_words }}</div>
     {% if s.orders_slipping %}<div class="warn"><span class="lbl">Watch</span> {{ s.orders_slipping }} order{{ '' if s.orders_slipping == 1 else 's' }} need{{ 's' if s.orders_slipping == 1 else '' }} it before then and stock doesn't cover {{ 'it' if s.orders_slipping == 1 else 'them' }} — {{ 'it slips' if s.orders_slipping == 1 else 'they slip' }} unless an open PO is pulled in or a faster source is found.</div>
     {% else %}<div><span class="lbl">Watch</span> Nothing slips if it's ordered today.</div>{% endif %}
