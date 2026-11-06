@@ -3,7 +3,7 @@ from datetime import date, timedelta
 import pandas as pd
 
 from pkmrp.core.netting import Demand, Part, PlannedOrder
-from pkmrp.core.order_qty import OrderPolicy, economic_weeks, size_all, size_buy
+from pkmrp.core.order_qty import OrderPolicy, economic_weeks, size_all, size_buy, why_words
 from pkmrp.core.settings import PlanSettings
 
 TODAY = date(2026, 10, 30)
@@ -72,11 +72,54 @@ def test_spend_cap_and_min_mult_rounding():
     assert rec["qty"] % 4 == 0
 
 
-def test_committed_part_follows_its_blanket():
-    info = Part("Z", "B", "", unit_cost=5.0)
-    buys = _weekly_buys("Z", 10, 10)
-    rec = size_buy("Z", info, buys, 10, _demands("Z", 10, 10), TODAY, POL, committed=True)
-    assert rec["qty"] == 10 and rec["policy"] == "committed" and rec["later_qty"] == 90
+def test_committed_part_covers_a_quarter_not_a_slice():
+    # the Haydon Kerk case: no blanket in MAX, so the minimum came back every few days
+    info = Part("Z", "B", "", unit_cost=130.0)
+    buys = _weekly_buys("Z", 20, 4)
+    rec = size_buy("Z", info, buys, 4, _demands("Z", 20, 4), TODAY, POL, committed=True)
+    assert rec["policy"] == "committed"
+    assert rec["cover_weeks"] == 13
+    # from when the order lands to 13 weeks on: a quarter, not one week's slice
+    assert 4 * 13 <= rec["qty"] <= 4 * 16
+    assert rec["later_qty"] == 80 - rec["qty"]
+    assert "weeks" in why_words(rec, 130.0)
+
+
+def test_committed_part_respects_spend_cap():
+    info = Part("Z", "B", "", unit_cost=5000.0)
+    buys = _weekly_buys("Z", 20, 1)
+    rec = size_buy("Z", info, buys, 1, _demands("Z", 20, 1), TODAY, POL, committed=True)
+    assert (rec["qty"] - 1) * 5000 <= POL.max_extra_spend
+
+
+def test_rounds_up_to_a_quoted_break_booked_orders_use():
+    # 37-0007-01G: 10 at a time, Haydon Kerk quotes 10 / 25
+    info = Part("37-0007-01G", "B", "motor", unit_cost=130.53)
+    buys = _weekly_buys(info.part, 30, 1)
+    breaks = [(1.0, 120.22), (10.0, 114.72), (25.0, 111.36)]
+    rec = size_buy(info.part, info, buys, 1, _demands(info.part, 30, 1), TODAY, POL,
+                   committed=True, breaks=breaks)
+    assert rec["qty"] == 25
+    assert rec["price_break"]["qty"] == 25 and rec["price_break"]["from_qty"] < 25
+    assert rec["later_qty"] == 30 - 25
+    assert "price break" in why_words(rec, 130.53)
+
+
+def test_no_break_beyond_booked_demand():
+    info = Part("B1", "B", "", unit_cost=100.0)
+    buys = _weekly_buys("B1", 2, 4)
+    rec = size_buy("B1", info, buys, 4, _demands("B1", 2, 4), TODAY, POL,
+                   breaks=[(1.0, 100.0), (25.0, 90.0)])
+    assert rec["qty"] == 8 and rec["price_break"] is None
+
+
+def test_break_rows_far_from_cost_are_ignored():
+    # per-pack rows: 100x the per-each cost
+    info = Part("B2", "B", "", unit_cost=1.0)
+    buys = _weekly_buys("B2", 30, 5)
+    rec = size_buy("B2", info, buys, 5, _demands("B2", 30, 5), TODAY, POL,
+                   breaks=[(1.0, 100.0), (10.0, 95.0), (500.0, 90.0)])
+    assert rec["price_break"] is None
 
 
 def test_recent_po_is_named_to_add_to():

@@ -103,7 +103,17 @@ def build(run, so_df):
 
     late_by_part = Counter(e.part for e in res.exceptions if e.kind == "late_to_place")
     committed = {r["part"] for r in run.get("segments") or [] if r["segment"] == "committed"}
-    size_all(buys, res.planned, res.demands, parts, run["open_pos"], committed, run["settings"], today)
+    size_all(
+        buys,
+        res.planned,
+        res.demands,
+        parts,
+        run["open_pos"],
+        committed,
+        run["settings"],
+        today,
+        breaks=_breaks_by_vendor_name(run.get("price_breaks"), run.get("vendor_names_by_id") or {}),
+    )
     for b in buys:
         part = b["part"]
         sz = b["sizing"]
@@ -319,6 +329,22 @@ def add_sourcing(run, snap):
                           "ideas": len(data["ideas"]), "top": data["ideas"][:5]})
     except Exception as exc:  # noqa: BLE001 -- the plan still publishes
         return {"status": "error", "error": str(exc)[:300]}
+
+
+def _breaks_by_vendor_name(breaks, names):
+    """{(part, vendor name): [(qty, unit price)]} from Part_Vendor's quoted
+    breaks; buys carry the vendor's name, not its id."""
+    out = {}
+    if breaks is None:
+        return out
+    for r in breaks.itertuples(index=False):
+        name = names.get(r.vendor_id)
+        if not name:
+            continue
+        for q, c in ((r.break1, r.cost1), (r.break2, r.cost2), (r.break3, r.cost3)):
+            if q and q == q and c and c == c and q > 0 and c > 0:
+                out.setdefault((r.part, name), []).append((float(q), float(c)))
+    return out
 
 
 def add_research(run, snap):

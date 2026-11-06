@@ -113,7 +113,7 @@
         </div>
         <div class="desc">{{ b.description|lower|capitalize }}</div>
         <div class="facts">
-          {% set sz = b.sizing or {} %}<span><b>{{ b.qty|qty }}</b> to buy{% if b.packs %} <span class="muted">({{ b.packs }} {{ b.pack_uom or 'pack' }} of {{ b.pack_qty|qty }})</span>{% endif %}{% if b.spend %} · {{ b.spend|money }}{% endif %} <small class="muted" title="{{ sz.why }}">{% if sz.policy == 'economic' %}· covers orders through {{ sz.covers_until|nice_date(False) }} ({{ b.min_qty|qty }} can't wait){% else %}· what booked orders need now{% endif %}</small></span>
+          {% set sz = b.sizing or {} %}<span><b>{{ b.qty|qty }}</b> to buy{% if b.packs %} <span class="muted">({{ b.packs }} {{ b.pack_uom or 'pack' }} of {{ b.pack_qty|qty }})</span>{% endif %}{% if b.spend %} · {{ b.spend|money }}{% endif %} <small class="muted" title="{{ sz.why }}">{% if sz.policy in ('economic', 'committed') and b.qty > b.min_qty %}· covers orders through {{ sz.covers_until|nice_date(False) }} ({{ b.min_qty|qty }} can't wait){% else %}· what booked orders need now{% endif %}{% if sz.price_break %} · price break at {{ sz.price_break.qty|qty }}{% endif %}</small></span>
           <span>{{ b.lead_days|round|int }}-day lead <small>· {{ b.lead_source|lead_words }}</small></span>
           {% if b.vendor %}{% set n = vendor_n.get(b.vendor, 1) %}<span>vendor <a class="vendor-link" href="{{ script_root }}/vendor?v={{ b.vendor|urlencode }}&part={{ b.part|urlencode }}" title="Everything PK needs from {{ b.vendor|title }}, on one PO">{{ b.vendor }}{% if n > 1 %} · +{{ n - 1 }} more to order with it{% endif %}</a></span>{% endif %}
         </div>
@@ -128,7 +128,7 @@
           Critical part: <b>{{ b.protects_orders }} order{{ '' if b.protects_orders == 1 else 's' }}</b>{% if b.protects_value %} worth <b>{{ b.protects_value|money }}</b>{% endif %} rely on it <span class="cust">· none is short; this restores its safety stock</span>
         </div>
         {% endif %}
-        {% if sz.add_to_po %}<div class="add-to-po small">PO {{ sz.add_to_po.po }} for {{ sz.add_to_po.qty|qty }} went in {{ sz.add_to_po.created|nice_date(False) }} — add these to it rather than a new PO, if the vendor will take it.</div>{% endif %}
+        {% if sz.add_to_po %}<div class="add-to-po strong"><b>Add to PO {{ sz.add_to_po.po }}</b> — it went in {{ sz.add_to_po.created|nice_date(False) }} for {{ sz.add_to_po.qty|qty }}. One bigger PO beats a second small one: the vendor prices the whole quantity.</div>{% endif %}
         {% if b.changed and b.changed.kind != 'new' %}<div class="add-to-po small late-text">{{ b.changed.text }}. Check Why this buy? before ordering — a re-dated order can swing back within hours.</div>{% endif %}
         {{ done_note(b.part) }}
         <div class="card-actions">

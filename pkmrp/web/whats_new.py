@@ -6,6 +6,11 @@ Every feature people can see gets a line here in the same change
 
 WHATS_NEW = (
     (
+        "2026-11-06",
+        "Long-lead parts: one order for a quarter, rounded to the price break",
+        "Long-lead parts were left to their blanket plan, so Today asked only for what couldn't wait — but no blanket is placed in MAX, so the same part came back every few days. Haydon Kerk motors went on three POs in eight days (70111310, 70111350, 70111387), each small enough to land in a smaller price break: 37-0007-01G cost $163.35 for 10 against $143.58 for 30 the same week. Now a long-lead buy covers about 13 weeks of booked orders, and any buy rounds up to the vendor's next quoted break (Part_Vendor) when booked orders inside 26 weeks use the extra and it stays within the spend cap. A PO for the part from the last two weeks is now the first thing on the card: Add to PO …, and a chip on All buys.",
+    ),
+    (
         "2026-11-05",
         "Vendor orders say which lines need a rush",
         "A vendor order gathered everything due from that vendor, all ticked, so a quote for the urgent lines carried the rest at the same speed. On 11-05 a Xometry quote for two top-ten 2920 parts also carried three that could wait — one already on a Duyck PO — at the fastest tier, 3.9x Xometry's own past prices. Each line now says rush (past its order-by: only the vendor's expedited option makes the need-by), order now (the usual lead still makes it) or can wait, and whether any order is waiting on it. When rush lines are mixed with others, a note says to quote them separately, with Tick rush lines only / Tick the rest. Copy and CSV carry the speed.",
