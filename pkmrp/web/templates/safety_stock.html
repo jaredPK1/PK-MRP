@@ -14,6 +14,26 @@
   <div class="tile"><span class="num small-num">{{ c.ignored or 0 }}</span><span class="lbl">ignored</span><span class="sub">held, replaced, obsolete or not used</span></div>
   <div class="tile"><span class="num small-num">{{ (data.value_not_held or 0)|money }}</span><span class="lbl">of MAX safety stock not held</span><span class="sub">of {{ (data.value_set or 0)|money }} set in MAX</span></div>
 </section>
+{% set held = (snap.ss_held if snap else []) or [] %}
+{% if held %}
+<section class="page-intro" id="held">
+  <h2>Waiting for the next buy · machine shops</h2>
+  <p class="lede small-gap">These parts are below safety stock, nothing booked is short, and the vendor charges setup on every lot, so one piece can cost several times the lot price. The top-up isn't on Today or the vendor order: it's added to the part's next booked buy. A part noted critical still tops up now.</p>
+</section>
+<div class="table-wrap"><table class="dense">
+  <thead><tr><th>Part</th><th>Vendor</th><th class="r">Safety stock</th><th class="r">Top-up</th><th>Next buy by</th><th class="r">Next buy, with it</th></tr></thead>
+  <tbody>{% for r in held %}
+    <tr>
+      <td><span class="mono">{{ r.part }}</span> {{ part_note(r.part, False) }}<div class="muted small dcol">{{ r.description|lower|capitalize|truncate(46, True, '…') }}</div></td>
+      <td>{{ r.vendor }}</td>
+      <td class="r">{{ r.safety_stock|qty }}</td>
+      <td class="r">{{ r.ss_qty|qty }}</td>
+      <td>{{ r.next_place_by|nice_date(False) }}</td>
+      <td class="r"><b>{{ r.next_qty|qty }}</b></td>
+    </tr>
+  {% endfor %}</tbody>
+</table></div>
+{% endif %}
 <div id="list"></div>
 <div class="table-tools"><input type="search" class="table-filter" placeholder="Filter: part, words, ignored, capped" aria-label="Filter"><span class="muted small filter-count"></span></div>
 <div class="table-wrap"><table class="dense">

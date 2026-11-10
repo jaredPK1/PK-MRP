@@ -98,6 +98,31 @@ class PlanSettings:
     # Amazon Business, Zoro... At 10 days it caught Protolabs and OZ Optics.
     shelf_fast_bdays: float = 6
 
+    # Machine shops (make-to-print): every lot carries a setup charge, so a
+    # one-piece order costs several times the lot price (Duyck, 11-09:
+    # 62-1132-01G $714.32 for one, $113.29 each for ten). Their buys are
+    # sized with OrderPolicy.setup_order_cost and a safety-stock-only top-up
+    # waits for the part's next booked buy (core/order_qty.py). Matched on
+    # the vendor name; the top 62-/63-/64- vendors by PO lines since 2024-11.
+    setup_vendors: tuple = (
+        "DUYCK",
+        "AMERICAN METAL SPECIALTIES",
+        "KJS MACHINING",
+        "QPD",
+        "EAGLE PRECISION",
+        "XOMETRY",
+        "JC CUSTOM MACHINING",
+        "RAMS HEAD",
+        "ANDERSON MACHINE",
+        "A-1 PRECISION",
+        "M.K. TOOLING",
+        "AMERICAN PRECISION",
+        "SEUBERT",
+        "FAHLGREN",
+        "T & G ENGINEERING",
+        "WESTERN PRECISION",
+    )
+
     # Respect MAX's order modifiers on planned orders.
     use_min_mult_qty: bool = True
 

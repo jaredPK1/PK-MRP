@@ -22,6 +22,7 @@ from .core.order_qty import size_all
 from .core.excess import excess
 from .core.overbuy import overbuys
 from .core.params import purlt_proposals
+from .core.quotes import current_quotes
 from .core.rank import buy_list
 from .core.story import build_story
 from .core.vendor_order import recent_open_pos, vendor_plan
@@ -113,7 +114,12 @@ def build(run, so_df):
         run["settings"],
         today,
         breaks=_breaks_by_vendor_name(run.get("price_breaks"), run.get("vendor_names_by_id") or {}),
+        quotes=current_quotes(today),
     )
+    # a machine-shop safety-stock top-up waiting for the part's next booked
+    # buy: off the buy lists and vendor orders, shown on Safety stock
+    held = [b for b in buys if b["sizing"]["policy"] == "hold"]
+    buys = [b for b in buys if b["sizing"]["policy"] != "hold"]
     for b in buys:
         part = b["part"]
         sz = b["sizing"]
@@ -198,6 +204,7 @@ def build(run, so_df):
             "needs_source": len(needs_source),
         },
         "buys": [{k: _iso(v) for k, v in b.items()} for b in buys],
+        "ss_held": [_iso_deep(_held_row(b)) for b in held],
         "needs_source": [{k: _iso(v) for k, v in b.items()} for b in needs_source],
         "segments": [r for r in segments if r["segment"] != "order_driven"],
         "segment_counts": dict(seg_counts),
@@ -223,6 +230,8 @@ def build(run, so_df):
                 so_values,
                 so_customers,
                 today,
+                sized={b["part"]: (b["qty"], b["sizing"].get("included") or 0) for b in buys},
+                held={b["part"]: b["sizing"]["hold"]["ss_qty"] for b in held},
             )
         ),
         "vendor_pos": _iso_deep(
@@ -251,6 +260,22 @@ def build(run, so_df):
         ),
         "safety_stock": {k: v for k, v in safety_summary.items() if k != "rows"},
         "excess": run["excess"]["totals"],
+    }
+
+
+def _held_row(b):
+    h = b["sizing"]["hold"]
+    return {
+        "part": b["part"],
+        "description": b["description"],
+        "buyer": b["buyer"],
+        "vendor": b["vendor"],
+        "unit_cost": b["unit_cost"],
+        "ss_qty": h["ss_qty"],
+        "safety_stock": b.get("safety_stock") or 0.0,
+        "next_place_by": h["place_by"],
+        "next_qty": h["qty"],
+        "why": b["sizing"]["why"],
     }
 
 

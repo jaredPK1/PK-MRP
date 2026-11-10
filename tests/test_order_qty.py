@@ -183,3 +183,70 @@ def test_past_due_first_need_does_not_eat_the_window():
     buys = _weekly_buys(info.part, 16, 25, start=past)
     rec = size_buy(info.part, info, buys, 75, _demands(info.part, 16, 25, start=past), TODAY, POL)
     assert rec["covers_until"] > TODAY + timedelta(days=42)
+
+
+def _ss_buy(part, qty, place_by):
+    return PlannedOrder(part, "buy", qty, place_by + timedelta(days=42), place_by, 30, "x", (),
+                        shortfall=qty, reason="safety_stock")
+
+
+def test_machine_shop_safety_stock_top_up_waits_for_the_next_booked_buy():
+    # 62-1132-01G on 11-06: 1 to restore safety stock, 36 booked from April
+    info = Part("62-1132-01G", "B", "TEST FIBER PLATE", unit_cost=113.29)
+    later = _weekly_buys(info.part, 3, 12, start=TODAY + timedelta(days=150))
+    buys = [_ss_buy(info.part, 1, TODAY)] + later
+    rec = size_buy(info.part, info, buys, 1, _demands(info.part, 3, 12), TODAY, POL,
+                   setup=True, ss_only=True)
+    assert rec["policy"] == "hold" and rec["qty"] == 0
+    assert rec["hold"]["place_by"] == later[0].place_by
+    assert rec["hold"]["qty"] == 13 and rec["hold"]["ss_qty"] == 1
+    assert "next buy" in why_words(rec, 113.29)
+    # a critical part, or a vendor without setup, still tops up now
+    for kw in ({"setup": True, "ss_only": True, "critical": True}, {"ss_only": True}):
+        rec = size_buy(info.part, info, buys, 1, _demands(info.part, 3, 12), TODAY, POL, **kw)
+        assert rec["policy"] != "hold" and rec["qty"] >= 1
+
+
+def test_no_booked_buy_ahead_means_no_hold():
+    info = Part("P", "B", "", unit_cost=100.0)
+    rec = size_buy("P", info, [_ss_buy("P", 1, TODAY)], 1, [], TODAY, POL, setup=True, ss_only=True)
+    assert rec["policy"] == "minimum" and rec["qty"] == 1
+    assert "lot price" in why_words(rec, 100.0)
+
+
+def test_setup_cost_stretches_a_machine_shop_buy():
+    rate, cost = 5.0, 142.32
+    plain = economic_weeks(rate, cost, POL)
+    shop = economic_weeks(rate, cost, POL, POL.setup_order_cost)
+    assert shop > plain * 2
+    assert economic_weeks(1.1, cost, POL, POL.setup_order_cost) == POL.max_cover_weeks
+
+
+def test_a_vendor_quote_is_trusted_where_part_vendor_rows_are_not():
+    # one-off price ~6x the unit cost: Part_Vendor's band check rejects it
+    info = Part("62-1147-02G", "B", "", unit_cost=108.67)
+    buys = _weekly_buys(info.part, 20, 1)
+    quote = [(1, 717.59), (2, 382.76), (5, 181.86), (10, 114.90), (15, 92.58)]
+    pol = OrderPolicy(order_cost=1.0)  # two weeks of cover: 2 or 3 pieces
+    args = (info.part, info, buys, 1, _demands(info.part, 20, 1), TODAY, pol)
+    assert size_buy(*args, breaks=quote)["price_break"] is None
+    rec = size_buy(*args, breaks=quote, quoted=True)
+    assert rec["price_break"] and rec["qty"] == 5
+
+
+def test_size_all_uses_a_current_quote_and_drops_held_qty():
+    from pkmrp.core.quotes import current_quotes
+
+    q = current_quotes(TODAY, {"quotes": [{"vendor": "DUYCK MACHINE INC", "quote": "Q1",
+                                           "date": "2026-10-20", "use_days": 30,
+                                           "parts": {"A": [[1, 700], [10, 110]]}}]})
+    assert q["A"]["breaks"] == [[1.0, 700.0], [10.0, 110.0]]
+    assert current_quotes(TODAY + timedelta(days=30), {"quotes": [
+        {"vendor": "D", "date": "2026-10-20", "use_days": 30, "parts": {"A": [[1, 1]]}}]}) == {}
+    parts = {"A": Part("A", "B", "", unit_cost=110.0)}
+    planned = [_ss_buy("A", 1, TODAY)] + _weekly_buys("A", 4, 3, start=TODAY + timedelta(days=90))
+    buys = [{"part": "A", "qty": 1.0, "spend": 110.0, "unit_cost": 110.0,
+             "vendor": "DUYCK MACHINE INC", "ss_only": True, "critical": False}]
+    empty = pd.DataFrame(columns=["part", "po", "created", "qty_due", "buyer"])
+    size_all(buys, planned, {}, parts, empty, set(), PlanSettings(), TODAY, quotes=q)
+    assert buys[0]["sizing"]["policy"] == "hold" and buys[0]["qty"] == 0

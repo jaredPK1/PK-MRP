@@ -29,6 +29,16 @@ This sizes each buy the way a buyer would if they had the time:
     spend cap -- it never buys past booked demand to reach one.
   * a PO for the part placed in the last few days is named, so the buyer
     can add to it instead of cutting a second PO.
+  * machine shops (settings.setup_vendors) charge a setup per lot, so a
+    line costs far more than $75 to place: Duyck quoted 62-1132-01G at
+    $714.32 for one and $113.29 each for ten (quote 261109.02, 11-09). Their
+    buys use setup_order_cost, which stretches the cover to whole lots.
+  * a machine-shop buy that only restores safety stock waits for the
+    part's next booked buy and goes on that order (`hold`): on 11-06 eight
+    such lines went on PO 70111396 at one piece each and Duyck repriced the
+    PO from $1,137 to $3,836. A critical part's top-up still goes now.
+  * a vendor's own quote (settings / quotes.json) is trusted as written;
+    Part_Vendor breaks still have to look like per-each pricing.
 
 Pure: plain data in, dicts out.
 """
@@ -53,6 +63,8 @@ class OrderPolicy:
     add_to_po_days: int = 14  # a PO this recent is "the one to add to"
     committed_cover_weeks: float = 13.0  # long-lead parts: one order for a quarter
     break_price_band: tuple = (0.5, 1.6)  # quoted break vs unit cost, to trust the row
+    setup_order_cost: float = 400.0  # $ per PO line at a machine shop: setup dominates a small lot
+    hold_ss_weeks: float = 52.0  # a machine-shop top-up waits for a booked buy this close
 
 
 def demand_rate(demands, today, min_weeks):
@@ -67,13 +79,14 @@ def demand_rate(demands, today, min_weeks):
     return total / weeks
 
 
-def economic_weeks(rate, unit_cost, policy):
+def economic_weeks(rate, unit_cost, policy, order_cost=None):
     """The stretch of weeks one order should cover."""
     if rate <= 0:
         return policy.min_cover_weeks
     if unit_cost <= 0:
         return policy.no_cost_weeks
-    years = math.sqrt(2 * policy.order_cost / (policy.holding_rate * rate * 52 * unit_cost))
+    order_cost = policy.order_cost if order_cost is None else order_cost
+    years = math.sqrt(2 * order_cost / (policy.holding_rate * rate * 52 * unit_cost))
     return min(max(years * 52, policy.min_cover_weeks), policy.max_cover_weeks)
 
 
@@ -89,6 +102,10 @@ def size_buy(
     committed=False,
     recent_pos=(),
     breaks=(),
+    setup=False,
+    quoted=False,
+    ss_only=False,
+    critical=False,
 ):
     """The recommendation for one part.
 
@@ -96,6 +113,9 @@ def size_buy(
     min_qty     this week's minimum (what rank.buy_list summed)
     recent_pos  [(po, created date, qty, buyer)] open POs for the part
     breaks      [(qty, unit price)] the buy's vendor quotes on Part_Vendor
+    setup       the vendor is a machine shop: a lot carries a setup charge
+    quoted      `breaks` are the vendor's own current quote: trust them
+    ss_only     this week's minimum only restores safety stock
     """
     buys = sorted(buys, key=lambda o: (o.need_by, o.place_by))
     unit_cost = float(info.unit_cost) if info else 0.0
@@ -130,10 +150,29 @@ def size_buy(
             included=len(buys) - len(rest),
         )
 
+    hold = _hold(buys, min_qty, today, policy) if setup and ss_only and not critical else None
+    if hold:
+        return dict(
+            base,
+            qty=0.0,
+            policy="hold",
+            cover_weeks=None,
+            covers_until=None,
+            later_qty=hold["qty"],
+            later_place_by=hold["place_by"],
+            included=0,
+            price_break=None,
+            hold=hold,
+            ss_only=True,
+            setup=True,
+        )
+
     if committed:
         weeks = policy.committed_cover_weeks
     else:
-        weeks = economic_weeks(rate, unit_cost, policy)
+        weeks = economic_weeks(
+            rate, unit_cost, policy, policy.setup_order_cost if setup else None
+        )
     # the stretch starts when this order lands (or the first need, if later):
     # anything needed before it arrives is in the minimum anyway, and a
     # past-due first need must not eat the window
@@ -157,7 +196,7 @@ def size_buy(
     rest = [o for o in buys if o not in chosen]
     # a quoted break the booked orders inside the cover cap will use anyway
     price_break = None
-    bq = _next_break(qty, breaks, unit_cost, policy)
+    bq = _next_break(qty, breaks, unit_cost, policy, trusted=quoted)
     if bq:
         cap = start + timedelta(days=round(policy.max_cover_weeks * 7))
         extra = bq - qty
@@ -188,18 +227,37 @@ def size_buy(
         later_place_by=horizon_place,
         included=len(chosen),
         price_break=price_break,
+        ss_only=ss_only,
+        setup=setup,
     )
 
 
-def _next_break(qty, breaks, unit_cost, policy):
+def _hold(buys, min_qty, today, policy):
+    """The part's next booked buy, if one is close enough for a safety-stock
+    top-up to ride on it: {qty, place_by, ss_qty}, qty including the top-up."""
+    cap = today + timedelta(days=round(policy.hold_ss_weeks * 7))
+    booked = [o for o in buys if o.reason != "safety_stock" and o.place_by <= cap]
+    if not booked:
+        return None
+    first = min(booked, key=lambda o: o.place_by)
+    return {
+        "place_by": first.place_by,
+        "qty": round(first.qty + min_qty, 3),
+        "ss_qty": min_qty,
+    }
+
+
+def _next_break(qty, breaks, unit_cost, policy, trusted=False):
     """The smallest quoted break above qty, if the quote looks like per-each
     pricing at about this part's cost (Part_Vendor rows are kept unevenly:
-    some per pack, some years stale)."""
+    some per pack, some years stale). A vendor's own current quote
+    (`trusted`) is taken as written: a machine shop's one-off price is
+    several times its lot price."""
     brs = sorted((float(q), float(p)) for q, p in breaks if q and p and q > 0 and p > 0)
     if len(brs) < 2 or unit_cost <= 0:
         return None
     lo, hi = policy.break_price_band
-    if not all(lo <= p / unit_cost <= hi for _q, p in brs):
+    if not trusted and not all(lo <= p / unit_cost <= hi for _q, p in brs):
         return None
     above = [q for q, _p in brs if q > qty + 1e-9]
     return above[0] if above else None
@@ -225,6 +283,24 @@ def why_words(rec, unit_cost):
             f"Long-lead part with no blanket PO in MAX — one order for about {rec['cover_weeks']:g} weeks "
             "of booked orders, not a new slice every few days." + tail
         )
+    if p == "hold":
+        h = rec["hold"]
+        return (
+            f"Only restores safety stock ({h['ss_qty']:g}) and nothing booked is short. A machine "
+            "shop charges setup on every lot, so a piece or two can cost several times the lot "
+            f"price — add the {h['ss_qty']:g} to this part's next buy instead (place by "
+            f"{h['place_by']:%b} {h['place_by'].day}, about {h['qty']:g} with it)."
+        )
+    if p == "minimum" and rec.get("ss_only"):
+        return (
+            "Only restores safety stock — nothing booked is short."
+            + (
+                " Machine shop: ask for the lot price before placing a piece or two."
+                if rec.get("setup")
+                else ""
+            )
+            + tail
+        )
     if p == "minimum" and rec.get("cover_weeks") is not None:
         if unit_cost >= 1000:
             return "Expensive part — buy only what booked orders need now; it's cheaper to place again than to carry it."
@@ -241,15 +317,28 @@ def why_words(rec, unit_cost):
     )
 
 
+def is_setup_vendor(name, settings):
+    """A machine shop / make-to-print vendor: setup is charged per lot."""
+    up = (name or "").upper().replace("-", "").replace(" ", "")
+    return bool(up) and any(
+        k.upper().replace("-", "").replace(" ", "") in up for k in settings.setup_vendors
+    )
+
+
 def size_all(
-    buys, planned, demands, parts, open_pos, committed, settings, today, policy=None, breaks=None
+    buys, planned, demands, parts, open_pos, committed, settings, today, policy=None, breaks=None,
+    quotes=None,
 ):
     """Add the recommendation to every buy dict in place (qty becomes the
     recommended quantity; min_qty keeps this week's minimum).
 
     breaks  {(part, vendor name): [(qty, unit price)]} quoted on Part_Vendor
+    quotes  {part: {"vendor", "quote", "date", "breaks": [[qty, price]]}} a
+            vendor's own quote, trusted over Part_Vendor while its vendor
+            is the buy's vendor
     """
     breaks = breaks or {}
+    quotes = quotes or {}
     policy = policy or OrderPolicy()
     by_part = {}
     for o in planned:
@@ -264,6 +353,9 @@ def size_all(
     for b in buys:
         part = b["part"]
         info = parts.get(part)
+        vendor = b.get("vendor") or ""
+        q = quotes.get(part)
+        quoted = bool(q and q.get("breaks") and _same_vendor(q.get("vendor"), vendor))
         rec = size_buy(
             part,
             info,
@@ -275,7 +367,11 @@ def size_all(
             use_min_mult=settings.use_min_mult_qty,
             committed=part in committed,
             recent_pos=recent.get(part, ()),
-            breaks=breaks.get((part, b.get("vendor") or ""), ()),
+            breaks=[tuple(x) for x in q["breaks"]] if quoted else breaks.get((part, vendor), ()),
+            setup=is_setup_vendor(vendor, settings),
+            quoted=quoted,
+            ss_only=bool(b.get("ss_only")),
+            critical=bool(b.get("critical")),
         )
         unit_cost = b.get("unit_cost") or 0.0
         b["min_qty"] = b["qty"]
@@ -285,5 +381,13 @@ def size_all(
         if b.get("pack_qty"):
             n = rec["qty"] / b["pack_qty"]
             b["packs"] = round(n) if abs(n - round(n)) < 1e-6 else None
+        if quoted:
+            rec["quote"] = {k: q.get(k) for k in ("quote", "date")}
         b["sizing"] = dict(rec, why=why_words(rec, unit_cost))
     return buys
+
+
+def _same_vendor(a, b):
+    a = (a or "").upper().replace(" ", "")
+    b = (b or "").upper().replace(" ", "")
+    return bool(a and b) and (a in b or b in a)

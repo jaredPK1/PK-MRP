@@ -86,3 +86,20 @@ def test_vendor_pages(client):  # noqa: F811
     assert "can wait" in page and "rush · " in page and "XO-A" in page
     assert "Tick rush lines only" in page and 'data-speed="rush"' in page
     assert client.get("/vendor?v=NOBODY").status_code == 404
+
+
+def test_vendor_order_shows_the_sized_qty_and_carries_held_top_ups():
+    ss = PlannedOrder("A", "buy", 1, date(2026, 11, 2), date(2026, 11, 2), 20, "x", (),
+                      reason="safety_stock")
+    planned = [
+        order("B", 1, date(2026, 11, 2)),
+        order("B", 2, date(2026, 11, 20)),
+        order("B", 3, date(2026, 12, 20)),
+        ss,
+        order("A", 4, date(2026, 12, 1)),
+    ]
+    p = vendor_plan(planned, PARTS, VENDOR, {}, {}, {}, TODAY,
+                    sized={"B": (10, 2)}, held={"A": 1})
+    rows = {ln["part"]: ln["orders"] for ln in p["XOMETRY"]}
+    assert [r[2] for r in rows["B"]] == [10, 3]  # first two slices became the buy
+    assert [(r[0], r[2]) for r in rows["A"]] == [(date(2026, 12, 1), 5)]  # top-up rides along

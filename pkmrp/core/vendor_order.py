@@ -14,6 +14,12 @@ window (2, 4, 8 or 12 weeks) and the buyer ticks what goes on the order.
   * shelf parts are included: a McMaster or Mouser order is a vendor order too
   * open POs with the vendor created recently are listed, since adding lines
     to one may beat a new PO
+  * a part on the buy list shows the sizer's quantity (core/order_qty.py),
+    not its lot-for-lot slices: on 11-06 the Duyck order listed only the
+    safety-stock slices due that week -- 1 or 2 of each -- while All buys
+    said 15 of 62-1147-02G, and the PO went in at the slices
+  * a machine-shop safety-stock top-up that waits for the next booked buy
+    (`held`) rides on that buy's line instead of being a line of its own
 """
 
 import math
@@ -33,8 +39,16 @@ def vendor_plan(
     so_customers,
     today,
     horizon_workdays=60,
+    sized=None,
+    held=None,
 ):
-    """{vendor: [line]} for every part with a planned buy by the horizon."""
+    """{vendor: [line]} for every part with a planned buy by the horizon.
+
+    sized  {part: (qty, n)} the buy list's quantity, covering the part's first
+           n planned buys (by need date): those rows become one row
+    held   {part: safety-stock qty} top-ups moved onto the next booked buy
+    """
+    sized, held = sized or {}, held or {}
     horizon = plus_workdays(today, horizon_workdays)
     by_part = defaultdict(list)
     for o in planned:
@@ -44,10 +58,29 @@ def vendor_plan(
     for part, orders in by_part.items():
         info = parts.get(part)
         orders.sort(key=lambda o: o.place_by)
+        if part in held:
+            orders = [o for o in orders if o.reason != "safety_stock"]
+            if not orders:
+                continue
         rows = []
         for o in orders:
             sos = sorted({s for s in (_so_of(p.ref) for p in o.pegs) if s})
             rows.append([o.place_by, o.need_by, o.qty, sos])
+        if part in held:
+            rows[0][2] = round(rows[0][2] + held[part], 3)
+        if part in sized:
+            qty, n = sized[part]
+            by_need = sorted(range(len(rows)), key=lambda i: (rows[i][1], rows[i][0]))
+            take = set(by_need[: max(n, 1)])
+            first = [rows[i] for i in sorted(take)]
+            merged = [
+                min(r[0] for r in first),
+                min(r[1] for r in first),
+                qty,
+                sorted({s for r in first for s in r[3]}),
+            ]
+            rows = sorted([merged] + [r for i, r in enumerate(rows) if i not in take],
+                          key=lambda r: r[0])
         all_sos = sorted({s for r in rows for s in r[3]}, key=lambda s: -so_values.get(s, 0.0))
         out[vendor_name[part]].append(
             {
