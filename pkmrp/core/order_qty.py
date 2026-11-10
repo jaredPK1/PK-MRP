@@ -64,7 +64,7 @@ class OrderPolicy:
     committed_cover_weeks: float = 13.0  # long-lead parts: one order for a quarter
     break_price_band: tuple = (0.5, 1.6)  # quoted break vs unit cost, to trust the row
     setup_order_cost: float = 400.0  # $ per PO line at a machine shop: setup dominates a small lot
-    hold_ss_weeks: float = 52.0  # a machine-shop top-up waits for a booked buy this close
+    hold_ss_weeks: float = 26.0  # a machine-shop top-up waits for a booked buy this close
 
 
 def demand_rate(demands, today, min_weeks):
