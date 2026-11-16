@@ -2,7 +2,7 @@
 {% from "_notes.html" import part_note with context %}
 {% block title %}{% if entry %}{{ part }} · {% endif %}Part lookup · PK-MRP{% endblock %}
 {% set pk_kind = {'so': 'Sales order', 'wo_req': 'WO needs it', 'planned_make': 'Parent build (planned)',
-                  'planned_kit': 'Subcontract kit (planned)', 'po_kit': 'Kit on a PO', 'sub_req': 'Subcontract need',
+                  'planned_kit': 'Subcontract kit (planned)', 'phantom': 'Through a phantom kit', 'po_kit': 'Kit on a PO', 'sub_req': 'Subcontract need',
                   'safety_stock': 'Safety stock', 'po': 'PO arrives', 'wo': 'WO finishes'} %}
 {% set mx_src = {'CU': 'Sales order', 'MF': 'Open WO', 'PL': 'MAX planned order (parent)', 'MS': 'Master schedule (forecast)', 'SO': 'Subcontract'} %}
 {% block content %}

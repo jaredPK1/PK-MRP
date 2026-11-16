@@ -6,6 +6,11 @@ Every feature people can see gets a line here in the same change
 
 WHATS_NEW = (
     (
+        "2026-11-16",
+        "Phantom kits, built sub-assemblies and bought assemblies are planned",
+        "PK-MRP planned only parts MAX types as make (A) or buy (B). Anything else was reported as \"not planned\" — and nothing under it was planned either. On 11-16 that hid 26 short parts on dozens of orders: the 2650 foundations and the 8000 laser common-parts kits (phantoms, type P), the 2302 cell guides and 125mm tank head (sub-assemblies built on work orders, type S), and the 2300 motor and stepper cables, SMA patch cord and lamp adapter (bought parts with a small BOM, type O). Now a phantom passes what it needs straight to its parts on the date its parent is built, S plans like a make part and O like a buy. First run: 36 buys appear, among them the Steinmeyer clamps and adapters inside the 2650 foundations, and three Steinmeyer leadscrews with no vendor. 26 open POs on O parts are no longer suggested for cancelling. The US power cord 35-0009-01G is set up as make with no BOM and was never built, so nothing ever ordered it (short for 20+ orders). PK-MRP now plans it as a buy, and it is at the top of Fix in MAX until its type in MAX is changed.",
+    ),
+    (
         "2026-11-10",
         "Machine shops: no more one-piece orders",
         "On 11-06 the Duyck vendor order listed ten parts at 1 or 2 pieces — each only topping up safety stock, nothing booked short — and that's how PO 70111396 went in. Duyck repriced it from $1,137 to $3,836: 62-1132-01G is $714.32 for one and $113.29 each for ten. Three changes. The vendor order now shows the same quantity as Today (it listed the bare weekly slices). Machine shops (Duyck, KJS, Xometry, American Metal Specialties and the other make-to-print shops) are sized for a setup charge on every lot, so their buys cover more weeks. And a machine-shop buy that only restores safety stock waits for the part's next booked buy and goes on that order — Safety stock lists them under Waiting for the next buy; a critical part still tops up now. Duyck's 11-09 quote with quantity breaks for these ten parts is on file and used for rounding.",

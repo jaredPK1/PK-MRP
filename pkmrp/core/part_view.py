@@ -25,6 +25,7 @@ PK_BUCKET = {
     "wo_req": "wos",
     "planned_make": "parents",
     "planned_kit": "parents",
+    "phantom": "parents",
     "po_kit": "kits",
     "sub_req": "kits",
     "safety_stock": "safety",

@@ -6,13 +6,24 @@
 {% block content %}
 <section class="page-intro">
   <h1 class="h1-small">Fix in MAX</h1>
-  <p class="lede"><b>The question this page answers: what in MAX still names a part Engineering obsoleted?</b> When an ECN obsoletes a part, the planning bills get switched, but orders, forecast entries and BOMs entered earlier keep the old part — and MRP keeps buying it. This list is rebuilt every plan from Ron's ECN app and MAX; a row disappears by itself once MAX is corrected.</p>
-  {% if fx.status == 'no_access' %}<p class="lede small-gap late-text">Waiting on read access to the ECN database (pk_ecn) — this list fills in on the first plan after it's granted.</p>
+  <p class="lede"><b>The question this page answers: what in MAX makes its MRP plan the wrong thing?</b> Parts set up as the wrong type are first; then records still naming a part Engineering obsoleted. When an ECN obsoletes a part, the planning bills get switched, but orders, forecast entries and BOMs entered earlier keep the old part — and MRP keeps buying it. This list is rebuilt every plan from Ron's ECN app and MAX; a row disappears by itself once MAX is corrected.</p>
+  {% if fx.status == 'no_access' %}<p class="lede small-gap late-text">Waiting on read access to the ECN database (pk_ecn) — the obsolete-part lists fill in on the first plan after it's granted.</p>
   {% elif fx.status != 'ok' %}<p class="lede small-gap late-text">The ECN app couldn't be read on the last plan, so this list is empty for now.</p>
   {% else %}{% set c = fx.counts %}
   <p class="lede small-gap"><b>{{ c.so_lines }}</b> order line{{ 's' if c.so_lines != 1 }} on {{ c.so_orders }} order{{ 's' if c.so_orders != 1 }} ({{ c.so_scheduled }} scheduled) · <b>{{ c.ms_entries }}</b> forecast entr{{ 'ies' if c.ms_entries != 1 else 'y' }} · <b>{{ c.work_orders }}</b> work order{{ 's' if c.work_orders != 1 }} · <b>{{ c.boms }}</b> BOM{{ 's' if c.boms != 1 }} for Engineering · <b>{{ c.coming }}</b> coming soon. <a href="{{ script_root }}/fix-max.csv">Download the bulk-change list (CSV)</a> — orders, forecast entries and work orders, one row each, with the part to change to.</p>
   {% endif %}
 </section>
+{% set tf = snap.type_fixes or [] %}
+<h3 class="steps-h" id="part-types">Parts set up as the wrong type — whoever keeps Part_Master</h3>
+<p class="muted small">MAX's MRP only plans what the part type says, so a bought part set up as make is never ordered by anyone. PK-MRP plans these as the type shown; a row leaves the list once the type in MAX matches.</p>
+<div class="table-wrap"><table class="dense">
+  <thead><tr><th>Part</th><th>Type in MAX</th><th>Change to</th><th>Why</th></tr></thead>
+  <tbody>{% for r in tf %}
+    <tr><td class="mono">{{ r.part }} {{ part_note(r.part, False) }}<div class="muted small">{{ r.description|lower|capitalize }}</div></td>
+        <td class="mono">{{ r.max_type }}</td><td class="mono">{{ r.planned_as }} <span class="muted small">{{ {'A': 'make', 'B': 'buy'}.get(r.planned_as, '') }}</span></td>
+        <td class="small">{{ r.why }}</td></tr>
+  {% else %}<tr><td colspan="4" class="muted">None — every part's type matches how it's really made or bought.</td></tr>{% endfor %}</tbody>
+</table></div>
 {% if fx.status == 'ok' %}
 
 <h3 class="steps-h">Order lines — Order Admin</h3>

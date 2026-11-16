@@ -33,10 +33,33 @@ class PlanSettings:
     bom_type_codes: tuple = ("N",)
 
     # Part_Master.TYPE_01: A = make (explode through), B = buy (plan
-    # purchases). Everything else (Y bulk, X, P, M, O, S, T, ...) is not
-    # planned; a shortage on one is reported, not ordered. OPEN beyond A/B/Y.
+    # purchases). Types not mapped below (Y bulk, X labels/docs, T tools,
+    # M, ...) are not planned; a shortage on one is reported, not ordered.
     make_types: tuple = ("A",)
     buy_types: tuple = ("B",)
+
+    # MAX types planned as make or buy (core/part_types.py). Code_Master has
+    # no decode; read from history 2026-11-16: S = a sub-assembly PK builds
+    # on work orders (2302 cell guides, 125mm tank head); O = a bought part
+    # that also carries a small BOM (2300 motor cables, lamp adapter).
+    type_map: tuple = (("S", "A"), ("O", "B"))
+
+    # P = phantom: never stocked or built on its own work order. What stock
+    # doesn't cover passes straight to its BOM on the date it's needed (2650
+    # foundations, 8000 laser common-parts kits). MAX does the same, but only
+    # when the parent WO is released -- too late to buy for.
+    phantom_types: tuple = ("P",)
+
+    # Parts MAX has typed wrong: planned as the given type until MAX is
+    # corrected, and listed on Fix in MAX. (part, planning type, why)
+    type_overrides: tuple = (
+        (
+            "35-0009-01G",
+            "B",
+            "Set up as make, but has no BOM and has never been built on a work order "
+            "— it's bought, so neither MAX nor anyone's list ever orders it.",
+        ),
+    )
 
     # Printed-on-demand documentation, never bought or built as stock.
     doc_prefixes: tuple = ("90-", "97-")

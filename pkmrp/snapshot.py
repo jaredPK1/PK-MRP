@@ -241,6 +241,7 @@ def build(run, so_df):
         "ecn": _ecn(run, buys, needs_source),
         "replaced": _iso_deep(run.get("replaced") or {}),
         "fix_max": _iso_deep(run.get("fix_max") or {"status": "off"}),
+        "type_fixes": run.get("type_fixes") or [],
         "load_slots": _iso_deep(run.get("load_slots") or {}),
         # open POs placed in the last 60 days, by part: lets a Done's PO
         # number be matched to MAX

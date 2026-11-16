@@ -72,6 +72,10 @@
 {% if fc and (fc.so_scheduled or fc.ms_entries or fc.work_orders) %}
 <p class="fix-max-line"><a href="{{ script_root }}/fix-max"><b>Fix in MAX:</b> {{ fc.so_scheduled }} order line{{ 's' if fc.so_scheduled != 1 }}{% if fc.ms_entries %}, {{ fc.ms_entries }} forecast entr{{ 'ies' if fc.ms_entries != 1 else 'y' }}{% endif %}{% if fc.work_orders %}, {{ fc.work_orders }} work order{{ 's' if fc.work_orders != 1 }}{% endif %} still name a part an ECN obsoleted — they make MRP buy the dead part →</a></p>
 {% endif %}
+{% set tf = snap.type_fixes or [] %}
+{% if tf %}
+<p class="fix-max-line"><a href="{{ script_root }}/fix-max#part-types"><b>Fix in MAX:</b> {{ tf|length }} part{{ 's' if tf|length != 1 }} set up as the wrong type ({{ tf|map(attribute='part')|join(', ') }}) — PK-MRP plans {{ 'them' if tf|length != 1 else 'it' }} correctly, MAX's MRP doesn't →</a></p>
+{% endif %}
 {% set ac = ((snap.audit or {}).get('counts')) or {} %}
 {% if ac.rebuy or ac.repeat_po or ac.jumped %}
 <p class="fix-max-line"><a href="{{ script_root }}/check"><b>Decision check:</b>{% if ac.rebuy %} {{ ac.rebuy }} part{{ 's' if ac.rebuy != 1 }} wanted again right after a PO (add to that PO){% endif %}{% if ac.repeat_po %}{{ ',' if ac.rebuy }} {{ ac.repeat_po }} part{{ 's' if ac.repeat_po != 1 }} on repeat POs this month{% endif %}{% if ac.jumped %}{{ ',' if ac.rebuy or ac.repeat_po }} {{ ac.jumped }} buy{{ 's' if ac.jumped != 1 }} changed since the last plan{% endif %} →</a></p>

@@ -24,7 +24,7 @@ from datetime import date
 from .calendar import plus_workdays
 
 FIRM_SUPPLY = {"on_hand", "po", "wo"}
-DEMAND = {"so", "wo_req", "planned_make", "planned_kit", "po_kit", "sub_req"}
+DEMAND = {"so", "wo_req", "planned_make", "planned_kit", "phantom", "po_kit", "sub_req"}
 
 
 def timelines(ledger):
@@ -79,14 +79,18 @@ def promise(part, qty, requested, children, lines, parts, lead_of, today, max_de
             steps.append({"part": p, "qty": need, "date": today, "how": "in stock", "path": path})
             return today, path
         kids = children.get(p, [])
-        if info and info.type == "A" and kids and depth < max_depth:
+        # a phantom builds like a make part with no lead time of its own
+        if info and info.type in ("A", "P") and kids and depth < max_depth:
             worst, worst_path = today, path
             for comp, qpu in kids:
                 d, cp = ready(comp, need * qpu, depth + 1, path + (comp,))
                 if d > worst:
                     worst, worst_path = d, cp
-            fresh = plus_workdays(worst, info.mfg_lt)
-            fresh_how = f"build: parts by {worst}, then {info.mfg_lt:g} working days"
+            if info.type == "P":
+                fresh, fresh_how = worst, f"phantom kit: ready when its parts are, {worst}"
+            else:
+                fresh = plus_workdays(worst, info.mfg_lt)
+                fresh_how = f"build: parts by {worst}, then {info.mfg_lt:g} working days"
         elif info and info.type == "A":
             fresh, worst_path = plus_workdays(today, info.mfg_lt), path
             fresh_how = f"build, {info.mfg_lt:g} working days (no BOM to check)"

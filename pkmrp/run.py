@@ -7,6 +7,7 @@ from datetime import date, timedelta
 import pandas as pd
 
 from .core import analytics, consign, leadtime, segment, skumap, supersede, supply, vendor_price
+from .core import part_types as part_types_mod
 from .core import committed as committed_mod
 from .core import fix_max as fix_max_mod
 from .core import load_plan
@@ -59,6 +60,8 @@ def build_plan(
         return out
 
     parts_df = timed("parts", extract.parts, erp)
+    # S/O planned as make/buy, mistyped parts corrected (listed on Fix in MAX)
+    parts_df, type_fixes = part_types_mod.normalize(parts_df, settings)
     bom_df = timed("bom", extract.bom, erp)
     so_df = timed("open_so_lines", extract.open_so_lines, erp)
     # Orders parked on 2030+ dates plan into Load Plan months with room;
@@ -116,7 +119,8 @@ def build_plan(
     po_parts_df = timed("po_parts", extract.po_parts, erp, since - timedelta(days=365))
     sub_df = timed("subcontract_reqs", extract.subcontract_reqs, erp, since)
     consigned, consign_evidence = consign.consigned_edges(moves_df, po_parts_df, sub_df, bom_df)
-    make = {p for p, v in parts.items() if v.type in settings.make_types}
+    # phantoms explode like make parts; netting passes their demand straight through
+    make = {p for p, v in parts.items() if v.type in settings.make_types + settings.phantom_types}
     kept = bom_df[bom_df["type_code"].isin(settings.bom_type_codes) & bom_df["parent"].isin(make)]
     skipped_codes = (
         bom_df.loc[~bom_df["type_code"].isin(settings.bom_type_codes), "type_code"]
@@ -368,6 +372,7 @@ def build_plan(
         "ecn": ecn,
         "replaced": replaced,
         "fix_max": fix_max,
+        "type_fixes": type_fixes,
         "max_mrp": max_mrp,
         "consigned": consigned,
         "consign_evidence": consign_evidence,

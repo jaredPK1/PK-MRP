@@ -73,7 +73,7 @@ class Demand:
     date: date
     qty: float
     pegs: tuple
-    source: str  # "so" | "wo_req" | "planned_make"
+    source: str  # "so" | "wo_req" | "planned_make" | "planned_kit" | "phantom" | ...
 
 
 @dataclass(frozen=True)
@@ -371,6 +371,28 @@ def _net_part(part, parts, kids, demands, on_hand, receipts, settings, today, le
 
     if not shortages:
         return []
+
+    if info.type in settings.phantom_types:
+        # Never built on its own: what stock doesn't cover passes straight to
+        # its parts, on the date the parent needs it.
+        bom = kids.get(part, [])
+        if not bom:
+            result.exceptions.append(
+                Exception_(
+                    part,
+                    "make_without_bom",
+                    qty=sum(s for _, s, _ in shortages),
+                    detail="phantom with no BOM: nothing to pass its demand to",
+                    pegs=_merge_pegs(d.pegs for d, _, _ in shortages),
+                )
+            )
+            return []
+        through = []
+        for d, short, _ in shortages:
+            for comp, qpu in bom:
+                pegs = tuple(Peg(p.kind, p.ref, p.root_part, p.path + (comp,), p.value) for p in d.pegs)
+                through.append(Demand(comp, d.date, short * qpu, pegs, "phantom"))
+        return through
 
     is_make = info.type in settings.make_types
     is_buy = info.type in settings.buy_types
